@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flavor Workbench</title>
+<style>
+  :root{
+    --surface:#F4F6F4; --panel:#FFFFFF; --line:#DCE3DE; --ink:#172019;
+    --muted:#5C6B63; --accent:#0F5C4D; --accent-soft:#0F5C4D14;
+    --sweet:#E0972E; --bitter:#6B4E9E; --umami:#C0563B; --sour:#9FB024; --salty:#4E84B0; --aroma:#2E7D6B;
+    --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--ui);
+    font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  header{padding:22px 28px;border-bottom:1px solid var(--line);display:flex;
+    align-items:baseline;gap:14px}
+  header h1{margin:0;font-size:18px;font-weight:650;letter-spacing:-.01em}
+  header .sub{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  main{max-width:980px;margin:0 auto;padding:26px 28px 60px}
+  .bar{display:flex;gap:10px;align-items:stretch}
+  .bar input{flex:1;font-family:var(--mono);font-size:15px;padding:13px 15px;
+    border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)}
+  .bar input:focus{outline:2px solid var(--accent);border-color:transparent}
+  .bar button{font-family:var(--ui);font-weight:600;font-size:15px;padding:0 22px;
+    border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer}
+  .bar button:disabled{opacity:.5;cursor:default}
+  .hint{font-family:var(--mono);font-size:12px;color:var(--muted);margin:8px 2px 0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+  .card h2{margin:0 0 4px;font-size:12px;font-weight:650;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted)}
+  .smiles{font-family:var(--mono);font-size:13px;color:var(--muted);margin:0 0 16px;
+    word-break:break-all}
+  .meter{margin:13px 0}
+  .meter .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+  .meter .name{font-weight:600;font-size:14px;text-transform:capitalize}
+  .meter .val{font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .meter .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;
+    margin-left:8px;vertical-align:middle;letter-spacing:.04em}
+  .tag.measured{background:var(--accent-soft);color:var(--accent)}
+  .tag.predicted{background:#EDEFEC;color:var(--muted)}
+  .track{height:9px;background:#EDEFEC;border-radius:6px;overflow:hidden}
+  .fill{height:100%;border-radius:6px;width:0;transition:width .5s ease}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .chip{font-family:var(--mono);font-size:12px;padding:5px 11px;border-radius:20px;
+    border:1px solid var(--line);background:var(--surface)}
+  .chip.on{color:#fff;border-color:transparent}
+  .neighbor{display:flex;justify-content:space-between;align-items:center;gap:12px;
+    padding:11px 0;border-bottom:1px solid var(--line)}
+  .neighbor:last-child{border-bottom:none}
+  .neighbor .s{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+  .neighbor .sim{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap}
+  .neighbor .kt{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .empty{color:var(--muted);font-size:14px;padding:8px 0}
+  .err{background:#FBEDE9;border:1px solid #E7C4B8;color:#8A3A22;border-radius:9px;
+    padding:12px 15px;margin-top:18px;font-size:14px}
+  .note{font-size:12.5px;color:var(--muted);margin-top:18px;line-height:1.55}
+</style>
+</head>
+<body>
+<header>
+  <h1>Flavor Workbench</h1>
+  <span class="sub">predict taste &amp; aroma before you pour</span>
+</header>
+<main>
+  <div class="bar">
+    <input id="q" placeholder="Compound name or SMILES — e.g. vanillin, or OC(=O)CC(O)(CC(=O)O)C(=O)O"
+           autocomplete="off" spellcheck="false">
+    <button id="go">Read flavor</button>
+  </div>
+  <div class="hint">Enter a molecule and read its profile before committing bench materials.</div>
+
+  <div id="err" class="err" style="display:none"></div>
+
+  <div class="grid" id="results" style="display:none">
+    <div class="card">
+      <h2>Flavor read</h2>
+      <p class="smiles" id="smiles"></p>
+      <div id="meters"></div>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="card">
+      <h2>Substitution candidates</h2>
+      <div id="neighbors"></div>
+    </div>
+  </div>
+
+  <p class="note" id="footnote" style="display:none">
+    Bars are model predictions; a <b>measured</b> tag means the molecule is in the
+    curated data (ground truth, not a guess). Salty is lookup-only and sour is a
+    rule. Substitutions rank by structural similarity today and sharpen to learned
+    aroma-space once the aroma model is trained. Results are leads for the bench,
+    not verdicts.
+  </p>
+</main>
+
+<script>
+const TASTE_COLORS = {sweet:'var(--sweet)',bitter:'var(--bitter)',umami:'var(--umami)',
+  sour:'var(--sour)',salty:'var(--salty)'};
+const MODEL_TASTES = ['sweet','bitter','umami'];
+
+const $ = id => document.getElementById(id);
+const go = $('go'), q = $('q');
+
+async function post(path, body){
+  const r = await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)});
+  return r.json();
+}
+
+function meter(name, value, measured){
+  const pct = Math.round(value*100);
+  const tag = measured ? '<span class="tag measured">measured</span>'
+                       : '<span class="tag predicted">predicted</span>';
+  return `<div class="meter">
+    <div class="row"><span class="name">${name}${tag}</span><span class="val">${pct}%</span></div>
+    <div class="track"><div class="fill" style="background:${TASTE_COLORS[name]}"
+      data-w="${pct}"></div></div></div>`;
+}
+
+async function run(){
+  const text = q.value.trim();
+  if(!text) return;
+  go.disabled = true; go.textContent = 'Reading…';
+  $('err').style.display='none';
+  try{
+    const [p, n] = await Promise.all([
+      post('/api/predict',{smiles:text}),
+      post('/api/neighbors',{smiles:text, k:8})
+    ]);
+    if(p.error){ throw new Error(p.error); }
+    render(p, n.neighbors||[]);
+  }catch(e){
+    $('results').style.display='none'; $('footnote').style.display='none';
+    $('err').textContent = e.message; $('err').style.display='block';
+  }finally{
+    go.disabled=false; go.textContent='Read flavor';
+  }
+}
+
+function render(p, neighbors){
+  $('smiles').textContent = p.smiles;
+  const known = new Set(p.known_tastes||[]);
+  let m = '';
+  for(const t of MODEL_TASTES){
+    if(typeof p[t] === 'number') m += meter(t, p[t], known.has(t));
+  }
+  $('meters').innerHTML = m || '<div class="empty">No taste heads trained yet.</div>';
+
+  // chips: sour (rule), salty (lookup), intensity, multitaste
+  let c = [];
+  c.push(chip('sour', p.sour, p.sour?'var(--sour)':null,
+    p.sour && p.sour_reason && p.sour_reason.length ? `sour · ${p.sour_reason[0]}` : 'not sour'));
+  c.push(chip('salty', p.salty===true, p.salty===true?'var(--salty)':null,
+    p.salty===true ? 'salty (known)' : 'salty — not in data'));
+  if(typeof p.sweet_intensity === 'number')
+    c.push(chip('intensity', true, 'var(--sweet)', `sweetness ×${p.sweet_intensity} vs sucrose`));
+  if(p.multitaste) c.push(chip('multi', true, 'var(--aroma)', 'multi-taste'));
+  $('chips').innerHTML = c.join('');
+
+  // neighbors
+  if(!neighbors.length){
+    $('neighbors').innerHTML = '<div class="empty">Build taste_master.parquet to enable substitution search.</div>';
+  }else{
+    $('neighbors').innerHTML = neighbors.map(x=>`
+      <div class="neighbor">
+        <div><div class="s">${x.smiles}</div>
+        <div class="kt">${x.known_tastes.length?x.known_tastes.join(' · '):'—'}</div></div>
+        <div class="sim">${x.similarity}</div>
+      </div>`).join('');
+  }
+
+  $('results').style.display='grid'; $('footnote').style.display='block';
+  // animate bar fills
+  requestAnimationFrame(()=>document.querySelectorAll('.fill')
+    .forEach(f=>f.style.width=f.dataset.w+'%'));
+}
+
+function chip(key, on, color, label){
+  const style = on && color ? `style="background:${color}"` : '';
+  return `<span class="chip ${on?'on':''}" ${style}>${label}</span>`;
+}
+
+go.addEventListener('click', run);
+q.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
+</script>
+</body>
+</html>
