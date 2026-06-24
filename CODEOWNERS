@@ -1,0 +1,20 @@
+# CODEOWNERS — review routing.
+#
+# A code owner is automatically requested for review on PRs touching their paths.
+# During bootstrap the lead owns all paths; module owners are filled in as the
+# team's GitHub handles are confirmed (planned map below).
+
+*                    @rvnminers-A-and-N
+
+# ----- Planned ownership map (enable + set handles as contributors join) -----
+# /training/         @rvnminers-A-and-N
+# /aroma-sidecar/    @rvnminers-A-and-N
+# /api/              @<api-owner>
+# /api/Serving/      @<api-owner> @rvnminers-A-and-N
+# /frontend/         @<frontend-owner>
+# *.tsx              @<frontend-owner>
+# *.css              @<frontend-owner>
+# /infra/            @<infra-owner>
+# docker-compose.yml @<infra-owner>
+# /docs/             @rvnminers-A-and-N
+# /.github/          @rvnminers-A-and-N
