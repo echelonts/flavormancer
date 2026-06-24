@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python — lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install tooling
+        run: pip install ruff pytest
+      - name: Ruff lint
+        run: ruff check .
+      - name: Pytest
+        run: |
+          if git ls-files '*test_*.py' '*_test.py' 'tests/**/*.py' | grep -q .; then
+            pytest -q
+          else
+            echo "No Python tests yet — skipping."
+          fi
+
+  dotnet:
+    name: .NET — build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build & test
+        run: |
+          if git ls-files '*.sln' '*.csproj' | grep -q .; then
+            dotnet build --configuration Release
+            if git ls-files '*Test*.csproj' | grep -q .; then
+              dotnet test --configuration Release --no-build
+            else
+              echo "No .NET test projects yet — build only."
+            fi
+          else
+            echo "No .NET projects yet — skipping."
+          fi
