@@ -1,0 +1,66 @@
+# ---- Python (training, aroma-sidecar) ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.python-version
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---- .NET (api) ----
+bin/
+obj/
+*.user
+*.suo
+.vs/
+[Dd]ebug/
+[Rr]elease/
+
+# ---- Node / React (frontend) ----
+node_modules/
+dist/
+build/
+.next/
+coverage/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+
+# ---- Datasets & trained models (NEVER commit — training scripts download these) ----
+ChemTastesDB_database.xlsx
+*.xlsx
+*.parquet
+*.tsv
+bittersweet/
+flavordb_taste.csv
+umami_list.csv
+sweeteners_db.csv
+gras_reference.parquet
+properties.parquet
+odor_model/
+onnx_models/
+*.onnx
+*.pkl
+*.joblib
+*.pt
+*.ckpt
+
+# ---- Secrets & local config ----
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+*.local
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
