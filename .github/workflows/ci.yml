@@ -39,10 +39,13 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Build & test
         run: |
-          if git ls-files '*.sln' '*.csproj' | grep -q .; then
-            dotnet build --configuration Release
+          target=$(git ls-files '*.sln' | head -1)
+          [ -z "$target" ] && target=$(git ls-files '*.csproj' | head -1)
+          if [ -n "$target" ]; then
+            echo "Building $target"
+            dotnet build "$target" --configuration Release
             if git ls-files '*Test*.csproj' | grep -q .; then
-              dotnet test --configuration Release --no-build
+              dotnet test --configuration Release
             else
               echo "No .NET test projects yet — build only."
             fi
