@@ -6,7 +6,7 @@ SMILES and get a single, honest flavor read, running entirely on hardware you ow
 
 > **Status:** early development. The training pipeline and prediction core exist;
 > the .NET serving layer, React workbench, and packaging are in progress. See the
-> milestones for what's landed and what's next.
+> [roadmap](ROADMAP.md) for what's landed (M0–M1) and what's next (M2–M6).
 
 ---
 
