@@ -6,5 +6,6 @@ Architecture, capability catalogue, and design decisions.
 - `CAPABILITIES.md` — what the tool does, what's buildable on open data, and the
   honest limits of public-data prediction
 - `SOURCES.md` — data sources, libraries, research, and license attribution
+- `API-CONTRACT.md` — the fixed JSON contract the .NET API exposes and the React UI consumes
 
 These document *what we're building and why*, so decisions don't get re-argued.
