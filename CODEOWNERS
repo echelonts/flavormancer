@@ -6,6 +6,10 @@
 
 *                    @rvnminers-A-and-N
 
+# ----- Active module ownership -----
+/infra/              @Frostfire0101 @rvnminers-A-and-N
+docker-compose.yml   @Frostfire0101 @rvnminers-A-and-N
+
 # ----- Planned ownership map (enable + set handles as contributors join) -----
 # /training/         @rvnminers-A-and-N
 # /aroma-sidecar/    @rvnminers-A-and-N
@@ -14,7 +18,5 @@
 # /frontend/         @<frontend-owner>
 # *.tsx              @<frontend-owner>
 # *.css              @<frontend-owner>
-# /infra/            @<infra-owner>
-# docker-compose.yml @<infra-owner>
 # /docs/             @rvnminers-A-and-N
 # /.github/          @rvnminers-A-and-N
