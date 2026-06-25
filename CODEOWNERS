@@ -7,14 +7,13 @@
 *                    @rvnminers-A-and-N
 
 # ----- Active module ownership -----
+/api/                @Jabbacado @rvnminers-A-and-N
 /infra/              @Frostfire0101 @rvnminers-A-and-N
 docker-compose.yml   @Frostfire0101 @rvnminers-A-and-N
 
 # ----- Planned ownership map (enable + set handles as contributors join) -----
 # /training/         @rvnminers-A-and-N
 # /aroma-sidecar/    @rvnminers-A-and-N
-# /api/              @<api-owner>
-# /api/Serving/      @<api-owner> @rvnminers-A-and-N
 # /frontend/         @<frontend-owner>
 # *.tsx              @<frontend-owner>
 # *.css              @<frontend-owner>
