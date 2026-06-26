@@ -21,7 +21,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from rdkit import Chem
-from rdkit.Chem import AllChem, DataStructs
+from rdkit.Chem import DataStructs, rdFingerprintGenerator
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, r2_score
@@ -31,6 +31,7 @@ BASIC = ["sweet", "bitter", "umami", "sour", "salty"]
 # handled in predict.py and never trained — regardless of how much data accrues.
 RULE_TASTES = {"sour", "salty"}
 FP_BITS, FP_RADIUS = 2048, 2
+_MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
 # Below this, a taste is too thin for an HONEST head, so it's skipped and
 # handled by rule/flag instead. It's not a hard exclusion: add more data (more
 # sources) and the taste crosses the line and trains itself on the next run.
@@ -55,7 +56,7 @@ def fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
-    bv = AllChem.GetMorganFingerprintAsBitVect(mol, FP_RADIUS, nBits=FP_BITS)
+    bv = _MORGAN.GetFingerprint(mol)
     arr = np.zeros((FP_BITS,), dtype=np.int8)
     DataStructs.ConvertToNumpyArray(bv, arr)
     return arr
