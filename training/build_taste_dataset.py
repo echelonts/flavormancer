@@ -103,6 +103,42 @@ def _row(ik, cs, source, labels=None, multitaste=0.0):
     return rec
 
 
+# Intensity modifiers stripped when parsing the granular 'Taste' column.
+_MODIFIERS = {"slightly", "very", "extremely", "mildly", "highly", "faintly",
+              "weakly", "strongly"}
+
+
+def parse_taste_column(val):
+    """Granular ChemTastesDB 'Taste' value -> per-taste 1/0 for basic tastes.
+
+    Handles compounds (Sweet/Bitter, Non-sweet; Bitter, Salty/Umami), intensity
+    modifiers (Slightly bitter -> bitter), and negations (Non-sweet -> sweet=0),
+    positive-wins within the row. Non-basic descriptors (cooling, pungent,
+    astringent, ...) are ignored — they're chemesthesis, not basic taste.
+    """
+    s = str(val).strip().lower()
+    if s in ("", "nan"):
+        return {}
+    if s == "tasteless":
+        return {t: 0.0 for t in BASIC}
+    for d in (";", ","):
+        s = s.replace(d, "/")
+    pos, neg = set(), set()
+    for tok in s.split("/"):
+        tok = tok.strip()
+        negated = tok.startswith("non-") or tok.startswith("non ")
+        if negated:
+            tok = tok[3:].lstrip("- ").strip()
+        tok = " ".join(w for w in tok.split() if w not in _MODIFIERS).strip()
+        if tok in BASIC:
+            (neg if negated else pos).add(tok)
+    out = {t: 1.0 for t in pos}
+    for t in neg:
+        if t not in pos:
+            out[t] = 0.0
+    return out
+
+
 def load_chemtastes(path):
     if not path.exists():
         print(f"  [skip] {path}")
@@ -110,12 +146,24 @@ def load_chemtastes(path):
     df = pd.read_excel(path)
     sc = _find(df, ["canonical smiles", "smiles"])
     cc = _find(df, ["class taste", "taste class", "class", "taste"])
+    cols = {c.lower().strip(): c for c in df.columns}
+    tc = cols.get("taste")  # granular multi-label column, if present
     rows = []
     for _, r in df.iterrows():
         ik, cs = canon(r[sc])
         if ik is None:
             continue
         labels, mt = chemtastes_labels(r[cc])
+        if tc is not None and tc != cc:
+            # Merge the granular 'Taste' multi-labels (positive-wins) so multitaste
+            # rows (Sweet/Bitter, Salty/Umami, ...) resolve into concrete labels.
+            fine = parse_taste_column(r[tc])
+            for t in BASIC:
+                vals = [labels.get(t), fine.get(t)]
+                if 1.0 in vals:
+                    labels[t] = 1.0
+                elif 0.0 in vals:
+                    labels[t] = 0.0
         rows.append(_row(ik, cs, "chemtastes", labels, mt))
     print(f"  chemtastes: {len(rows)}")
     return pd.DataFrame(rows)

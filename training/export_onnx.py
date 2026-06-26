@@ -24,6 +24,10 @@ from skl2onnx.common.data_types import FloatTensorType
 SRC = Path("taste_models")     # produced by train_taste.py
 OUT = Path("onnx_models")
 OUT.mkdir(exist_ok=True)
+# Clear stale exports so a removed/renamed head doesn't leave an orphan .onnx
+# alongside a manifest that no longer references it.
+for _stale in OUT.glob("*.onnx"):
+    _stale.unlink()
 FP_BITS, FP_RADIUS, INPUT_NAME = 2048, 2, "fp"
 
 if not SRC.exists() or not list(SRC.glob("*_rf.joblib")):
