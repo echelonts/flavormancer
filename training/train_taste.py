@@ -49,7 +49,10 @@ for _stale in OUT.glob("*_rf.joblib"):
 
 # Acidic-group SMARTS — used both for the sour rule and to VALIDATE it against
 # whatever labeled sour compounds exist (so that data isn't wasted either).
-ACID_SMARTS = ["[CX3](=O)[OX2H1]", "[SX4](=O)(=O)[OX2H1]", "[PX4](=O)[OX2H1]"]
+# Match BOTH protonated (-OH) and deprotonated (-O-) forms: sour compounds are
+# routinely drawn as carboxylate/sulfonate/phosphate anions or zwitterions, which
+# the -OH-only patterns missed (the main driver of the low recall).
+ACID_SMARTS = ["[CX3](=O)[OX2H1,OX1-]", "[SX4](=O)(=O)[OX2H1,OX1-]", "[PX4](=O)[OX2H1,OX1-]"]
 _ACID = [Chem.MolFromSmarts(s) for s in ACID_SMARTS]
 
 

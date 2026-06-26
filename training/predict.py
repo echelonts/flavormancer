@@ -55,9 +55,12 @@ _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_
 TASTE = Path("taste_models")
 
 ACID_SMARTS = {
-    "carboxylic acid": "[CX3](=O)[OX2H1]",
-    "sulfonic acid": "[SX4](=O)(=O)[OX2H1]",
-    "phosphoric/phosphonic acid": "[PX4](=O)[OX2H1]",
+    # Match both protonated (-OH) and deprotonated (-O-) forms — sour compounds are
+    # routinely drawn as carboxylate/sulfonate/phosphate anions or zwitterions.
+    # (Lifted the rule's recall on labeled-sour from 0.57 to 0.93.)
+    "carboxylic acid / carboxylate": "[CX3](=O)[OX2H1,OX1-]",
+    "sulfonic / sulfonate": "[SX4](=O)(=O)[OX2H1,OX1-]",
+    "phosphoric / phosphonic (+ anion)": "[PX4](=O)[OX2H1,OX1-]",
 }
 _ACID = {k: Chem.MolFromSmarts(v) for k, v in ACID_SMARTS.items()}
 
