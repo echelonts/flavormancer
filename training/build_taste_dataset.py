@@ -64,11 +64,23 @@ def _find(df, candidates):
     raise KeyError(f"none of {candidates} in {list(df.columns)}  [VERIFY]")
 
 
+# ChemTastesDB v2.0 encodes the 'Class taste' column as '-ness' nouns
+# (Sweetness/Bitterness/Umaminess/Sourness/Saltiness/Tastelessness), negations
+# (Non-sweetness/Non-bitterness), 'Multitaste', or 'Miscellaneous'. Normalize the
+# nouns to the base taste word. [VERIFIED against the v2.0 file, 2026-06-25.]
+_NESS = {"sweetness": "sweet", "bitterness": "bitter", "umaminess": "umami",
+         "sourness": "sour", "saltiness": "salty", "tastelessness": "tasteless"}
+
+
 def chemtastes_labels(cls):
-    """One ChemTastesDB class -> per-taste 1/0/NaN + multitaste flag."""
+    """One ChemTastesDB 'Class taste' value -> per-taste 1/0/NaN + multitaste flag."""
     out = {t: np.nan for t in BASIC}
     multitaste = 0.0
     c = str(cls).strip().lower()
+    if c in _NESS:
+        c = _NESS[c]
+    elif c.startswith("non-") and c[4:] in _NESS:
+        c = "non-" + _NESS[c[4:]]
     if c in BASIC:
         for t in BASIC:
             out[t] = 1.0 if t == c else 0.0
