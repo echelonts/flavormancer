@@ -35,10 +35,10 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 **Taste**
 - **ChemTastesDB** — Rojas et al., curated taste dataset (sweet/bitter/umami/sour/salty/tasteless). Zenodo, DOI 10.5281/zenodo.5747393 (and the extended record). License **CC-BY-4.0** (commercially clean with attribution).
 - **cosylab BitterSweet** — Bagler lab (IIIT-Delhi). Code **AGPL-3.0** (bind-aware: train-your-own-on-data is the safe pattern; `INCLUDE_COSYLAB=False` drops it for clean licensing).
-- **FlavorDB** — Bagler lab (IIIT-Delhi); taste + odor + natural-source associations. (Confirm terms.)
-- **SweetenersDB** — Chéron et al.; sweetness *intensity* (vs sucrose) for the regressor.
+- **FlavorDB** — Bagler lab (IIIT-Delhi); taste + odor + natural-source associations. License **CC BY-NC-SA 3.0** (NonCommercial) — incompatible with a commercial product; **not used**.
+- **SweetenersDB v2.0** — Bouysset et al. (2020) *Food Chem.*, building on Chéron et al. (2017); relative-to-sucrose sweetness *intensity* for the regressor. Released **MIT** by the authors' own lab (ChemSenSim, `github.com/chemosim-lab/SweetenersDB`) — the paywall is only on the journal article, not the authors' own data. **In use.**
 - **BitterDB** *(future)* — bitterness intensity, if/when added.
-- **UMP442 / BIOPEP-UWM** — umami references.
+- **UMP442 / BIOPEP-UWM** — umami references. BIOPEP-UWM is web-only; the GitHub repost `Shoombuatong/Dataset-Code` carries **no license** (all-rights-reserved) and is umami *peptide* data (a different class from our small-molecule head). **Not used.**
 
 **Aroma**
 - **Pyrfume** + **Leffingwell** odor datasets — SMILES + multilabel odor descriptors; the training data behind OpenPOM. (Pyrfume project; confirm per-dataset terms.)
