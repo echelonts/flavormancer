@@ -48,9 +48,10 @@ from pathlib import Path
 import joblib
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import AllChem, Crippen, DataStructs, Descriptors, rdMolDescriptors
+from rdkit.Chem import Crippen, DataStructs, Descriptors, rdFingerprintGenerator, rdMolDescriptors
 
 FP_BITS, FP_RADIUS = 2048, 2
+_MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
 TASTE = Path("taste_models")
 
 ACID_SMARTS = {
@@ -234,7 +235,7 @@ def _measured(mol):
 
 
 def _fp(mol):
-    bv = AllChem.GetMorganFingerprintAsBitVect(mol, FP_RADIUS, nBits=FP_BITS)
+    bv = _MORGAN.GetFingerprint(mol)
     arr = np.zeros((FP_BITS,), dtype=np.int8)
     DataStructs.ConvertToNumpyArray(bv, arr)
     return arr.reshape(1, -1)

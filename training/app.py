@@ -28,13 +28,14 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from rdkit import Chem
-from rdkit.Chem import AllChem, DataStructs
+from rdkit.Chem import DataStructs, rdFingerprintGenerator
 
 import predict as P  # reuse the unified flavor read
 
 app = FastAPI(title="Flavor Workbench (demo)")
 
 _FPS, _SMI, _KNOWN = [], [], []
+_MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
 
 def _build_index():
@@ -48,7 +49,7 @@ def _build_index():
         mol = Chem.MolFromSmiles(r["smiles"])
         if mol is None:
             continue
-        _FPS.append(AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048))
+        _FPS.append(_MORGAN.GetFingerprint(mol))
         _SMI.append(r["smiles"])
         _KNOWN.append([t for t in basic if r[t] == 1])
     print(f"substitution index built: {len(_FPS)} molecules")
@@ -92,7 +93,7 @@ def api_neighbors(q: Query):
     if not smi or not _FPS:
         return {"neighbors": []}
     mol = Chem.MolFromSmiles(smi)
-    fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
+    fp = _MORGAN.GetFingerprint(mol)
     sims = DataStructs.BulkTanimotoSimilarity(fp, _FPS)
     self_smi = Chem.MolToSmiles(mol)
     ranked = sorted(range(len(sims)), key=lambda i: sims[i], reverse=True)
