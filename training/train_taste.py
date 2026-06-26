@@ -2,10 +2,10 @@
 train_taste.py — taste heads (multi-taste) + sweetness-intensity regressor.
 
 Reads the merged dataset from build_taste_dataset.py and trains one binary
-RandomForest per structure-driven taste (sweet/bitter/umami). Sour and salty
-are validated RULES in predict.py (sourness is a pH/solution property, saltiness
-a cation property), never trained — by design, not just data volume. Add more
-sweet/bitter/umami data and those heads sharpen on the next run.
+RandomForest per trainable taste (sweet/bitter/umami, plus sour as a small-data
+*indicative* head). Salty stays a validated RULE in predict.py (a cation
+property, too few labels to model); sour ALSO keeps its acidity rule there as a
+deterministic cross-check. Add more data and the heads sharpen on the next run.
 
 Even with everything merged this trains in minutes on the R620 CPU. The
 multi-day budget is the aroma model (train_odor.py), not this.
@@ -27,9 +27,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, r2_score
 
 BASIC = ["sweet", "bitter", "umami", "sour", "salty"]
-# Sour and salty are validated RULES by design (pH/solution and cation properties),
-# handled in predict.py and never trained — regardless of how much data accrues.
-RULE_TASTES = {"sour", "salty"}
+# Salty stays a validated RULE only (cation property, too few labels to model).
+# Sour trains as a small-data INDICATIVE head but ALSO keeps its acidity rule in
+# predict.py as a deterministic second check (surfaced as sour_predicted + sour).
+RULE_TASTES = {"salty"}
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
 # Below this, a taste is too thin for an HONEST head, so it's skipped and

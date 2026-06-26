@@ -636,6 +636,23 @@ def predict_aroma(smiles, top_k=8):
         return {"available": False, "note": "aroma model load ok but prediction failed", "detail": str(e)}
 
 
+def _taste_profile(out):
+    """Trained taste heads ranked by probability (descending) — the 'order of
+    dominance' view. Sour is a small-data indicative head; the deterministic
+    sour/salty rules remain separate flags (out['sour'], out['salty'])."""
+    ranked = []
+    for t in ("sweet", "bitter", "umami"):
+        v = out.get(t)
+        if isinstance(v, (int, float)):
+            ranked.append({"taste": t, "probability": round(float(v), 3), "basis": "trained"})
+    sp = out.get("sour_predicted")
+    if isinstance(sp, (int, float)):
+        ranked.append({"taste": "sour", "probability": round(float(sp), 3),
+                       "basis": "trained (indicative)"})
+    ranked.sort(key=lambda e: e["probability"], reverse=True)
+    return ranked
+
+
 def predict(smiles: str, include_aroma: bool = False) -> dict:
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
@@ -644,6 +661,10 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
     out = {"smiles": Chem.MolToSmiles(mol)}
     for name, clf in sorted(_CLASSIFIERS.items()):
         out[name] = round(float(clf.predict_proba(x)[0, 1]), 3)
+    # Sour trains as a small-data INDICATIVE head, but its boolean stays the rule's
+    # call below — keep the model probability separately as sour_predicted.
+    if "sour" in out:
+        out["sour_predicted"] = out.pop("sour")
     if _INTENSITY is not None:
         out["sweet_intensity"] = round(float(_INTENSITY.predict(x)[0]), 2)
     out.update(_sour(mol))
@@ -661,6 +682,7 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
     strong = [t for t in ("sweet", "bitter", "umami")
               if isinstance(out.get(t), float) and out[t] >= 0.5]
     out["multitaste"] = len(strong) >= 2
+    out["taste_profile"] = _taste_profile(out)
     out["physchem"] = physchem(mol)
     out["stability"] = stability(mol)
     out["chemesthesis"] = chemesthesis(mol)

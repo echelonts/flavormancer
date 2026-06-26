@@ -51,12 +51,20 @@ Single-molecule flavor read.
   "bitter": 0.74,                           // (trained)
   "umami": 0.03,                            // (trained)
   "sweet_intensity": 1.8,                   // vs sucrose — OPTIONAL (trained)
-  "sour": false,                            // (rule)
+  "sour": false,                            // RULE call — acidic-group structural rule (rule)
   "sour_reason": [],                        // acidic groups matched (rule)
+  "sour_predicted": 0.12,                   // trained sour head — small-data INDICATIVE (trained)
   "salty": false,                           // (rule)
   "salty_reason": "no alkali-salt structure", // (rule)
   "known_tastes": ["bitter"],               // OPTIONAL, verified dataset labels (lookup)
   "multitaste": false,                      // 2+ taste heads ≥ 0.5 (trained-derived)
+
+  "taste_profile": [                        // tastes ranked by dominance (trained heads, desc)
+    { "taste": "bitter", "probability": 0.74, "basis": "trained" },
+    { "taste": "sweet",  "probability": 0.12, "basis": "trained" },
+    { "taste": "sour",   "probability": 0.12, "basis": "trained (indicative)" },
+    { "taste": "umami",  "probability": 0.03, "basis": "trained" }
+  ],
 
   "physchem": {
     "computed":  { "mol_weight": 152.15, "logP": 1.21, "tpsa": 46.5,
@@ -98,6 +106,11 @@ Single-molecule flavor read.
 **Field notes for implementers**
 - Taste-head keys (`sweet`/`bitter`/`umami`) are present **per trained classifier**; a
   head below the data threshold is absent and the corresponding rule/flag covers it.
+- **Sour carries two signals:** `sour` is the deterministic acidity-rule boolean;
+  `sour_predicted` is a small-data **indicative** trained probability. They can disagree
+  (the rule flags structure, the model reflects perception) — surface both.
+- **`taste_profile`** ranks the trained heads (incl. sour-indicative) by probability,
+  descending — the "order of dominance" view. The `sour`/`salty` rules stay separate flags.
 - `sweet_intensity` and `physchem.measured` appear only when their model/table is loaded.
 - `salty` may be overridden to `true` with `salty_reason: "verified (dataset label)"` when
   a ground-truth label exists (lookup beats rule).
