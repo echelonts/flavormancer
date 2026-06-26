@@ -2,10 +2,10 @@
 train_taste.py — taste heads (multi-taste) + sweetness-intensity regressor.
 
 Reads the merged dataset from build_taste_dataset.py and trains one binary
-RandomForest per taste that clears the data thresholds. Sweet/bitter/umami
-will train; sour/salty are auto-skipped (too few labels) and handled by the
-acidity rule in predict.py instead. If you add more sour/umami data later,
-they upgrade themselves on the next run — no code change.
+RandomForest per structure-driven taste (sweet/bitter/umami). Sour and salty
+are validated RULES in predict.py (sourness is a pH/solution property, saltiness
+a cation property), never trained — by design, not just data volume. Add more
+sweet/bitter/umami data and those heads sharpen on the next run.
 
 Even with everything merged this trains in minutes on the R620 CPU. The
 multi-day budget is the aroma model (train_odor.py), not this.
@@ -27,6 +27,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, r2_score
 
 BASIC = ["sweet", "bitter", "umami", "sour", "salty"]
+# Sour and salty are validated RULES by design (pH/solution and cation properties),
+# handled in predict.py and never trained — regardless of how much data accrues.
+RULE_TASTES = {"sour", "salty"}
 FP_BITS, FP_RADIUS = 2048, 2
 # Below this, a taste is too thin for an HONEST head, so it's skipped and
 # handled by rule/flag instead. It's not a hard exclusion: add more data (more
@@ -37,6 +40,10 @@ FP_BITS, FP_RADIUS = 2048, 2
 MIN_POS, MIN_NEG = 80, 80
 OUT = Path("taste_models")
 OUT.mkdir(exist_ok=True)
+# Clear stale heads first, so a taste that no longer trains (e.g. now rule-handled)
+# can't leave an orphan .joblib that export_onnx would pick up.
+for _stale in OUT.glob("*_rf.joblib"):
+    _stale.unlink()
 
 # Acidic-group SMARTS — used both for the sour rule and to VALIDATE it against
 # whatever labeled sour compounds exist (so that data isn't wasted either).
@@ -73,6 +80,9 @@ def train_classifiers(master):
         yv = y[mask].astype(int).values
         Xv = X_all[mask]
         pos, neg = int((yv == 1).sum()), int((yv == 0).sum())
+        if taste in RULE_TASTES:
+            print(f"  {taste:7s} RULE by design (pos={pos}, neg={neg}) -> handled in predict.py")
+            continue
         if pos < MIN_POS or neg < MIN_NEG:
             print(f"  {taste:7s} SKIP (pos={pos}, neg={neg}) -> handled by rule/omitted")
             continue
