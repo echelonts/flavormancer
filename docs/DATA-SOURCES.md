@@ -15,7 +15,7 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 | **cosylab/bittersweet** | more sweet/bitter volume | AGPL-3.0 | ⬜ to get | `git clone github.com/cosylabiiit/bittersweet` → `bittersweet/data/*.tsv`. AGPL: keep a CC-BY-clean build with `INCLUDE_COSYLAB=False`, or opt in deliberately. |
 | **FlavorDB** | ~25k molecules taste+odor + natural-source mapping | confirm terms | ⬜ to get | REST/JSON API at `cosylab.iiitd.edu.in/flavordb` → `flavordb_taste.csv`. Map taste fields; **[VERIFY] columns** before trusting. |
 | **UMP442 / BIOPEP-UWM** | more umami examples (only 283 now) | confirm terms | ⬜ to get | BIOPEP-UWM umami DB (form-driven) → `umami_list.csv`. |
-| **SweetenersDB (Chéron 2017)** | the sweetness-**intensity** regressor (currently skipped) | publisher supp. | ⬜ to get | paper supplementary (~316 compounds, relative-to-sucrose) → `sweeteners_db.csv`. Likely **paywalled → manual grab**. |
+| **SweetenersDB v2.0** | the sweetness-**intensity** regressor | **MIT** | ✅ in use | direct CSV from `github.com/chemosim-lab/SweetenersDB` (`SweetenersDB_v2.0.csv`, 316 cmpds, `logSw` column). R²≈0.82. |
 | **Pyrfume / Leffingwell** | the **aroma model** (OpenPOM) — issues #17 / #18 | per-set; confirm | ⬜ to get | `git clone github.com/pyrfume/pyrfume-data`; Leffingwell odor set. Separate, version-fragile effort. |
 | **FEMA GRAS / FDA SAF** | GRAS cross-reference + dosing/OAV lookups | gov public / FEMA | ⬜ to get | FDA "Substances Added to Food" (public domain) → `gras_reference.parquet`; FEMA use-level PDFs → `properties.parquet`. **Verify every scraped dosing number.** |
 
@@ -27,6 +27,7 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 - **Column verification.** Each new source's column names must be checked against the
   loaders (the `[VERIFY]` markers) — see issue **#25**. ChemTastesDB's mapping is
   resolved (both the coarse `Class taste` and the granular `Taste` columns are parsed).
-- **Suggested priority.** (1) `Taste`-column mining — **done** ✅ → (2) cosylab /
-  FlavorDB for taste volume → (3) SweetenersDB for the intensity head → (4)
-  Pyrfume / Leffingwell for the aroma model.
+- **Suggested priority.** (1) `Taste`-column mining — **done** ✅ → (2) SweetenersDB
+  intensity head — **done** ✅ → (3) Pyrfume / Leffingwell for the aroma model →
+  (4) cosylab for taste volume (AGPL — pending decision). **FlavorDB is
+  CC BY-NC-SA (NonCommercial) — incompatible with a commercial product; skip.**

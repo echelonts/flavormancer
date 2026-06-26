@@ -248,7 +248,9 @@ def build_intensity(path):
         return None
     df = pd.read_csv(path)
     sc = _find(df, ["smiles", "canonical smiles"])
-    vc = _find(df, ["relative_sweetness", "log_sweetness", "sweetness", "rs"])
+    # SweetenersDB v2.0 (MIT) names it 'logSw' (log sweetness vs sucrose, ~316 cmpds);
+    # also accept the generic names. [VERIFIED against SweetenersDB_v2.0.csv, 2026-06-26.]
+    vc = _find(df, ["log_sweetness", "logsw", "relative_sweetness", "sweetness", "rs"])
     rows = []
     for _, r in df.iterrows():
         _, cs = canon(r[sc])
