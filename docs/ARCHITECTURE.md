@@ -99,7 +99,7 @@ artifact, not bolted onto this.)
 ## Status: built vs to-build
 
 **Built (Track A / training, reusable by Track B):**
-- `build_taste_dataset.py`, `train_taste.py`, `train_odor.py` (scaffold), `predict.py`
+- `build_taste_dataset.py`, `train_taste.py`, `predict.py` (aroma training added when clean data exists — see [`AROMA.md`](AROMA.md))
 - `app.py` + `workbench.html` — the Python/HTML *demo* serving prototype
 
 **Safety (defensive, caution-only — built into predict.py):**

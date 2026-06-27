@@ -41,12 +41,12 @@ reference table), and **qualitative** (a class/flag, not a number).
 
 Python trains the models offline; a .NET application serves them at runtime. The
 training language is a build-time detail — nothing at runtime depends on Python
-(aside from an optional aroma sidecar if the GNN won't export cleanly).
+(aside from a possible aroma sidecar later — aroma is deferred; see docs/AROMA.md).
 
 ```
 data sources ─► Python training (build-time) ─► ONNX (taste) ──┐
-                RDKit · scikit-learn · OpenPOM   aroma model ─┐ │
-                                                              ▼ ▼
+                RDKit · scikit-learn                            │
+                                                                ▼
 React workbench ◄─ JSON API ◄─ ASP.NET Core + ONNX Runtime + Postgres/pgvector
                                               │
                                               ▼
@@ -55,7 +55,7 @@ React workbench ◄─ JSON API ◄─ ASP.NET Core + ONNX Runtime + Postgres/pg
 
 | Layer | Technology |
 |-------|-----------|
-| Model training (build-time) | Python · RDKit · scikit-learn · OpenPOM/DeepChem |
+| Model training (build-time) | Python · RDKit · scikit-learn · skl2onnx |
 | Model handoff | ONNX |
 | App / API | ASP.NET Core (C#) |
 | ML serving | ONNX Runtime, in-process in .NET |
@@ -67,7 +67,6 @@ React workbench ◄─ JSON API ◄─ ASP.NET Core + ONNX Runtime + Postgres/pg
 
 ```
 training/        Python — dataset build + model training (build-time)
-aroma-sidecar/   Python — thin aroma inference service (only if needed)
 api/             ASP.NET Core — app, auth, endpoints, ONNX serving
 frontend/        React — the workbench UI
 infra/           Dockerfiles, docker-compose.yml, deploy

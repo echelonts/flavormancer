@@ -8,7 +8,7 @@ property, too few labels to model); sour ALSO keeps its acidity rule there as a
 deterministic cross-check. Add more data and the heads sharpen on the next run.
 
 Even with everything merged this trains in minutes on the R620 CPU. The
-multi-day budget is the aroma model (train_odor.py), not this.
+multi-day budget is the aroma model (deferred — see docs/AROMA.md), not this.
 
 Run order:
   python build_taste_dataset.py   # writes taste_master.parquet (+ sweet_intensity.parquet)

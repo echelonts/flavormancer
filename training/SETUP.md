@@ -6,118 +6,88 @@
 > lives in `/api` + `/frontend`; it consumes the ONNX models this training
 > pipeline produces. Train here, ship there.
 
-Target box: Dell R620, Linux, **no GPU** → CPU training. Install the CPU
-PyTorch build. Everything below assumes a fresh user/env so it stays
-isolated and reproducible.
+Target box: Dell R620, Linux, **no GPU** → CPU only. The taste + demo stack is
+light (RDKit, scikit-learn, skl2onnx) and installs cleanly — no version-fussy
+deep-learning dependencies. Everything below assumes a fresh, isolated env.
 
 ## 0. Prereqs
-- Miniforge/Mambaforge (mamba resolves the finicky deepchem stack far faster
-  than conda). https://github.com/conda-forge/miniforge
+- Python 3.12 + venv, **or** Miniforge/Mambaforge — either works for this stack.
+  https://github.com/conda-forge/miniforge
 - git
 
-## 1. Create an isolated user + workspace
+## 1. Create an isolated workspace
 ```bash
-sudo adduser flavordemo          # optional but clean
-sudo su - flavordemo
-mkdir -p ~/odor-demo && cd ~/odor-demo
+mkdir -p ~/flavormancer-train && cd ~/flavormancer-train
+python3 -m venv .venv && source .venv/bin/activate
+# (or: mamba create -n flavor python=3.12 -y && mamba activate flavor)
 ```
 
-## 2. Conda env
-OpenPOM is built on DeepChem and is **version-fussy** — this is the part most
-likely to eat an afternoon. Pin against OpenPOM's own requirements, don't let
-it resolve against "latest". Start here, then reconcile with the repo:
-
+## 2. Install the stack (light — no GPU, no DeepChem)
 ```bash
-mamba create -n odor python=3.10 -y
-mamba activate odor
-
-# CPU PyTorch (NO cuda wheels — this box has no GPU)
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-
-mamba install -c conda-forge rdkit pandas scikit-learn numpy openpyxl pyarrow -y
+pip install rdkit pandas scikit-learn numpy openpyxl pyarrow
 # openpyxl: read the ChemTastesDB .xlsx  |  pyarrow: read/write the .parquet files
-pip install deepchem
-pip install dgl dgllife            # OpenPOM's GNN backend
-pip install pubchempy              # name -> SMILES, for the demo UX
-pip install umap-learn             # for the odor-space map later
+pip install skl2onnx onnxruntime    # export + self-validate the taste ONNX models
+pip install pubchempy               # name -> SMILES, for the demo UX
+pip install umap-learn              # for the flavor-space map
 ```
 
-## 3. Get OpenPOM + data
+> **Aroma is deferred** (see [`docs/AROMA.md`](../docs/AROMA.md)) — no commercially
+> usable public odor data is good enough to train it. The heavy OpenPOM/DeepChem GNN
+> stack is therefore **not installed here**. When licensed (PMP 2001) or customer
+> data exists, add it then; the aroma pipeline (`build_aroma_dataset.py` +
+> `train_aroma.py`) is committed and ready to run.
+
+## 3. Get the taste data
 ```bash
-git clone https://github.com/BioMachineLearning/openpom.git
-pip install -e ./openpom
-# Reconcile any version conflicts NOW using openpom/requirements — this is the
-# expected friction point. If torch/dgl/deepchem fight, match openpom's pins.
-
-# Leffingwell odor dataset (SMILES + multilabel descriptors) — AROMA head
-git clone --depth 1 https://github.com/pyrfume/pyrfume-data.git
-# dataset lives under pyrfume-data/leffingwell/
-
-# Taste data — TASTE heads (sweet, bitter, umami) + sweetness intensity.
-# 1) ChemTastesDB v2.0 — PRIMARY source, CC-BY-4.0, 4075 molecules, 10 classes:
+# ChemTastesDB v2.0 — PRIMARY source, CC-BY-4.0, ~4075 molecules, multi-class taste:
 curl -L -o ChemTastesDB_database.xlsx \
   "https://zenodo.org/records/14963136/files/ChemTastesDB_database.xlsx?download=1"
-# 2) cosylab/bittersweet — extra sweet/bitter (AGPL; optional, ignore their py2.7 code):
-git clone --depth 1 https://github.com/cosylabiiit/bittersweet.git
-# 3) SweetenersDB (Cheron 2017) — sweetness INTENSITY regressor. [OBTAIN]
-#    Pull the ~316-compound table (SMILES + relative-to-sucrose sweetness) from the
-#    paper's supplementary; save as sweeteners_db.csv. Optional; intensity head
-#    is skipped cleanly if absent.
-# 4) (optional) more sources the build script will auto-merge IF present:
-#      flavordb_taste.csv  — FlavorDB export: columns SMILES + taste   [OBTAIN]
-#      umami_list.csv      — UMP442 / BIOPEP-UWM umami SMILES           [OBTAIN]
-#    Each is optional and skipped cleanly if the file isn't there.
-```
 
-## 4. Sanity checks (do these before training anything)
+# SweetenersDB v2.0 — sweetness INTENSITY regressor. MIT, from the authors' own lab:
+git clone --depth 1 https://github.com/chemosim-lab/SweetenersDB.git
+# relative-to-sucrose sweetness (SMILES + logS); the build script reads it if present.
+```
+> Other taste sources are auto-merged **only if present**, but note the licensing
+> decisions in [`docs/SOURCES.md`](../docs/SOURCES.md): cosylab/bittersweet is AGPL
+> and FlavorDB is NonCommercial — both are **off by default and not used**.
+
+## 4. Sanity check
 ```bash
 python - <<'PY'
-import torch, deepchem, rdkit
-print("torch", torch.__version__, "cuda?", torch.cuda.is_available())  # expect False on R620
+import rdkit, sklearn, skl2onnx
 from rdkit import Chem
 print("rdkit ok:", Chem.MolToSmiles(Chem.MolFromSmiles("c1ccccc1")))
 PY
 ```
-`cuda? False` is correct and expected here — it'll train on CPU.
 
-## 5. Build the merged taste dataset, then train
+## 5. Build the dataset, then train
 ```bash
-python build_taste_dataset.py   # merges all sources -> taste_master.parquet
-python train_odor.py            # AROMA head (OpenPOM) — multi-hour / overnight CPU
-python train_taste.py           # TASTE heads (sklearn) — minutes, even merged
+python build_taste_dataset.py   # merges sources -> taste_master.parquet (+ sweet_intensity.parquet)
+python train_taste.py           # taste heads (sklearn) — minutes, even merged
+python export_onnx.py           # export taste models to ONNX (+ roundtrip self-validation)
 ```
-`build_taste_dataset.py` writes `taste_master.parquet` (multi-label: sweet/
-bitter/umami/sour/salty) and, if SweetenersDB is present, `sweet_intensity.parquet`.
-
 `train_taste.py` trains one head per taste that clears the data threshold
-(sweet/bitter/umami train; sour/salty auto-skip -> rule), plus a sweetness-
-intensity regressor. Prints AUROC / R2 you can quote. Saves to `taste_models/`.
+(sweet/bitter/umami train; sour also gets a small-data *indicative* head; salty
+stays a validated rule), plus a sweetness-intensity regressor. Prints AUROC / R²
+you can quote. Saves to `taste_models/`.
 
-`train_odor.py` writes `odor_model/`, `embeddings.parquet`, `metrics.json`.
-
-## 6. One molecule's full flavor read (taste runs today; aroma once wired)
+## 6. One molecule's full flavor read (taste runs today)
 ```bash
 python predict.py "OC(=O)CC(O)(CC(=O)O)C(=O)O"   # citric acid → sour=True, low sweet/bitter
 ```
-Returns every taste head present + sweetness intensity + the sour flag. This is
-exactly what the workbench screen calls per molecule.
+Returns every taste head present + sweetness intensity + sour/salty flags + the
+physicochemical / stability / chemesthesis / safety packs. `substitute()` provides
+the nearest-neighbor substitution search. This is what the workbench screen calls.
+
+## 7. Run the demo workbench
+```bash
+pip install fastapi "uvicorn[standard]"
+uvicorn app:app --host 0.0.0.0 --port 8000   # then open http://<r620-ip>:8000/
+```
 
 ## Notes
-- The hard part is the install pins, not the training. Budget for it.
-- Keep raw data + checkpoints small; whole project should sit well under 40GB.
-- When you move to serving: the model file goes into a light CPU FastAPI
-  container; CUDA never has to be containerized because inference is CPU work.
-
-
-## Aroma model (OpenPOM) — the smell half
-The aroma GNN is the one version-fussy install. On the R620 (CPU):
-
-1. `pip install deepchem openpom` (pin compatible torch/rdkit/deepchem; see OpenPOM's README).
-2. Get the training data: the OpenPOM repo's curated `curated_GS_LF_merged_4983.csv`
-   (easiest), or build from `pyrfume-data/leffingwell`.
-3. `python train_odor.py`  -> writes `./odor_model/` (model + tasks.json + metrics.json)
-   and `odor_embeddings.parquet` (for the odor map + substitution search). Overnight on CPU.
-4. `predict.py` auto-loads `./odor_model/` when present; until then `predict_aroma()`
-   returns an honest 'not trained yet' instead of fabricating smells.
-5. Product (.NET): try ONNX-exporting the GNN; if it won't export cleanly, run it behind
-   the thin Python aroma sidecar (the architecture's documented fallback).
+- The taste/demo stack is light and CPU-only — no CUDA, no DeepChem.
+- Keep raw data + model artifacts small; the whole project sits well under a few GB.
+- Aroma, when it comes, trains on licensed/customer data and exports to ONNX
+  (RandomForest) or runs behind a thin Python sidecar (OpenPOM GNN) — built then,
+  not now. See `docs/AROMA.md`.

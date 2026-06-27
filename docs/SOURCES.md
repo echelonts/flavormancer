@@ -11,7 +11,7 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 
 **Cheminformatics / ML (training side — Python)**
 - **RDKit** — molecular parsing, fingerprints, descriptors, SMARTS, InChIKeys. (BSD-3-Clause.)
-- **DeepChem** — GNN training framework under OpenPOM. (MIT.) Python-only; the one runtime-Python piece.
+- **DeepChem** — GNN training framework under OpenPOM. (MIT.) For the **deferred** aroma model only; not currently installed or used.
 - **OpenPOM** (BioMachineLearning/openpom) — the message-passing GNN for odor; open reimplementation of the principal-odor-map work. (MIT — confirm.) The aroma model is theirs in spirit.
 - **scikit-learn** — RandomForest taste heads + sweetness-intensity regressor. (BSD-3-Clause.)
 - **PyTorch** — tensor/Autograd backend under DeepChem. (BSD-style.)
@@ -25,7 +25,7 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 - **ASP.NET Core / .NET** — the app/API backbone. (MIT.)
 - **React** — frontend. (MIT.)
 - **PostgreSQL** + **pgvector** — DB + embedding/substitution search. (PostgreSQL License.)
-- **FastAPI** — the Track-A demo serving layer (+ aroma sidecar if needed). (MIT.)
+- **FastAPI** — the Track-A demo serving layer. (MIT.)
 - **Docker** — single-box deployment. (Apache-2.0.)
 
 ---
