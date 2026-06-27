@@ -1,0 +1,9 @@
+# Core runtime for the prediction pipeline (training/predict.py) + the test suite.
+# Demo/export extras (skl2onnx, onnxruntime, pubchempy, umap-learn, fastapi,
+# openpyxl) are listed in training/SETUP.md and installed as needed.
+rdkit
+numpy
+pandas
+scikit-learn
+joblib
+pyarrow

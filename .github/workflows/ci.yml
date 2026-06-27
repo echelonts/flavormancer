@@ -21,6 +21,8 @@ jobs:
         run: pip install ruff pytest
       - name: Ruff lint
         run: ruff check .
+      - name: Install runtime deps
+        run: pip install -r requirements.txt
       - name: Pytest
         run: |
           if git ls-files '*test_*.py' '*_test.py' 'tests/**/*.py' | grep -q .; then
