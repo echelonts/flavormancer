@@ -37,6 +37,16 @@ the whole answer:
 So **OpenPOM does *not* "come with commercially-allowed data"** — it comes with
 *NonCommercial* data. The code was never the blocker; the data always was.
 
+**The richest target — deferred for *legal* reasons, not technical ones.** To be
+explicit: OpenPOM's curated `curated_GS_LF_merged_4983.csv` (~4,983 molecules with
+expert odor labels) is the **richest aroma-descriptor dataset we found anywhere**, and
+it's exactly what we'd train on — it's what OpenPOM itself trains on, so the model
+*would* work. We defer it **solely because it is NonCommercial / proprietary**, not
+because of any limitation in our pipeline. A more legally-aggressive actor might train
+on it; for a commercial product we will not. The clean route to comparable richness is
+to **license** the equivalent data (Leffingwell **PMP 2001**) or to use the customer's
+own — same data quality, with the commercial rights attached.
+
 **What this means for us:** we keep only OpenPOM's *code* — the MIT architecture and
 training recipe — and we **never use its GS-LF-trained weights**. When clean fuel
 exists we **train our own weights from scratch** on it: either a **licensed copy**
