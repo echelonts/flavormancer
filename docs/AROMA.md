@@ -23,6 +23,33 @@ reserved"), AromaDB (CSIR), Dravnieks (ASTM ©), sharma_2021 (ACS ©), snitz_201
 (CC-BY-NC). The **only** commercially-clean odor-descriptor set is **`keller_2016`**
 (Keller & Vosshall 2016, *BMC Neuroscience*, CC-BY-4.0; ~480 molecules, 20 descriptors).
 
+### Can we use OpenPOM commercially? (the precise scope)
+
+Yes for the **engine**, no for the **fuel it ships with** — and that distinction is
+the whole answer:
+
+| Component | License | Commercial use |
+|---|---|---|
+| OpenPOM **code** (the GNN / message-passing model) | MIT | ✅ **Yes** — use the architecture freely |
+| Bundled **data** (`curated_GS_LF_merged_4983.csv`) | GS-LF = Leffingwell/GoodScents, **NonCommercial** | ❌ **No** — the MIT repo does *not* relicense third-party data it doesn't own (same rule as Pyrfume/SweetenersDB: a repo's license only covers what the uploader authored) |
+| Any **pretrained weights** trained on that data | derivative of NonCommercial data | ❌ **Murky/risky** — a model trained on NC data and used commercially is legally unsettled; not something to bet a product on |
+
+So **OpenPOM does *not* "come with commercially-allowed data"** — it comes with
+*NonCommercial* data. The code was never the blocker; the data always was.
+
+**What this means for us:** we keep only OpenPOM's *code* — the MIT architecture and
+training recipe — and we **never use its GS-LF-trained weights**. When clean fuel
+exists we **train our own weights from scratch** on it: either a **licensed copy**
+(Leffingwell PMP 2001, ~$2,775, ideally licensed by the customer and run on-prem) or
+**the customer's own odor data**. There is no shortcut around this — a usable aroma
+model *must* be our own, trained on data we can legally use. That's exactly the taste
+pipeline over again: structures + labels in, model out. (For a small set, plain
+RandomForest suffices — see the taste heads; OpenPOM's GNN only earns its keep once
+the labeled set is large, thousands of expert-labeled molecules like PMP 2001 — so
+"keep OpenPOM" really means *keep the option of its architecture*, not any pre-baked
+model.) The only requirements: the labels are **expert sensory descriptors** (GC-MS
+identifies the molecules but carries no smell labels) and the data is ours/licensed.
+
 ## The empirical result
 
 We aggregated `keller_2016` ([`training/build_aroma_dataset.py`](../training/build_aroma_dataset.py))
