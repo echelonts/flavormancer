@@ -41,7 +41,7 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 - **UMP442 / BIOPEP-UWM** — umami references. BIOPEP-UWM is web-only; the GitHub repost `Shoombuatong/Dataset-Code` carries **no license** (all-rights-reserved) and is umami *peptide* data (a different class from our small-molecule head). **Not used.**
 
 **Aroma**
-- **Pyrfume** + **Leffingwell** odor datasets — SMILES + multilabel odor descriptors; the training data behind OpenPOM. (Pyrfume project; confirm per-dataset terms.)
+- **Pyrfume** + **Leffingwell / GoodScents (GS-LF)** odor datasets — the usual training data behind OpenPOM, but **RESTRICTED and NOT USED**: Leffingwell's manifest cites use restrictions (*John Leffingwell & Google*); GoodScents/Arctander/Flavornet (© Datu Inc.) are likewise proprietary. We **exclude all of them** (the demo may go to a customer / commercial use). The aroma model will use only commercial-clean **open** odor data (CC-BY sets like `keller_2016`; smaller — see `DATA-SOURCES.md`). The OpenPOM *code* is MIT.
 
 **Safety / regulatory (lookups — data-gated)**
 - **FEMA GRAS list** — usual/maximum use levels for the dosing analyzer. (FEMA.)
