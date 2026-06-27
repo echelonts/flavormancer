@@ -27,6 +27,15 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 - **Licensing.** ChemTastesDB (CC-BY-4.0) is the clean base. cosylab is AGPL — gated
   behind the `INCLUDE_COSYLAB` flag. Get an IP/OSS-license review before any
   commercial release; full attribution lives in [`SOURCES.md`](SOURCES.md).
+- **Verified at the data-deposit level (2026-06-27).** The two taste sources in use are
+  clean *as data*, not merely as articles — the distinction that disqualified
+  PlantMolecularTasteDB and FartDB. **ChemTastesDB** is a Zenodo **Dataset** deposit
+  (record `14963136`) with CC-BY-4.0 on the downloadable files themselves;
+  **SweetenersDB** is MIT on the authors' own repo (`chemosim-lab`), covering the CSV.
+  The underlying taste classes / sweetness values are *measured facts* (not
+  copyrightable — *Feist*), released openly by the compilers. **Rule of thumb:** a clean
+  source licenses the **data itself**; an article's CC-BY does **not** extend to a
+  database it merely describes (cf. PMTDB — article CC-BY, database i-Depot/unlicensed).
 - **Column verification.** Each new source's column names must be checked against the
   loaders (the `[VERIFY]` markers) — see issue **#25**. ChemTastesDB's mapping is
   resolved (both the coarse `Class taste` and the granular `Taste` columns are parsed).
