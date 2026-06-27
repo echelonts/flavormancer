@@ -42,6 +42,7 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 
 **Aroma**
 - **Pyrfume** + **Leffingwell / GoodScents (GS-LF)** odor datasets — the usual training data behind OpenPOM, but **RESTRICTED and NOT USED**: Leffingwell's manifest cites use restrictions (*John Leffingwell & Google*); GoodScents/Arctander/Flavornet (© Datu Inc.) are likewise proprietary. We **exclude all of them** (the demo may go to a customer / commercial use). The aroma model will use only commercial-clean **open** odor data (CC-BY sets like `keller_2016`; smaller — see `DATA-SOURCES.md`). The OpenPOM *code* is MIT.
+- **keller_2016** — Keller & Vosshall (2016), *BMC Neuroscience*, **CC-BY-4.0**; ~480 molecules with naive-subject odor-descriptor ratings. The only commercially-clean odor-descriptor set — evaluated for the aroma model and found too noisy to learn from (CV-R² ≤ 0 across all 20 descriptors; see `docs/AROMA.md`).
 
 **Safety / regulatory (lookups — data-gated)**
 - **FEMA GRAS list** — usual/maximum use levels for the dosing analyzer. (FEMA.)
