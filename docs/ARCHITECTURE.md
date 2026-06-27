@@ -111,7 +111,7 @@ artifact, not bolted onto this.)
 **To build (Track B / product — the team work):**
 - ONNX export for the taste models (`skl2onnx`)
 - ASP.NET Core API + ONNX Runtime in-process serving
-- Aroma: get the OpenPOM model trained, then ONNX-export or sidecar
+- Aroma: get the OpenPOM model trained, then ONNX-export or sidecar — **deferred until clean fuel exists; see [`AROMA.md`](AROMA.md)** for the data/licensing situation and the OpenPOM commercial scope
 - React workbench against the fixed JSON contract
 - Dockerfiles + `docker-compose.yml` (single-box)
 - Auth + per-seat (pilot-stage)

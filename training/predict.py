@@ -656,6 +656,61 @@ def _taste_profile(out):
     return ranked
 
 
+# --- Substitution search (issue #22) -------------------------------------------
+# "Find me a molecule that behaves like X." Nearest-neighbor search over our
+# labeled molecules by Morgan/Tanimoto similarity — the reformulation / cost-down
+# tool (swap an expensive or supply-constrained ingredient for a close analogue,
+# with its known tastes shown). This is the clean Track-A core; the product
+# (Track B, #22) mirrors it as a pgvector ANN query over the same fingerprints.
+_SUB_INDEX = None  # lazily built: (list[bitvect], list[smiles], list[known_tastes])
+
+
+def _build_sub_index():
+    global _SUB_INDEX
+    fps, smis, tastes = [], [], []
+    if _MASTER.exists():
+        import pandas as pd  # noqa: F811
+        m = pd.read_parquet(_MASTER)
+        basic = [t for t in ("sweet", "bitter", "umami", "sour", "salty") if t in m.columns]
+        for _, r in m.iterrows():
+            mol = Chem.MolFromSmiles(str(r["smiles"]))
+            if mol is None:
+                continue
+            fps.append(_MORGAN.GetFingerprint(mol))
+            smis.append(Chem.MolToSmiles(mol))
+            tastes.append([t for t in basic if r.get(t) == 1])
+    _SUB_INDEX = (fps, smis, tastes)
+
+
+def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
+    """Nearest-neighbor substitution: the k labeled molecules most structurally
+    similar to the query (Tanimoto over Morgan fingerprints), each with its known
+    tastes. The reformulation / cost-down tool — swap an ingredient for a close
+    analogue. Returns {'neighbors': [...]} ranked by similarity (self excluded)."""
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return {"error": f"unparseable SMILES: {smiles}"}
+    if _SUB_INDEX is None:
+        _build_sub_index()
+    fps, smis, tastes = _SUB_INDEX
+    if not fps:
+        return {"neighbors": [], "note": "no reference set loaded (taste_master.parquet absent)"}
+    q = _MORGAN.GetFingerprint(mol)
+    self_smi = Chem.MolToSmiles(mol)
+    sims = DataStructs.BulkTanimotoSimilarity(q, fps)
+    order = sorted(range(len(sims)), key=lambda i: sims[i], reverse=True)
+    neighbors = []
+    for i in order:
+        if smis[i] == self_smi or sims[i] < min_similarity:
+            continue
+        neighbors.append({"smiles": smis[i], "similarity": round(float(sims[i]), 3),
+                          "known_tastes": tastes[i]})
+        if len(neighbors) >= k:
+            break
+    return {"query": self_smi, "neighbors": neighbors,
+            "basis": "Tanimoto / Morgan r2 2048-bit over labeled molecules"}
+
+
 def predict(smiles: str, include_aroma: bool = False) -> dict:
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
