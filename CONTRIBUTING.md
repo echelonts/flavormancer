@@ -31,6 +31,10 @@ docs(data): document ChemTastesDB column names
 - **Types:** `feat fix docs chore refactor test perf`
 - **Scopes:** `training aroma api serving ui infra data docs`
 - Commits must be **signed** (GPG or SSH). PRs with unsigned commits won't merge.
+- Commits must also be **signed off** (`git commit -s`) — the `Signed-off-by:` line
+  certifies the [DCO](https://developercertificate.org/) and your agreement to the
+  project's [Contributor License Agreement](CLA.md), which lets Flavormancer be offered
+  both open-source and as proprietary on-premise builds. See [`CLA.md`](CLA.md).
 
 ## Pull requests
 
