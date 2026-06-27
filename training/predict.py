@@ -2,7 +2,7 @@
 predict.py — the unified flavor read the workbench screen renders.
 
 One molecule in, one dict out, combining whatever heads exist in taste_models/:
-  aroma          : odor descriptors        (OpenPOM model from train_odor.py)  [VERIFY hook]
+  aroma          : DEFERRED — honest 'not available' (no clean public data; see docs/AROMA.md)
   sweet/bitter/umami : probabilities 0-1   (trained heads, if present)
   sweet_intensity    : ~relative-to-sucrose estimate (if regressor present)
   sour           : bool + which acid group  (RULE — acidic groups)
@@ -585,58 +585,17 @@ def analyze_balance(ingredients):
     }
 
 
-_AROMA_DIR = Path("odor_model")
-_AROMA = None  # lazy: (model, featurizer, tasks) | ("unavailable", reason, None)
-
-
-def _load_aroma():
-    global _AROMA
-    if _AROMA is not None:
-        return _AROMA
-    try:
-        if not (_AROMA_DIR.exists() and (_AROMA_DIR / "tasks.json").exists()):
-            raise FileNotFoundError("no trained ./odor_model (run train_odor.py)")
-        import json
-        from openpom.feat.graph_featurizer import GraphFeaturizer
-        from openpom.models.mpnn_pom import MPNNPOMModel
-        tasks = json.load(open(_AROMA_DIR / "tasks.json"))
-        model = MPNNPOMModel(n_tasks=len(tasks), mode="classification",
-                             n_classes=1, model_dir=str(_AROMA_DIR), device="cpu")
-        model.restore()
-        _AROMA = (model, GraphFeaturizer(), tasks)
-    except Exception as e:  # noqa: BLE001
-        _AROMA = ("unavailable", str(e), None)
-    return _AROMA
-
-
 def predict_aroma(smiles, top_k=8):
-    """Odor-descriptor profile from the trained OpenPOM GNN.
-
-    Loads ./odor_model if present; otherwise degrades honestly (does NOT fabricate
-    smells, and does NOT crash predict()). Train it with train_odor.py.
-    """
+    """Aroma is deferred. No commercially-clean *public* odor data yields a working
+    model (see docs/AROMA.md), so rather than fabricate smells we return an honest
+    'not available'. A real head gets trained on licensed (PMP 2001) or customer
+    odor data — OpenPOM's MIT architecture for large sets, RandomForest for small —
+    and wired in here then. predict() never calls this unless include_aroma=True."""
     m = Chem.MolFromSmiles(smiles)
     if m is None:
         return {"error": f"unparseable SMILES: {smiles}"}
-    loaded = _load_aroma()
-    if loaded[0] == "unavailable":
-        return {"available": False,
-                "note": "aroma model not trained/loadable yet — run train_odor.py to build "
-                        "./odor_model (needs DeepChem + OpenPOM on the R620)",
-                "detail": loaded[1]}
-    model, feat, tasks = loaded
-    try:
-        import deepchem as dc
-        X = feat.featurize([Chem.MolToSmiles(m)])
-        scores = np.array(model.predict(dc.data.NumpyDataset(X)))
-        scores = scores[:, :, -1] if scores.ndim == 3 else scores
-        ranked = sorted(zip(tasks, [float(v) for v in scores.ravel()[:len(tasks)]]),
-                        key=lambda t: t[1], reverse=True)[:top_k]
-        return {"available": True,
-                "descriptors": [{"odor": d, "score": round(s, 3)} for d, s in ranked],
-                "note": "OpenPOM GNN (principal-odor-map reimplementation), loaded from ./odor_model"}
-    except Exception as e:  # noqa: BLE001
-        return {"available": False, "note": "aroma model load ok but prediction failed", "detail": str(e)}
+    return {"available": False,
+            "note": "aroma deferred — needs licensed/customer odor data; see docs/AROMA.md"}
 
 
 def _taste_profile(out):

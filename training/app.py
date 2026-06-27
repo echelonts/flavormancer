@@ -8,54 +8,26 @@ Then open http://<r620-ip>:8000/
 
 Endpoints:
     GET  /              -> the workbench UI (workbench.html)
-    POST /api/predict   -> {smiles|name}      -> full flavor read (predict.predict)
-    POST /api/neighbors -> {smiles|name, k}   -> substitution candidates
+    POST /api/predict   -> {smiles|name}      -> full flavor read   (predict.predict)
+    POST /api/neighbors -> {smiles|name, k}   -> substitution search (predict.substitute)
 
-Substitution runs today on Morgan-fingerprint Tanimoto similarity over the
-labeled molecules — runnable now, no aroma model required. It upgrades to the
-learned aroma-embedding space (embeddings.parquet from train_odor.py) once that
-exists: swap the fingerprint index below for those vectors + cosine distance.
-
-Auth / per-seat is stubbed (single open instance) for the demo. For deployment,
-put this behind login + per-user history as in the plan; the prediction core
-doesn't change.
+Both endpoints delegate to predict.py — one source of truth for the flavor read AND
+the substitution search (Tanimoto/Morgan nearest-neighbor over the labeled molecules;
+runnable today, no aroma model required). Auth / per-seat is stubbed (single open
+instance) for the demo; deployment puts this behind login + per-user history, and the
+prediction core doesn't change.
 """
 
 from pathlib import Path
 
-import pandas as pd
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from rdkit import Chem
-from rdkit.Chem import DataStructs, rdFingerprintGenerator
 
-import predict as P  # reuse the unified flavor read
+import predict as P  # the unified flavor read + substitution search
 
 app = FastAPI(title="Flavor Workbench (demo)")
-
-_FPS, _SMI, _KNOWN = [], [], []
-_MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
-
-
-def _build_index():
-    path = Path("taste_master.parquet")
-    if not path.exists():
-        print("note: taste_master.parquet not found — substitution search disabled")
-        return
-    m = pd.read_parquet(path)
-    basic = [t for t in ("sweet", "bitter", "umami", "sour", "salty") if t in m.columns]
-    for _, r in m.iterrows():
-        mol = Chem.MolFromSmiles(r["smiles"])
-        if mol is None:
-            continue
-        _FPS.append(_MORGAN.GetFingerprint(mol))
-        _SMI.append(r["smiles"])
-        _KNOWN.append([t for t in basic if r[t] == 1])
-    print(f"substitution index built: {len(_FPS)} molecules")
-
-
-_build_index()
 
 
 def _resolve(text: str):
@@ -90,22 +62,9 @@ def api_predict(q: Query):
 @app.post("/api/neighbors")
 def api_neighbors(q: Query):
     smi = _resolve(q.smiles)
-    if not smi or not _FPS:
+    if not smi:
         return {"neighbors": []}
-    mol = Chem.MolFromSmiles(smi)
-    fp = _MORGAN.GetFingerprint(mol)
-    sims = DataStructs.BulkTanimotoSimilarity(fp, _FPS)
-    self_smi = Chem.MolToSmiles(mol)
-    ranked = sorted(range(len(sims)), key=lambda i: sims[i], reverse=True)
-    out = []
-    for i in ranked:
-        if _SMI[i] == self_smi:
-            continue
-        out.append({"smiles": _SMI[i], "similarity": round(sims[i], 3),
-                    "known_tastes": _KNOWN[i]})
-        if len(out) >= q.k:
-            break
-    return {"neighbors": out}
+    return P.substitute(smi, k=q.k)
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -10,7 +10,7 @@ PRs reference their milestone (e.g. *"Part of M2"*), and progress is tracked in
 | **M1 — Training pipeline (Python)** | Dataset build, taste training, prediction core, ONNX export, demo workbench | ✅ Done |
 | **M2 — .NET API + ONNX serving** | ASP.NET Core skeleton, load taste ONNX, `/predict`, in-process ONNX Runtime | 🔜 Next |
 | **M3 — React workbench** | React UI against the fixed JSON contract; taste meters with confidence tags | Planned |
-| **M4 — Aroma model** | Train OpenPOM on Leffingwell; ONNX-export or sidecar; wire `predict_aroma()` | Planned |
+| **M4 — Aroma model** | Train on licensed (PMP 2001) / customer odor data; wire `predict_aroma()` — **deferred, see [docs/AROMA.md](docs/AROMA.md)** | Deferred |
 | **M5 — Packaging** | Dockerfiles, `docker-compose`, Postgres + pgvector, single-box deploy | Planned |
 | **M6 — Pilot-ready** | Auth + per-seat, pgvector substitution search, polish, demo script | Planned |
 

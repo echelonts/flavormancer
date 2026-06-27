@@ -83,8 +83,11 @@ We do **not** ship a negative-R² model — it would output confident, wrong sme
 a flavor chemist would catch it instantly (worse than nothing). `predict_aroma()`
 returns an honest "not available" marker, and **we lead with the taste engine**.
 
-The **OpenPOM scaffold (`training/train_odor.py`) is kept** as the aroma engine for
-when clean fuel exists:
+We carry **no dead scaffold** — the architecture decision lives here, not in an
+unrunnable stub. **OpenPOM is the chosen architecture** (MIT, re-addable in an
+afternoon) for large sets; RandomForest suffices for small ones, exactly as the
+taste heads and the `train_aroma.py` evaluation already demonstrate. We build the
+training script when clean fuel exists:
 1. **License PMP 2001** (~$2,775, Leffingwell & Associates) → re-curate → train.
 2. **A customer's own odor data** (the paid pilot) → train on-prem.
 3. A future open *expert-labeled* dataset, if one emerges.
