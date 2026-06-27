@@ -1,5 +1,9 @@
 # Contributing to Flavormancer
 
+> **Note:** Flavormancer is currently built by a fixed internal team and is **not
+> accepting external contributions** at this stage. Unsolicited pull requests will be
+> closed (no reflection on the work). This guide is for the project's own team.
+
 Thanks for contributing. This guide covers how we branch, commit, and review so
 the history stays clean and the work stays legible.
 

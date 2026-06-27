@@ -16,7 +16,8 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 | **FlavorDB** | ~25k molecules taste+odor + natural-source mapping | **CC BY-NC-SA 3.0** | ❌ skip | NonCommercial — incompatible with a commercial product. |
 | **UMP442 / BIOPEP-UWM** | more umami examples | none / unclear | ❌ skip | BIOPEP-UWM is web-only; the `Shoombuatong/Dataset-Code` repost has **no LICENSE** (all-rights-reserved) and is umami *peptide* data (different class from our small-molecule head). |
 | **SweetenersDB v2.0** | the sweetness-**intensity** regressor | **MIT** | ✅ in use | direct CSV from `github.com/chemosim-lab/SweetenersDB` (`SweetenersDB_v2.0.csv`, 316 cmpds, `logSw` column). R²≈0.82. |
-| **Pyrfume / Leffingwell** | the **aroma model** (OpenPOM) — issues #17 / #18 | per-set; confirm | ⬜ to get | `git clone github.com/pyrfume/pyrfume-data`; Leffingwell odor set. Separate, version-fragile effort. |
+| **Pyrfume — Leffingwell/GoodScents (GS-LF)** | the **aroma model** (OpenPOM) — #17/#18 | **RESTRICTED** | ❌ **excluded** | Use restrictions (John Leffingwell & Google; GoodScents/Arctander/Flavornet © Datu Inc.). **Not used at all, not even for the demo** — it may go to a customer / a commercial soda venture, so we avoid the liability entirely. |
+| **Pyrfume — open academic sets** | aroma model, **clean but small** | CC-BY / open-access (verify each) | candidates | `keller_2016` (BMC, CC-BY, ~480 cmpds), `snitz_2013` (PLOS, CC-BY), etc. Confirm each data deposit's license; combine + harmonize descriptor vocabularies for volume. |
 | **FEMA GRAS / FDA SAF** | GRAS cross-reference + dosing/OAV lookups | gov public / FEMA | ⬜ to get | FDA "Substances Added to Food" (public domain) → `gras_reference.parquet`; FEMA use-level PDFs → `properties.parquet`. **Verify every scraped dosing number.** |
 
 ## Notes
@@ -28,6 +29,25 @@ What feeds the models, what each source unlocks, its license, and how to get it.
   loaders (the `[VERIFY]` markers) — see issue **#25**. ChemTastesDB's mapping is
   resolved (both the coarse `Class taste` and the granular `Taste` columns are parsed).
 - **Suggested priority.** (1) `Taste`-column mining — **done** ✅ → (2) SweetenersDB
-  intensity head — **done** ✅ → (3) Pyrfume / Leffingwell for the aroma model →
-  (4) cosylab for taste volume (AGPL — pending decision). **FlavorDB is
-  CC BY-NC-SA (NonCommercial) — incompatible with a commercial product; skip.**
+  intensity head — **done** ✅ → (3) aroma model (see the data caveat below) →
+  (4) cosylab — **skip** (AGPL). **FlavorDB is CC BY-NC-SA (NonCommercial) — skip.**
+- **Aroma data — COMMERCIAL-CLEAN ONLY (decision).** Every *rich* odor-descriptor set
+  (Leffingwell, GoodScents, Arctander, Flavornet © Datu Inc., FlavorDB / FooDB NC) is
+  restricted or NonCommercial — **we do NOT use any of them, not even for the demo**,
+  because the demo may be handed to a customer or used in a commercial soda venture.
+  Build the aroma model **only on truly-open (CC-BY / public-domain) odor sets** —
+  candidates from open-access journals: `keller_2016` (BMC, CC-BY, ~480), `snitz_2013`
+  (PLOS, CC-BY), etc. (verify each deposit's license). These are *small*, so the public
+  aroma model will be modest — combine + harmonize them for volume, or **defer the
+  aroma model until enough clean data (or the customer's own) exists.** OpenPOM *code*
+  is MIT and stays usable.
+- **Pyrfume's repo MIT covers code/curation only** — each dataset keeps its *own*
+  license (Pyrfume: *"data provided as-is… licensing per dataset… takedown requests to
+  admin@pyrfume.org"*). **Downloadable ≠ usable.**
+- **Affordable commercial path for *rich* aroma.** The Zenodo Leffingwell set (3,523
+  odor-descriptor molecules, `zenodo.org/records/4085098`) is **CC-BY-NC** (research-only
+  → not for us), but it derives from Leffingwell's **PMP 2001** database, which **is
+  commercially licensable** (~$2,775 historical, 2 workstations, from Leffingwell &
+  Associates). License PMP 2001 → re-curate the descriptors from *your licensed copy* →
+  a strong, commercially-clean aroma model. Or have a client license it and load it
+  on-prem (the data liability stays with them).
