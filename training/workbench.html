@@ -59,12 +59,19 @@
   .err{background:#FBEDE9;border:1px solid #E7C4B8;color:#8A3A22;border-radius:9px;
     padding:12px 15px;margin-top:18px;font-size:14px}
   .note{font-size:12.5px;color:var(--muted);margin-top:18px;line-height:1.55}
+  .card-sub{font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5}
+  .aroma-card{margin-top:18px;border-color:#BFD8D0;background:linear-gradient(180deg,#F2F8F6,#FFFFFF)}
+  .aroma-card h2{color:var(--aroma)}
+  .aroma-lead{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px}
+  .aroma-lead b{color:var(--aroma)}
+  .aroma-note{font-size:13px;color:var(--muted);margin:0;line-height:1.55;max-width:760px}
+  .aroma-note b{color:var(--ink)}
 </style>
 </head>
 <body>
 <header>
   <h1>Flavor Workbench</h1>
-  <span class="sub">predict taste &amp; aroma before you pour</span>
+  <span class="sub">taste prediction &amp; substitution — before you pour</span>
 </header>
 <main>
   <div class="bar">
@@ -85,16 +92,26 @@
     </div>
     <div class="card">
       <h2>Substitution candidates</h2>
+      <p class="card-sub">Structurally similar molecules you could swap in — each with its known tastes.</p>
       <div id="neighbors"></div>
     </div>
+  </div>
+
+  <div class="card aroma-card" id="aromaCard" style="display:none">
+    <h2>Aroma</h2>
+    <div class="aroma-lead">Aroma prediction unlocks with <b>your</b> data.</div>
+    <p class="aroma-note">The public demo predicts <b>taste</b> from open data. A useful
+    aroma model needs expert-labeled odor data — so we train it <b>on-premise, on your
+    licensed or in-house data</b>, never leaving your firewall. The pipeline is built and
+    ready; it lights up the moment the data is yours to use.</p>
   </div>
 
   <p class="note" id="footnote" style="display:none">
     Bars are model predictions; a <b>measured</b> tag means the molecule is in the
     curated data (ground truth, not a guess). Salty is lookup-only and sour is a
-    rule. Substitutions rank by structural similarity today and sharpen to learned
-    aroma-space once the aroma model is trained. Results are leads for the bench,
-    not verdicts.
+    rule. Substitutions rank by structural similarity (Tanimoto over molecular
+    fingerprints). Aroma isn't in the public demo — it trains on your licensed or
+    in-house odor data, on-prem. Results are leads for the bench, not verdicts.
   </p>
 </main>
 
@@ -135,7 +152,7 @@ async function run(){
     if(p.error){ throw new Error(p.error); }
     render(p, n.neighbors||[]);
   }catch(e){
-    $('results').style.display='none'; $('footnote').style.display='none';
+    $('results').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
     $('err').textContent = e.message; $('err').style.display='block';
   }finally{
     go.disabled=false; go.textContent='Read flavor';
@@ -170,11 +187,11 @@ function render(p, neighbors){
       <div class="neighbor">
         <div><div class="s">${x.smiles}</div>
         <div class="kt">${x.known_tastes.length?x.known_tastes.join(' · '):'—'}</div></div>
-        <div class="sim">${x.similarity}</div>
+        <div class="sim">${Math.round(x.similarity*100)}% match</div>
       </div>`).join('');
   }
 
-  $('results').style.display='grid'; $('footnote').style.display='block';
+  $('results').style.display='grid'; $('aromaCard').style.display='block'; $('footnote').style.display='block';
   // animate bar fills
   requestAnimationFrame(()=>document.querySelectorAll('.fill')
     .forEach(f=>f.style.width=f.dataset.w+'%'));
