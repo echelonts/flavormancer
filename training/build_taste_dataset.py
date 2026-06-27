@@ -9,9 +9,16 @@ how much data each taste actually has.
 Inputs (download what you have; loaders skip cleanly if a file is absent):
   - ChemTastesDB_database.xlsx   Zenodo, CC-BY-4.0   10 classes, 4075 molecules
   - bittersweet/data/*.tsv       cosylab,  AGPL-3.0   sweet/bitter      [optional]
-  - flavordb_taste.csv           FlavorDB export      SMILES + taste     [OBTAIN]
+  - flavordb_taste.csv           FlavorDB export      SMILES + taste     [OBTAIN — NC, skip]
   - umami_list.csv               UMP442/BIOPEP-UWM    umami SMILES       [OBTAIN]
   - sweeteners_db.csv            Cheron SweetenersDB  sweetness intensity[OBTAIN]
+
+Note: the two richest *extra* taste sources are BOTH excluded on diligence — FartDB
+(HuggingFace, ~31k) is an MIT badge over a FlavorDB (CC-BY-NC-SA) + SciFinder
+(proprietary) composite; PlantMolecularTasteDB is article-CC-BY but the DATABASE is
+web-only + i-Depot IP-registered with no open data license. Both are the "downloadable
+!= usable" trap (cf. OpenPOM GS-LF). See docs/DATA-SOURCES.md. Taste stays on
+ChemTastesDB + SweetenersDB until a genuinely clean source (or customer data) appears.
 
 Outputs:
   - taste_master.parquet     inchikey, smiles, {sweet,bitter,umami,sour,salty}=1/0/NaN,
