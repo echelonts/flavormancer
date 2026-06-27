@@ -12,6 +12,8 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 | Source | Unlocks | License | Status | How to get |
 |--------|---------|---------|--------|-----------|
 | **ChemTastesDB v2.0** | sweet/bitter/umami training + sour/salty rule data (primary) | CC-BY-4.0 | ✅ in use | Zenodo record `14963136`, direct download (see `training/SETUP.md`). Column mapping verified. |
+| **PlantMolecularTasteDB** | natural-product / phytochemical tastants (1,527 cmpds) | **article CC-BY, but DATABASE unlicensed** | ❌ **excluded (on diligence)** | Gradinaru et al., *Front. Pharmacol.* `10.3389/fphar.2021.751712`. The **article** is CC-BY, but the **database** is web-only (plantmoleculartastedb.org), carries **no open data license**, and the authors registered an **i-Depot** (IP/authorship claim, cert. 122867). Article-CC-BY ≠ database-CC-BY — would need the authors' explicit commercial grant. **Not used.** |
+| **FartDB** | largest public tastant set (~31k molecules) | **MIT badge — composite NOT clean** | ❌ **excluded** | HuggingFace `FartLabs/FartDB` is labeled MIT, but it composites **FlavorDB (CC-BY-NC-SA)** + **SciFinder (CAS, proprietary)** + Tas2R-DB (ACS). The MIT badge can't relicense data FartLabs doesn't own — the **OpenPOM GS-LF trap again**. NonCommercial/proprietary upstream → not usable commercially. |
 | **cosylab/bittersweet** | more sweet/bitter volume | AGPL-3.0 | ⬜ to get | `git clone github.com/cosylabiiit/bittersweet` → `bittersweet/data/*.tsv`. AGPL: keep a CC-BY-clean build with `INCLUDE_COSYLAB=False`, or opt in deliberately. |
 | **FlavorDB** | ~25k molecules taste+odor + natural-source mapping | **CC BY-NC-SA 3.0** | ❌ skip | NonCommercial — incompatible with a commercial product. |
 | **UMP442 / BIOPEP-UWM** | more umami examples | none / unclear | ❌ skip | BIOPEP-UWM is web-only; the `Shoombuatong/Dataset-Code` repost has **no LICENSE** (all-rights-reserved) and is umami *peptide* data (different class from our small-molecule head). |
@@ -30,7 +32,13 @@ What feeds the models, what each source unlocks, its license, and how to get it.
   resolved (both the coarse `Class taste` and the granular `Taste` columns are parsed).
 - **Suggested priority.** (1) `Taste`-column mining — **done** ✅ → (2) SweetenersDB
   intensity head — **done** ✅ → (3) aroma model (see the data caveat below) →
-  (4) cosylab — **skip** (AGPL). **FlavorDB is CC BY-NC-SA (NonCommercial) — skip.**
+  (4) cosylab — **skip** (AGPL). **No additional commercial-clean taste source is
+  currently available** — the three richest candidates all fail the same "downloadable
+  ≠ usable" test: FlavorDB is CC-BY-NC-SA (NonCommercial); FartDB (~31k) is an MIT badge
+  over an NC/proprietary composite (FlavorDB + SciFinder); PlantMolecularTasteDB is
+  article-CC-BY but its database is i-Depot-registered and unlicensed. Taste stays on
+  ChemTastesDB + SweetenersDB until a genuinely clean source — or **customer data** —
+  appears.
 - **Aroma data — COMMERCIAL-CLEAN ONLY (decision).** Every *rich* odor-descriptor set
   (Leffingwell, GoodScents, Arctander, Flavornet © Datu Inc., FlavorDB / FooDB NC) is
   restricted or NonCommercial — **we do NOT use any of them, not even for the demo**,
