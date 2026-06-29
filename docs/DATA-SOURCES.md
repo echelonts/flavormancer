@@ -35,7 +35,7 @@ be filled with **truly commercial-free** data:
 
 | Feature | Clean-commercial source | Verdict |
 |---|---|---|
-| **GRAS / food-ingredient cross-check** | **FDA "Substances Added to Food" (SAF)** — US-gov **public domain** (CC0 via openFDA); Excel download | ✅ **Commercial-ready.** Build `gras_reference.parquet` (an `inchikey` column) from SAF. |
+| **GRAS / food-ingredient cross-check** | **FDA "Substances Added to Food" (SAF)** — US-gov **public domain**; direct download | ✅ **Built.** `training/build_gras_reference.py` downloads SAF, extracts CAS, resolves to InChIKey via PubChem → `gras_reference.parquet`. Tested on the live file: 3,969 CAS parsed and resolving cleanly. ~20 min full build, run locally. |
 | **Measured boiling point / vapor pressure** | **PubChem** experimental properties — **public domain**, no commercial restriction; API | ✅ **Built.** `training/build_properties.py` pulls + parses PubChem experimental BP/VP → `properties.parquet`. Verified on knowns (vanillin 285 °C, eugenol 254 °C, limonene 178 °C, ethyl acetate 77 °C). Run it to enable measured volatility. |
 | **Quantitative dosing (OAV) — odor thresholds** | none clean — the standard compilations (Devos/Oxford 1990, ASTM DS48A, van Gemert) are **copyrighted books**; only tiny open subsets exist | ⚠️ **Stays qualitative.** Quantitative only with **customer-supplied** thresholds or a licensed compilation. Individual values are facts (*Feist*), but no clean bulk set exists. **Not** academic-rescuable (copyright ≠ NC). |
 | **Quantitative dosing — FEMA use levels** | FEMA usual/max levels sit in copyrighted GRAS papers; SAF is an inventory, not max-ppm | ⚠️ Customer-supplied or licensed, as above. |
