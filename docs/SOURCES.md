@@ -64,7 +64,9 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
   ~$2,850 single-seat) — *not used* (paywall); RI deferred to customer/licensed data. (RI
   is **not** in PubChem — verified by probe.)
 - **Tox21** (NIH/NCATS · EPA · FDA · NTP) — public toxicity-assay data (public domain, on
-  PubChem / data.gov). A **clean candidate** for caution-only tox flags; **not yet built**.
+  PubChem / data.gov; MoleculeNet mirror of the Tox21 Challenge set). **In use** — 12
+  caution-only RandomForest tox-assay heads (`train_tox.py` → `predict_tox()`),
+  CV-AUROC 0.72–0.90. INDICATIVE in-vitro flags, never a determination.
 
 ---
 

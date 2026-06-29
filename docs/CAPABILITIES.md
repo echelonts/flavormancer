@@ -54,7 +54,10 @@ by how it's derived, and nothing claims more certainty than its source supports.
 **Safety (all defensive, caution-only — never a clearance)**
 - Disclaimer + scope on every result.
 - Structural tox-alert screen — nitro/N-nitroso/azo/epoxide (**rule**).
-- GRAS / approved-ingredient cross-reference (**lookup**, data-gated).
+- GRAS / approved-ingredient cross-reference — FDA SAF, public domain, `build_gras_reference.py` (**lookup**).
+- **In-vitro tox-assay flags** — 12 Tox21 assays (genotoxic-stress SR-p53/SR-ATAD5, AhR,
+  mitochondrial, endocrine), `predict_tox()` (**trained**, Tox21 public domain). INDICATIVE
+  activity for review, **never a determination**.
 - Preliminary TTC concern tier (**qualitative** heuristic; Toxtree for the real call).
 - EU declarable fragrance-allergen labeling flag — `labeling()` (**lookup**, curated subset).
 

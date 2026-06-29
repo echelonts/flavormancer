@@ -22,3 +22,10 @@ def test_predict_aroma_is_honest_placeholder():
     out = predict.predict_aroma("CCO")
     assert out["available"] is False
     assert "AROMA.md" in out["note"]
+
+
+def test_predict_includes_tox_screen():
+    # tox_screen is always present and well-formed (honest available:False with no models, as in CI)
+    out = predict.predict("CCO")
+    assert "tox_screen" in out["safety"]
+    assert isinstance(out["safety"]["tox_screen"]["available"], bool)
