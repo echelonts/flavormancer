@@ -18,7 +18,9 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 - **NumPy**, **pandas** — arrays + dataframes. (BSD-3-Clause.)
 - **UMAP** — 2D odor/flavor-space map. (BSD-3-Clause.)
 - **skl2onnx** — exports the sklearn taste models to ONNX. (Apache-2.0.)
-- *(thermo — evaluated for Joback boiling point, then REJECTED for accuracy; not shipped. MIT.)*
+- **thermo** — used to evaluate Joback structure-based boiling point; **REJECTED** (mean
+  abs error 33 °C across 12 flavor molecules, max 89 °C). Not shipped. (MIT.)
+- **PubChem / FDA SAF** — data sources for measured properties + GRAS; cited under *Data sources*.
 
 **Product / serving side**
 - **ONNX** + **ONNX Runtime** — run taste models in-process in .NET. (MIT.)
@@ -39,17 +41,30 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 - **FartDB** — FartLabs (HuggingFace), ~31k tastants behind the 2025 *npj Science of Food* "FART" model — the largest public tastant set. Repo labeled **MIT**, but it **composites FlavorDB (CC-BY-NC-SA) + SciFinder (CAS, proprietary) + Tas2R-DB (ACS)**; the MIT badge cannot relicense data the authors don't own. **Excluded** (NonCommercial/proprietary upstream) — the same "downloadable ≠ usable" trap as OpenPOM's GS-LF.
 - **SweetenersDB v2.0** — Bouysset et al. (2020) *Food Chem.*, building on Chéron et al. (2017); relative-to-sucrose sweetness *intensity* for the regressor. Released **MIT** by the authors' own lab (ChemSenSim, `github.com/chemosim-lab/SweetenersDB`) — the paywall is only on the journal article, not the authors' own data. **In use.**
 - **PlantMolecularTasteDB** — Gradinaru et al. (2022), *Frontiers in Pharmacology* (DOI 10.3389/fphar.2021.751712); 1,527 taste-active phytochemicals. The **article** is CC-BY, but the **database** is web-only (plantmoleculartastedb.org) with **no open data license** and an **i-Depot** IP/authorship registration by the authors — article-CC-BY does **not** extend to the database. **Excluded** pending an explicit commercial grant; article-CC-BY ≠ database-CC-BY (same lesson as Pyrfume/OpenPOM).
-- **BitterDB** *(future)* — bitterness intensity, if/when added.
+- **BitterDB** — Niv lab (Hebrew U), >2,200 bitter compounds. License **CC BY-NC 3.0
+  (NonCommercial)** — commercial use needs a separate license. **Excluded from the
+  commercial edition**; a candidate for the **academic edition's** bitterness-intensity head.
 - **UMP442 / BIOPEP-UWM** — umami references. BIOPEP-UWM is web-only; the GitHub repost `Shoombuatong/Dataset-Code` carries **no license** (all-rights-reserved) and is umami *peptide* data (a different class from our small-molecule head). **Not used.**
 
 **Aroma**
 - **Pyrfume** + **Leffingwell / GoodScents (GS-LF)** odor datasets — the usual training data behind OpenPOM, but **RESTRICTED and NOT USED**: Leffingwell's manifest cites use restrictions (*John Leffingwell & Google*); GoodScents/Arctander/Flavornet (© Datu Inc.) are likewise proprietary. We **exclude all of them** (the demo may go to a customer / commercial use). The aroma model will use only commercial-clean **open** odor data (CC-BY sets like `keller_2016`; smaller — see `DATA-SOURCES.md`). The OpenPOM *code* is MIT.
 - **keller_2016** — Keller & Vosshall (2016), *BMC Neuroscience*, **CC-BY-4.0**; ~480 molecules with naive-subject odor-descriptor ratings. The only commercially-clean odor-descriptor set — evaluated for the aroma model and found too noisy to learn from (CV-R² ≤ 0 across all 20 descriptors; see `docs/AROMA.md`).
 
-**Safety / regulatory (lookups — data-gated)**
-- **FEMA GRAS list** — usual/maximum use levels for the dosing analyzer. (FEMA.)
+**Safety / regulatory / properties**
+- **FDA "Substances Added to Food" (SAF)** — the GRAS / recognized-food-ingredient
+  cross-check. **US-government work, public domain.** In use via `build_gras_reference.py`.
+- **FEMA usual/maximum use levels** — for *quantitative* dosing. Published in FEMA's
+  copyrighted GRAS papers — **not freely available in bulk**; data-gated (customer/licensed).
 - **EU declarable fragrance/flavor allergen annex** — the labeling flags. (EU regulation.)
-- **PubChem** — name↔SMILES↔CID resolution. (Public domain data; confirm API terms.)
+- **PubChem** (NIH/NCBI) — used three ways: name/CAS↔SMILES↔CID resolution; experimental
+  **boiling point / vapor pressure** (`build_properties.py`); and CAS→InChIKey for GRAS
+  (`build_gras_reference.py`). **Public domain — no restriction on use, incl. commercial**
+  (attribution appreciated).
+- **NIST GC/RI library** — Kovats retention indices. **PAID** (~$595 data-only FTP to
+  ~$2,850 single-seat) — *not used* (paywall); RI deferred to customer/licensed data. (RI
+  is **not** in PubChem — verified by probe.)
+- **Tox21** (NIH/NCATS · EPA · FDA · NTP) — public toxicity-assay data (public domain, on
+  PubChem / data.gov). A **clean candidate** for caution-only tox flags; **not yet built**.
 
 ---
 

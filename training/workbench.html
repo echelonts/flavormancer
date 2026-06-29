@@ -66,6 +66,9 @@
   .aroma-lead b{color:var(--aroma)}
   .aroma-note{font-size:13px;color:var(--muted);margin:0;line-height:1.55;max-width:760px}
   .aroma-note b{color:var(--ink)}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:10px}
+  .kv .k{font-weight:600;font-size:13px}
+  .kv .v{font-family:var(--mono);font-size:13px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -95,6 +98,11 @@
       <p class="card-sub">Structurally similar molecules you could swap in — each with its known tastes.</p>
       <div id="neighbors"></div>
     </div>
+  </div>
+
+  <div class="card" id="behaviorCard" style="display:none">
+    <h2>Behavior &amp; safety</h2>
+    <div id="behavior"></div>
   </div>
 
   <div class="card aroma-card" id="aromaCard" style="display:none">
@@ -152,7 +160,7 @@ async function run(){
     if(p.error){ throw new Error(p.error); }
     render(p, n.neighbors||[]);
   }catch(e){
-    $('results').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
+    $('results').style.display='none'; $('behaviorCard').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
     $('err').textContent = e.message; $('err').style.display='block';
   }finally{
     go.disabled=false; go.textContent='Read flavor';
@@ -191,10 +199,30 @@ function render(p, neighbors){
       </div>`).join('');
   }
 
-  $('results').style.display='grid'; $('aromaCard').style.display='block'; $('footnote').style.display='block';
+  renderBehavior(p);
+  $('results').style.display='grid'; $('behaviorCard').style.display='block'; $('aromaCard').style.display='block'; $('footnote').style.display='block';
   // animate bar fills
   requestAnimationFrame(()=>document.querySelectorAll('.fill')
     .forEach(f=>f.style.width=f.dataset.w+'%'));
+}
+
+function renderBehavior(p){
+  const pc = p.physchem||{}, sf = p.safety||{};
+  const comp = pc.computed||{}, meas = pc.measured||{}, qual = pc.qualitative||{};
+  const MEAS = ' <span class="tag measured">measured</span>';
+  const rows = [];
+  if(typeof comp.mol_weight==='number') rows.push(['MW', comp.mol_weight+' g/mol']);
+  if(typeof comp.logP==='number') rows.push(['logP', comp.logP]);
+  if(typeof meas.boiling_point_c==='number') rows.push(['Boiling point', meas.boiling_point_c+' °C'+MEAS]);
+  if(qual.aroma_volatility) rows.push(['Volatility', qual.aroma_volatility]);
+  if(typeof meas.vapor_pressure_pa==='number') rows.push(['Vapor pressure', meas.vapor_pressure_pa+' Pa'+MEAS]);
+  if(sf.gras_status) rows.push(['Food-use status', sf.gras_status]);
+  if(sf.ttc_hint && sf.ttc_hint.preliminary_tier) rows.push(['TTC tier (prelim.)', sf.ttc_hint.preliminary_tier]);
+  let html = '<div class="kv">'+rows.map(r=>`<div class="k">${r[0]}</div><div class="v">${r[1]}</div>`).join('')+'</div>';
+  const alerts = sf.structural_alerts||[];
+  if(alerts.length) html += '<div class="chips">'+alerts.map(a=>`<span class="chip" style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8">⚠ ${a}</span>`).join('')+'</div>';
+  html += '<div class="empty" style="font-size:12px">Defensive screen — flags for review, never a clearance.</div>';
+  $('behavior').innerHTML = html;
 }
 
 function chip(key, on, color, label){
