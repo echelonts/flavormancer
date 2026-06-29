@@ -5,6 +5,12 @@ what it *cannot* do on public data (and what would unlock it), and the ultimate
 shape of the tool. The organizing discipline throughout: **every output is tagged
 by how it's derived, and nothing claims more certainty than its source supports.**
 
+> **Edition note.** This catalogues the **commercial** edition (Apache-2.0,
+> commercial-clean data). **Aroma** (odor descriptors) is **not** here — it moves to
+> the open-source **academic edition** (coming soon), which adds research odor data
+> carrying NonCommercial terms. In the commercial product, aroma trains on the
+> customer's own licensed / in-house data.
+
 **Confidence tiers used below**
 - **computed** — exact from structure (RDKit). Not a prediction; a calculation.
 - **trained** — an ML model fit on open data; accuracy varies by data volume.
@@ -25,9 +31,11 @@ by how it's derived, and nothing claims more certainty than its source supports.
 - Multitaste — fires when 2+ taste heads are high (**trained**-derived).
 - Known-taste ground truth — verified labels override predictions (**lookup**).
 
-**Aroma**
-- Odor-descriptor profile (**trained**, OpenPOM principal-odor-map scaffold; the
-  hardest piece, still to be trained on Pyrfume/Leffingwell).
+**Aroma** — *not in the commercial edition.*
+- Odor-descriptor prediction needs research odor datasets with NonCommercial terms,
+  so it ships in the separate **academic edition** (coming soon), not here. In the
+  commercial product, aroma trains on **your** licensed / in-house odor data, on-prem.
+  See [`AROMA.md`](AROMA.md).
 
 **Physicochemical & behavior**
 - logP, molecular weight, TPSA, H-bond donors/acceptors, rotatable bonds,
@@ -137,7 +145,8 @@ The maximal *honest* tool, on-prem, one screen:
 
 **Enter a molecule** (name or SMILES) → a complete single-molecule dossier: taste
 (sweet/bitter/umami + sweetness intensity + sour/salty rules), aroma descriptor
-profile, behavior (logP/MW/TPSA/solubility/volatility/pKa, measured props where
+profile *(academic edition, or trained on your data)*, behavior
+(logP/MW/TPSA/solubility/volatility/pKa, measured props where
 loaded), stability watch-flags, chemesthetic class (cooling/pungent/astringent),
 an analytical RI estimate, and a layered safety panel (alerts + GRAS + TTC hint) —
 each value tagged computed/trained/rule/estimate/lookup/qualitative.
@@ -148,8 +157,9 @@ checks against FEMA max use levels, and the documented dangerous-pair hazard
 screen — with the explicit caveat that this is single-molecule impact, not
 finished-blend perception.
 
-**Explore** → a flavor-space map (chemistry→aroma embedding) and nearest-neighbor
-substitution search for cost-down/reformulation, all running on hardware the
+**Explore** → a flavor-space map and nearest-neighbor substitution search
+(structural similarity today; learned embeddings once the aroma model is in) for
+cost-down/reformulation, all running on hardware the
 customer owns, with their data never leaving the building.
 
 **The honest boundary:** everything above is *single-molecule prediction and
