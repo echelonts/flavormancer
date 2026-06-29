@@ -22,6 +22,31 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 | **Pyrfume — open academic sets** | aroma model, **clean but small** | CC-BY / open-access (verify each) | candidates | `keller_2016` (BMC, CC-BY, ~480 cmpds), `snitz_2013` (PLOS, CC-BY), etc. Confirm each data deposit's license; combine + harmonize descriptor vocabularies for volume. |
 | **FEMA GRAS / FDA SAF** | GRAS cross-reference + dosing/OAV lookups | gov public / FEMA | ⬜ to get | FDA "Substances Added to Food" (public domain) → `gras_reference.parquet`; FEMA use-level PDFs → `properties.parquet`. **Verify every scraped dosing number.** |
 
+## Commercial data-completion plan (the data-gated features)
+
+Several features are **built but data-gated** — the code lives in `predict.py`; they
+light up when their reference table is dropped in. Diligence on whether each gap can
+be filled with **truly commercial-free** data:
+
+> **Key finding:** the academic edition does **not** rescue these. Its special power is
+> *NonCommercial-licensed research data* (aroma / GS-LF). Copyrighted or paid data
+> (odor thresholds, NIST RI) isn't NonCommercial — it's all-rights-reserved or
+> for-sale — so it's blocked in **both** editions until licensed or customer-supplied.
+
+| Feature | Clean-commercial source | Verdict |
+|---|---|---|
+| **GRAS / food-ingredient cross-check** | **FDA "Substances Added to Food" (SAF)** — US-gov **public domain** (CC0 via openFDA); Excel download | ✅ **Commercial-ready.** Build `gras_reference.parquet` (an `inchikey` column) from SAF. |
+| **Measured boiling point / vapor pressure** | **PubChem** experimental properties — **public domain**, no commercial restriction; API/FTP | ✅ **Commercial-ready.** Build `properties.parquet` (`inchikey` + `boiling_point_c` / `vapor_pressure_pa`) from PubChem. |
+| **Quantitative dosing (OAV) — odor thresholds** | none clean — the standard compilations (Devos/Oxford 1990, ASTM DS48A, van Gemert) are **copyrighted books**; only tiny open subsets exist | ⚠️ **Stays qualitative.** Quantitative only with **customer-supplied** thresholds or a licensed compilation. Individual values are facts (*Feist*), but no clean bulk set exists. **Not** academic-rescuable (copyright ≠ NC). |
+| **Quantitative dosing — FEMA use levels** | FEMA usual/max levels sit in copyrighted GRAS papers; SAF is an inventory, not max-ppm | ⚠️ Customer-supplied or licensed, as above. |
+| **GC-MS Kovats retention index** | **NIST RI library** is a **paid** Standard Reference Database; open RI sets are small/uncertain | ⚠️ **Data-gated.** Commercial via a **NIST license**, **customer RI data**, or a QSPR trained on a vetted open set. Not free at scale. |
+
+**Bottom line:** GRAS + measured BP/VP are fully enableable now on public-domain data
+(loaders already exist — just build the two parquet tables). Quantitative dosing and RI
+can't be filled with free-commercial data and aren't academic-rescuable either; they
+light up with the **customer's own data** or a **paid license** — the "comes with your
+data" model again.
+
 ## Notes
 
 - **Licensing.** ChemTastesDB (CC-BY-4.0) is the clean base. cosylab is AGPL — gated

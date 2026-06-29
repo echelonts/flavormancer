@@ -40,9 +40,16 @@ is tagged by how it was derived**, so nothing reads as more certain than its sou
 - **Substitution search** — nearest-neighbor lookup over the labeled set for
   reformulation and cost-down ("find me a molecule that behaves like this one").
 
-**Aroma** (odor-descriptor prediction) is **not** in this edition — it moves to the
-academic edition below. In the commercial product, aroma trains on your **licensed
-or in-house** odor data, on-prem.
+**Aroma** (odor-descriptor prediction) is **not** built into this edition and isn't
+pre-trained. It *can* be trained for a customer on **their own odor data**, or on a
+**commercially-licensed** dataset (e.g. Leffingwell **PMP 2001**), when that data is
+provided. The full *open* aroma model — trained on research odor data that carries
+NonCommercial terms — lives in the academic edition.
+
+> *What aroma training needs from you:* molecules (SMILES, or **GC-MS** to identify
+> the compounds in your products) paired with your panel's **expert odor descriptors**
+> (e.g. green / fruity / woody, ideally with intensity). GC-MS identifies the
+> molecules; the sensory labels are what the model learns — GC-MS alone isn't enough.
 
 **Scope:** Flavormancer predicts *flavor properties only*. It is not a safety,
 toxicity, GRAS, regulatory, or stability determination. A prediction is never a
@@ -65,7 +72,7 @@ Flavormancer ships as two editions of one method:
 | Edition | Commercial | Academic / open-source *(coming soon)* |
 | License | Apache-2.0 | open-source, **research / NonCommercial** |
 | Data | commercial-clean open data only | adds research odor datasets with **NonCommercial** terms |
-| Aroma | trained on **your** licensed / customer data | full open aroma model included |
+| Aroma | *would* be trained on your own data, or a licensed set (e.g. PMP 2001), when provided | full open model included (research odor data) |
 | Use | free to use, sell, run on-prem | research, teaching, advancing the method |
 
 The split is deliberate. The richest aroma data is licensed for research only, so
