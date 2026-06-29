@@ -2,8 +2,8 @@
 
 On-prem flavor prediction from chemical structure — **taste, physicochemical
 behavior, dosing, and safety flags** for any molecule, plus substitution search.
-Enter a name or SMILES and get a single, honest flavor read, running entirely on
-hardware you own.
+Enter a **common or IUPAC name** (or a SMILES) and get a single, honest flavor read,
+running entirely on hardware you own.
 
 > **This is the commercial edition** — Apache-2.0 and **commercial-clean**: every
 > model trains only on permissively-licensed open data, so it's free to use, sell,
@@ -50,6 +50,10 @@ NonCommercial terms — lives in the academic edition.
 > the compounds in your products) paired with your panel's **expert odor descriptors**
 > (e.g. green / fruity / woody, ideally with intensity). GC-MS identifies the
 > molecules; the sensory labels are what the model learns — GC-MS alone isn't enough.
+
+For exactly what data unlocks each *further* capability (aroma, quantitative dosing,
+retention index) and the formats we accept from a client, see
+[docs/DATA-REQUIREMENTS.md](docs/DATA-REQUIREMENTS.md).
 
 **Scope:** Flavormancer predicts *flavor properties only*. It is not a safety,
 toxicity, GRAS, regulatory, or stability determination. A prediction is never a

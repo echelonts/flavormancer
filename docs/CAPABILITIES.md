@@ -109,8 +109,12 @@ either *lookups awaiting a dataset* or *quantitative upgrades* of something abov
 - **Synonym / identifier resolution** — name↔SMILES↔CAS via PubChem for UX. *(lookup.)*
 
 **Explicitly evaluated and rejected (accuracy)**
-- **Structure-based boiling point (Joback)** — validated and *declined*: benzaldehyde
-  missed by ~90 °C. BP/vapor pressure stays a **measured lookup**, not an estimate.
+- **Structure-based boiling point (Joback)** — re-validated across 12 flavor molecules:
+  **mean abs error 33 °C, max 89 °C** (benzaldehyde −89, vanillin −64, methyl salicylate
+  +53) — near-perfect on simple aliphatics (limonene, ethyl acetate) but badly off on the
+  aromatic/oxygenated molecules that matter most, and you can't tell which in advance. So
+  BP/vapor pressure stays a **measured lookup** (now PubChem-sourced via `build_properties.py`),
+  never an estimate.
 
 ---
 
