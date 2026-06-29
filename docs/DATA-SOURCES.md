@@ -18,7 +18,7 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 | **FlavorDB** | ~25k molecules taste+odor + natural-source mapping | **CC BY-NC-SA 3.0** | ❌ skip | NonCommercial — incompatible with a commercial product. |
 | **UMP442 / BIOPEP-UWM** | more umami examples | none / unclear | ❌ skip | BIOPEP-UWM is web-only; the `Shoombuatong/Dataset-Code` repost has **no LICENSE** (all-rights-reserved) and is umami *peptide* data (different class from our small-molecule head). |
 | **SweetenersDB v2.0** | the sweetness-**intensity** regressor | **MIT** | ✅ in use | direct CSV from `github.com/chemosim-lab/SweetenersDB` (`SweetenersDB_v2.0.csv`, 316 cmpds, `logSw` column). R²≈0.82. |
-| **Pyrfume — Leffingwell/GoodScents (GS-LF)** | the **aroma model** (OpenPOM) — #17/#18 | **RESTRICTED** | ❌ **excluded** | Use restrictions (John Leffingwell & Google; GoodScents/Arctander/Flavornet © Datu Inc.). **Not used at all, not even for the demo** — it may go to a customer / a commercial soda venture, so we avoid the liability entirely. |
+| **Pyrfume — Leffingwell/GoodScents (GS-LF)** | the **aroma model** (OpenPOM) — #17/#18 | **RESTRICTED** | ❌ **excluded** | Use restrictions (John Leffingwell & Google; GoodScents/Arctander/Flavornet © Datu Inc.). **GS-LF = OpenPOM's GoodScents + Leffingwell *combined* set (~4,983 cmpds — rich precisely because it merges both), NonCommercial.** Excluded from the commercial edition entirely; it's the **academic edition's** aroma data. *Distinct from* **PMP 2001** — Leffingwell's *paid, commercially-licensable* product — which the commercial edition could use if licensed. |
 | **Pyrfume — open academic sets** | aroma model, **clean but small** | CC-BY / open-access (verify each) | candidates | `keller_2016` (BMC, CC-BY, ~480 cmpds), `snitz_2013` (PLOS, CC-BY), etc. Confirm each data deposit's license; combine + harmonize descriptor vocabularies for volume. |
 | **FEMA GRAS / FDA SAF** | GRAS cross-reference + dosing/OAV lookups | gov public / FEMA | ⬜ to get | FDA "Substances Added to Food" (public domain) → `gras_reference.parquet`; FEMA use-level PDFs → `properties.parquet`. **Verify every scraped dosing number.** |
 
@@ -39,13 +39,21 @@ be filled with **truly commercial-free** data:
 | **Measured boiling point / vapor pressure** | **PubChem** experimental properties — **public domain**, no commercial restriction; API | ✅ **Built.** `training/build_properties.py` pulls + parses PubChem experimental BP/VP → `properties.parquet`. Verified on knowns (vanillin 285 °C, eugenol 254 °C, limonene 178 °C, ethyl acetate 77 °C). Run it to enable measured volatility. |
 | **Quantitative dosing (OAV) — odor thresholds** | none clean — the standard compilations (Devos/Oxford 1990, ASTM DS48A, van Gemert) are **copyrighted books**; only tiny open subsets exist | ⚠️ **Stays qualitative.** Quantitative only with **customer-supplied** thresholds or a licensed compilation. Individual values are facts (*Feist*), but no clean bulk set exists. **Not** academic-rescuable (copyright ≠ NC). |
 | **Quantitative dosing — FEMA use levels** | FEMA usual/max levels sit in copyrighted GRAS papers; SAF is an inventory, not max-ppm | ⚠️ Customer-supplied or licensed, as above. |
-| **GC-MS Kovats retention index** | **NIST RI library** is a **paid** Standard Reference Database; open RI sets are small/uncertain | ⚠️ **Data-gated.** Commercial via a **NIST license**, **customer RI data**, or a QSPR trained on a vetted open set. Not free at scale. |
+| **GC-MS Kovats retention index** | **not in PubChem** (verified by probe); the **NIST GC/RI library** is **paid** — ~**$595** (data-only FTP) to ~**$2,850** (single-seat) | ⚠️ **Data-gated.** Commercial via a **NIST license**, **customer RI data**, or a QSPR trained on a vetted open set. Not free at scale. |
 
-**Bottom line:** GRAS + measured BP/VP are fully enableable now on public-domain data
-(loaders already exist — just build the two parquet tables). Quantitative dosing and RI
-can't be filled with free-commercial data and aren't academic-rescuable either; they
-light up with the **customer's own data** or a **paid license** — the "comes with your
-data" model again.
+**Bottom line:** GRAS + measured BP/VP are **built** on public-domain data
+(`build_gras_reference.py` from FDA SAF, `build_properties.py` from PubChem) — run them
+to populate the tables. Quantitative dosing and RI can't be filled with free-commercial
+data; they light up with the **customer's own data** or a **paid license** — the "comes
+with your data" model again. See [`DATA-REQUIREMENTS.md`](DATA-REQUIREMENTS.md) for the
+exact formats.
+
+> **Academic-access nuance.** The academic edition doesn't *launder* paid/copyrighted
+> data — its lever is *NonCommercial* research data (aroma/GS-LF). But universities often
+> hold **institutional licenses, library access, or academic pricing** for these paid
+> sources (NIST RI, the threshold compilations). So in a research context RI/threshold
+> data is frequently *more attainable* — through legitimate institutional licensing, not
+> because "academic" rewrites the terms.
 
 ## Notes
 
