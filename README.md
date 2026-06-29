@@ -67,6 +67,23 @@ rule), **estimate** (published QSPR with known error), **lookup** (from a loaded
 reference table), and **qualitative** (a class/flag, not a number). Full map in
 [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
 
+## Why it's built this way
+
+The value isn't any single number — those you can look up. It's four design choices:
+
+- **Prediction, not lookup.** The trained models read a molecule from its *structure*,
+  so they answer for a **novel or unmeasured** compound that's in no database — not just
+  for known ones.
+- **On-premise, behind your firewall.** Proprietary candidate structures **never leave
+  your network**. You can screen confidential molecules without exposing your direction
+  to any external service — something no public web tool can offer.
+- **One integrated read.** Taste, behaviour, safety, and substitution in a single
+  confidence-tagged screen, instead of stitching together half a dozen databases and
+  manual checks per molecule.
+- **It sharpens on your own data.** The open-data models are the floor. Trained on a
+  user's *own* formulation and sensory data — on the same on-prem box — they become
+  specific to that user's products, which no public dataset can be.
+
 ## Two editions
 
 Flavormancer ships as two editions of one method:

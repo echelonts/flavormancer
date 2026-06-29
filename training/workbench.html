@@ -221,6 +221,8 @@ function renderBehavior(p){
   let html = '<div class="kv">'+rows.map(r=>`<div class="k">${r[0]}</div><div class="v">${r[1]}</div>`).join('')+'</div>';
   const alerts = sf.structural_alerts||[];
   if(alerts.length) html += '<div class="chips">'+alerts.map(a=>`<span class="chip" style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8">⚠ ${a}</span>`).join('')+'</div>';
+  const tox = sf.tox_screen||{};
+  if(tox.available && (tox.flags||[]).length) html += '<div class="chips">'+tox.flags.map(f=>`<span class="chip" style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8">⚠ tox-assay: ${f}</span>`).join('')+'</div>';
   html += '<div class="empty" style="font-size:12px">Defensive screen — flags for review, never a clearance.</div>';
   $('behavior').innerHTML = html;
 }

@@ -185,6 +185,14 @@ if TASTE.exists():
         else:
             _CLASSIFIERS[name] = joblib.load(p)
 
+# Caution-only toxicity-assay heads (Tox21, public domain). Loaded if trained.
+# INDICATIVE in-vitro signals — never a toxicity determination.
+_TOX = {}
+_TOX_DIR = Path("tox_models")
+if _TOX_DIR.exists():
+    for p in _TOX_DIR.glob("*_rf.joblib"):
+        _TOX[p.stem.replace("_rf", "")] = joblib.load(p)
+
 # Known-label lookup: ground truth for molecules we actually have data on. This
 # is how the salty/sour data works as a FLAG without a model — if a queried
 # molecule is in our labeled set, we report the verified fact instead of a guess.
@@ -598,6 +606,37 @@ def predict_aroma(smiles, top_k=8):
             "note": "aroma deferred — needs licensed/customer odor data; see docs/AROMA.md"}
 
 
+# Plain-language meaning of each Tox21 assay, for caution context.
+_TOX_MEANING = {
+    "NR-AhR": "aryl-hydrocarbon receptor (xenobiotic / dioxin-like activity)",
+    "NR-AR": "androgen receptor", "NR-AR-LBD": "androgen receptor (LBD)",
+    "NR-Aromatase": "aromatase (estrogen synthesis)",
+    "NR-ER": "estrogen receptor", "NR-ER-LBD": "estrogen receptor (LBD)",
+    "NR-PPAR-gamma": "PPAR-γ (metabolic)",
+    "SR-ARE": "oxidative-stress response (ARE)",
+    "SR-ATAD5": "ATAD5 — genotoxicity / DNA damage",
+    "SR-HSE": "heat-shock response", "SR-MMP": "mitochondrial toxicity",
+    "SR-p53": "p53 — DNA-damage response (genotoxic stress)",
+}
+
+
+def predict_tox(mol, threshold=0.5):
+    """Caution-only in-vitro tox-assay activity (Tox21 models). INDICATIVE flags for
+    review — NEVER a toxicity/safety determination. Honest/empty if heads untrained."""
+    if not _TOX:
+        return {"available": False,
+                "note": "tox heads not trained — run train_tox.py (Tox21, public domain)"}
+    x = _fp(mol)
+    assays = []
+    for name, clf in sorted(_TOX.items()):
+        p = round(float(clf.predict_proba(x)[0, 1]), 3)
+        assays.append({"assay": name, "meaning": _TOX_MEANING.get(name, name), "probability": p})
+    flags = [a["assay"] for a in assays if a["probability"] >= threshold]
+    return {"available": True, "assays": assays, "flags": flags,
+            "note": "INDICATIVE in-vitro tox-assay activity (Tox21 RandomForest heads) — "
+                    "caution-only, NOT a toxicity/safety determination; confirm with a toxicologist."}
+
+
 def _taste_profile(out):
     """Trained taste heads ranked by probability (descending) — the 'order of
     dominance' view. Sour is a small-data indicative head; the deterministic
@@ -707,6 +746,7 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
     out["labeling"] = labeling(mol)
     out["safety"] = _safety(mol)
     out["safety"]["ttc_hint"] = ttc_hint(mol)
+    out["safety"]["tox_screen"] = predict_tox(mol)
     if include_aroma:
         out["aroma"] = predict_aroma(smiles)
     return out
