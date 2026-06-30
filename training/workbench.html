@@ -95,6 +95,16 @@
   #mixResults{margin-top:14px}
   .hazard{border:1px solid #E7C4B8;background:#FBEDE9;color:#8A3A22;border-radius:8px;padding:10px 13px;margin-bottom:8px;font-size:13px;line-height:1.5}
   .hazard.cond{border-color:#E8D38A;background:#FFF6E6;color:#7A5A12}
+  .suggest-dd{position:absolute;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px #00000022;max-height:340px;overflow:auto}
+  .sg-row{display:flex;gap:10px;align-items:center;padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--line)}
+  .sg-row:last-child{border-bottom:none}
+  .sg-row:hover{background:var(--accent-soft)}
+  .sg-st{flex:0 0 auto;width:56px;height:42px;background:#fff;border:1px solid var(--line);border-radius:5px}
+  .sg-st svg{width:56px;height:42px}
+  .sg-info{min-width:0}
+  .sg-name{font-weight:600;font-size:13px}
+  .sg-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all}
+  .sg-smi{font-family:var(--mono);font-size:11px;color:var(--accent);word-break:break-all}
 </style>
 </head>
 <body>
@@ -104,9 +114,8 @@
 </header>
 <main>
   <div class="bar">
-    <input id="q" list="suggest" placeholder="Compound name or SMILES — e.g. vanillin, or OC(=O)CC(O)(CC(=O)O)C(=O)O"
+    <input id="q" placeholder="Compound name or SMILES — e.g. vanillin, or OC(=O)CC(O)(CC(=O)O)C(=O)O"
            autocomplete="off" spellcheck="false">
-    <datalist id="suggest"></datalist>
     <button id="go">Read flavor</button>
   </div>
   <div class="hint">Type a <b>common or IUPAC name</b> (e.g. <code>vanillin</code>) or a
@@ -251,9 +260,10 @@ function render(p, neighbors, svg, names){
     p.sour && p.sour_reason && p.sour_reason.length ? `sour · ${p.sour_reason[0]}` : 'not sour'));
   c.push(chip('salty', p.salty===true, p.salty===true?'var(--salty)':null,
     p.salty===true ? 'salty (known)' : 'salty — not in data'));
-  if(inDomain && p.sweet >= 0.5 && typeof p.sweet_intensity === 'number'){
+  const logP = ((p.physchem||{}).computed||{}).logP;
+  if(inDomain && p.sweet >= 0.5 && typeof p.sweet_intensity === 'number' && typeof logP==='number' && logP < 2){
     const x = Math.pow(10, p.sweet_intensity);
-    c.push(chip('intensity', true, 'var(--sweet)', `~${x>=10?Math.round(x):x.toFixed(1)}× as sweet as sucrose`));
+    c.push(chip('intensity', true, 'var(--sweet)', `~${x>=10?Math.round(x):x.toFixed(1)}× as sweet as sucrose (est.)`));
   }
   if(inDomain && p.multitaste) c.push(chip('multi', true, 'var(--aroma)', 'multi-taste'));
   $('chips').innerHTML = c.join('');
@@ -340,30 +350,40 @@ $('neighbors').addEventListener('click', e=>{
   if(nb && nb.dataset.smi){ q.value = nb.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
 });
 
-// --- name typeahead (datalist) over the curated flavor-volatile list, on any input ---
-let suggestT;
-function wireSuggest(input){
-  input.setAttribute('list','suggest');
+// --- rich typeahead dropdown (structure + names + SMILES) on any input ---
+function attachRichSuggest(input, onPick){
+  const dd=document.createElement('div'); dd.className='suggest-dd'; dd.style.display='none';
+  document.body.appendChild(dd);
+  let t;
+  const close=()=>{ dd.style.display='none'; };
+  const place=()=>{ const r=input.getBoundingClientRect(); dd.style.left=(r.left+window.scrollX)+'px'; dd.style.top=(r.bottom+window.scrollY+4)+'px'; dd.style.width=r.width+'px'; };
   input.addEventListener('input', ()=>{
-    clearTimeout(suggestT);
-    suggestT=setTimeout(async ()=>{
+    clearTimeout(t);
+    t=setTimeout(async ()=>{
       const v=input.value.trim();
-      if(v.length<2){ $('suggest').innerHTML=''; return; }
+      if(v.length<2){ close(); return; }
       try{
         const r=await fetch('/api/suggest?qs='+encodeURIComponent(v));
-        const d=await r.json();
-        $('suggest').innerHTML=(d.items||[]).map(it=>`<option value="${it.name}">`).join('');
-      }catch(_){}
-    }, 160);
+        const items=(await r.json()).items||[];
+        if(!items.length){ close(); return; }
+        dd.innerHTML=items.map(it=>`<div class="sg-row" data-smi="${it.smiles}">
+          <div class="sg-st">${it.svg||''}</div>
+          <div class="sg-info"><div class="sg-name">${it.name}</div>${it.iupac?`<div class="sg-iupac">${it.iupac}</div>`:''}<div class="sg-smi">${it.smiles}</div></div></div>`).join('');
+        place(); dd.style.display='block';
+      }catch(_){ close(); }
+    }, 150);
   });
+  dd.addEventListener('mousedown', e=>{ const row=e.target.closest('.sg-row'); if(row){ e.preventDefault(); input.value=row.dataset.smi; close(); if(onPick) onPick(); } });
+  input.addEventListener('blur', ()=>setTimeout(close, 150));
+  window.addEventListener('scroll', ()=>{ if(dd.style.display!=='none') place(); }, true);
 }
-wireSuggest(q);
+attachRichSuggest(q, ()=>run());
 
 // --- mixture mode ---
 function mixAddRow(val){
   const div=document.createElement('div'); div.className='mix-row';
   const inp=document.createElement('input'); inp.placeholder='name or SMILES'; inp.value=val||'';
-  wireSuggest(inp);
+  attachRichSuggest(inp);
   const rm=document.createElement('button'); rm.className='rm'; rm.textContent='×'; rm.title='remove';
   rm.onclick=()=>div.remove();
   div.append(inp, rm); $('mixRows').appendChild(div);
