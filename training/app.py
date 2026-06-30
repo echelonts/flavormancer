@@ -18,6 +18,7 @@ instance) for the demo; deployment puts this behind login + per-user history, an
 prediction core doesn't change.
 """
 
+import threading
 from functools import lru_cache
 from pathlib import Path
 
@@ -139,15 +140,29 @@ def _load_suggest():
 
 
 _SUGGEST = _load_suggest()
+_IUPAC = {}  # smiles -> IUPAC name, filled in the background (PubChem, cached)
+
+
+def _precompute_iupac():
+    for _, s in _SUGGEST:
+        _IUPAC[s] = _names(s)[1]
+
+
+if _SUGGEST:
+    threading.Thread(target=_precompute_iupac, daemon=True).start()
 
 
 @app.get("/api/suggest")
 def api_suggest(qs: str = ""):
-    """Name typeahead over the curated flavor-volatile list."""
+    """Rich typeahead over the curated flavor-volatile list — name + SMILES + structure + IUPAC."""
     t = qs.strip().lower()
     if len(t) < 2:
         return {"items": []}
-    return {"items": [{"name": n, "smiles": s} for n, s in _SUGGEST if t in n.lower()][:8]}
+    items = [{"name": n, "smiles": s} for n, s in _SUGGEST if t in n.lower()][:8]
+    for it in items:
+        it["svg"] = _svg(it["smiles"], 90, 64)
+        it["iupac"] = _IUPAC.get(it["smiles"])
+    return {"items": items}
 
 
 @app.get("/", response_class=HTMLResponse)
