@@ -77,6 +77,7 @@
   .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:10px}
   .kv .k{font-weight:600;font-size:13px}
   .kv .v{font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .bsub{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px}
   .structure{text-align:center;margin:0 0 14px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px}
   .structure svg{max-width:100%;height:auto}
   .structure:empty{display:none}
@@ -281,26 +282,48 @@ function render(p, neighbors, svg, names){
 }
 
 function renderBehavior(p){
-  const pc = p.physchem||{}, sf = p.safety||{};
-  const comp = pc.computed||{}, meas = pc.measured||{}, qual = pc.qualitative||{};
-  const MEAS = ' <span class="tag measured">measured</span>';
-  const rows = [];
-  if(typeof comp.mol_weight==='number') rows.push(['MW', comp.mol_weight+' g/mol']);
-  if(typeof comp.logP==='number') rows.push(['logP', comp.logP]);
+  const pc=p.physchem||{}, sf=p.safety||{}, st=p.stability||{}, ch=p.chemesthesis||{}, lb=p.labeling||{};
+  const comp=pc.computed||{}, est=pc.estimate||{}, meas=pc.measured||{}, qual=pc.qualitative||{};
+  const MEAS=' <span class="tag measured">measured</span>', EST=' <span class="tag predicted">estimate</span>';
+  const kv = rows => '<div class="kv">'+rows.map(r=>`<div class="k">${r[0]}</div><div class="v">${r[1]}</div>`).join('')+'</div>';
+  const chips = (arr,style)=> '<div class="chips">'+arr.map(x=>`<span class="chip" ${style||''}>${x}</span>`).join('')+'</div>';
+  const WARN='style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8"';
+
+  const rows=[];
+  if(typeof comp.mol_weight==='number') rows.push(['Molecular weight', comp.mol_weight+' g/mol']);
+  if(typeof comp.logP==='number') rows.push(['logP (lipophilicity)', comp.logP]);
+  if(typeof comp.tpsa==='number') rows.push(['Polar surface area', comp.tpsa+' Å²']);
+  if(typeof comp.h_bond_donors==='number') rows.push(['H-bond donors / acceptors', comp.h_bond_donors+' / '+comp.h_bond_acceptors]);
+  if(typeof comp.rotatable_bonds==='number') rows.push(['Rotatable bonds', comp.rotatable_bonds]);
+  if(typeof est.water_solubility_logS==='number') rows.push(['Water solubility (logS)', est.water_solubility_logS+EST]);
   if(typeof meas.boiling_point_c==='number'){
-    const atP = (typeof meas.boiling_point_pressure_mmhg==='number') ? ` (at ${meas.boiling_point_pressure_mmhg} mmHg)` : '';
+    const atP=(typeof meas.boiling_point_pressure_mmhg==='number')?` (at ${meas.boiling_point_pressure_mmhg} mmHg)`:'';
     rows.push(['Boiling point', meas.boiling_point_c+' °C'+atP+MEAS]);
   }
   if(qual.aroma_volatility) rows.push(['Volatility', qual.aroma_volatility]);
   if(typeof meas.vapor_pressure_pa==='number') rows.push(['Vapor pressure', meas.vapor_pressure_pa+' Pa'+MEAS]);
-  if(sf.gras_status) rows.push(['Food-use status', sf.gras_status]);
-  if(sf.ttc_hint && sf.ttc_hint.preliminary_tier) rows.push(['TTC tier (prelim.)', sf.ttc_hint.preliminary_tier]);
-  let html = '<div class="kv">'+rows.map(r=>`<div class="k">${r[0]}</div><div class="v">${r[1]}</div>`).join('')+'</div>';
-  const alerts = sf.structural_alerts||[];
-  if(alerts.length) html += '<div class="chips">'+alerts.map(a=>`<span class="chip" style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8">⚠ ${a}</span>`).join('')+'</div>';
-  const tox = sf.tox_screen||{};
-  if((p.applicability||{}).in_domain!==false && tox.available && (tox.flags||[]).length) html += '<div class="chips">'+tox.flags.map(f=>`<span class="chip" style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8">⚠ tox-assay: ${f}</span>`).join('')+'</div>';
-  html += '<div class="empty" style="font-size:12px">Defensive screen — flags for review, never a clearance.</div>';
+  const ions=(qual.ionizable_groups||[]).map(g=>`${g.group} (pKa≈${g.typical_pKa})`).join(', ');
+  if(ions) rows.push(['Ionizable groups', ions]);
+  let html = kv(rows);
+
+  const cc=ch.classes||[];
+  if(cc.length) html += '<div class="bsub">Chemesthesis (trigeminal)</div>'+chips(cc,'style="background:var(--aroma);color:#fff;border-color:transparent"');
+
+  const sw=[...(st.oxidation_watch||[]).map(x=>'oxidation: '+x),...(st.hydrolysis_watch||[]).map(x=>'hydrolysis: '+x),...(st.photodegradation_watch||[]).map(x=>'photo: '+x)];
+  if(sw.length) html += '<div class="bsub">Stability watch</div>'+chips(sw);
+
+  if(lb.eu_declarable_allergen) html += '<div class="bsub">Regulatory</div>'+chips(['EU declarable allergen'+(lb.allergen_name?': '+lb.allergen_name:'')],'style="background:#FFF6E6;border-color:#E8D38A;color:#7A5A12"');
+
+  html += '<div class="bsub">Safety (defensive, caution-only)</div>';
+  const srows=[];
+  if(sf.gras_status) srows.push(['Food-use status', sf.gras_status]);
+  if(sf.ttc_hint && sf.ttc_hint.preliminary_tier) srows.push(['TTC tier (prelim.)', sf.ttc_hint.preliminary_tier]);
+  if(srows.length) html += kv(srows);
+  const alerts=sf.structural_alerts||[];
+  if(alerts.length) html += chips(alerts.map(a=>'⚠ '+a), WARN);
+  const tox=sf.tox_screen||{};
+  if((p.applicability||{}).in_domain!==false && tox.available && (tox.flags||[]).length) html += chips(tox.flags.map(f=>'⚠ tox-assay: '+f), WARN);
+  html += '<div class="empty" style="font-size:12px">'+(sf.disclaimer||'Defensive screen — flags for review, never a clearance.')+'</div>';
   $('behavior').innerHTML = html;
 }
 
