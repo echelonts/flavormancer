@@ -62,19 +62,19 @@ def _svg(smi, w=320, h=220):
 
 
 @lru_cache(maxsize=8192)
-def _name(smi):
-    """PubChem common name (Title) for a SMILES — cached, best-effort, short timeout."""
+def _names(smi):
+    """(common, IUPAC) names from PubChem for a SMILES — cached, best-effort, short timeout."""
     import json
     import urllib.parse
     import urllib.request
     url = ("https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/"
-           f"{urllib.parse.quote(smi)}/property/Title/JSON")
+           f"{urllib.parse.quote(smi)}/property/Title,IUPACName/JSON")
     try:
         with urllib.request.urlopen(url, timeout=4) as r:
-            d = json.load(r)
-        return d["PropertyTable"]["Properties"][0].get("Title")
+            p = json.load(r)["PropertyTable"]["Properties"][0]
+        return p.get("Title"), p.get("IUPACName")
     except Exception:  # noqa: BLE001 — not found / timeout / throttled
-        return None
+        return None, None
 
 
 class Query(BaseModel):
@@ -99,8 +99,16 @@ def api_neighbors(q: Query):
     res = P.substitute(smi, k=q.k)
     for n in res.get("neighbors", []):  # enrich each candidate with a structure + a name
         n["svg"] = _svg(n["smiles"], 132, 96)
-        n["name"] = _name(n["smiles"])
+        n["name"] = _names(n["smiles"])[0]
     return res
+
+
+@app.post("/api/names")
+def api_names(q: Query):
+    """Common (PubChem Title) + IUPAC names for the queried molecule."""
+    smi = _resolve(q.smiles)
+    common, iupac = _names(smi) if smi else (None, None)
+    return {"common": common, "iupac": iupac, "smiles": smi}
 
 
 @app.post("/api/structure")

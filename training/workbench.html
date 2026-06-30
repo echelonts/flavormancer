@@ -33,8 +33,10 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
   .card h2{margin:0 0 4px;font-size:12px;font-weight:650;text-transform:uppercase;
     letter-spacing:.08em;color:var(--muted)}
-  .smiles{font-family:var(--mono);font-size:13px;color:var(--muted);margin:0 0 16px;
+  .smiles{font-family:var(--mono);font-size:13px;color:var(--muted);margin:0 0 4px;
     word-break:break-all}
+  .cname{font-size:16px;font-weight:650;color:var(--ink);margin:0 0 4px}
+  .iupac{font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 0 14px;word-break:break-all}
   .meter{margin:13px 0}
   .meter .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
   .meter .name{font-weight:600;font-size:14px;text-transform:capitalize}
@@ -52,6 +54,8 @@
   .neighbor{display:flex;align-items:center;gap:12px;
     padding:11px 0;border-bottom:1px solid var(--line)}
   .neighbor:last-child{border-bottom:none}
+  .neighbor{cursor:pointer}
+  .neighbor:hover{background:var(--accent-soft)}
   .neighbor .nb-struct{flex:0 0 auto;width:64px;height:48px;background:#fff;border:1px solid var(--line);border-radius:6px}
   .neighbor .nb-struct svg{width:64px;height:48px}
   .neighbor .nb-info{flex:1;min-width:0}
@@ -101,7 +105,9 @@
     <div class="card">
       <h2>Flavor read</h2>
       <div class="structure" id="structure"></div>
+      <div class="cname" id="cname"></div>
       <p class="smiles" id="smiles"></p>
+      <p class="iupac" id="iupac"></p>
       <div id="domainBanner" class="domain-banner" style="display:none"></div>
       <div id="meters"></div>
       <div class="chips" id="chips"></div>
@@ -171,13 +177,14 @@ async function run(){
   go.disabled = true; go.textContent = 'Reading…';
   $('err').style.display='none';
   try{
-    const [p, n, s] = await Promise.all([
+    const [p, n, s, nm] = await Promise.all([
       post('/api/predict',{smiles:text}),
       post('/api/neighbors',{smiles:text, k:8}),
-      post('/api/structure',{smiles:text})
+      post('/api/structure',{smiles:text}),
+      post('/api/names',{smiles:text})
     ]);
     if(p.error){ throw new Error(p.error); }
-    render(p, n.neighbors||[], (s&&s.svg)||null);
+    render(p, n.neighbors||[], (s&&s.svg)||null, nm||{});
   }catch(e){
     $('results').style.display='none'; $('behaviorCard').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
     $('err').textContent = e.message; $('err').style.display='block';
@@ -186,9 +193,14 @@ async function run(){
   }
 }
 
-function render(p, neighbors, svg){
+function render(p, neighbors, svg, names){
+  names = names || {};
   $('structure').innerHTML = svg || '';
+  $('cname').textContent = names.common || '';
+  $('cname').style.display = names.common ? 'block' : 'none';
   $('smiles').textContent = p.smiles;
+  $('iupac').textContent = names.iupac ? ('IUPAC: ' + names.iupac) : '';
+  $('iupac').style.display = names.iupac ? 'block' : 'none';
   const inDomain = !(p.applicability && p.applicability.in_domain === false);
   const db = $('domainBanner');
   db.style.display = inDomain ? 'none' : 'block';
@@ -211,8 +223,10 @@ function render(p, neighbors, svg){
     p.sour && p.sour_reason && p.sour_reason.length ? `sour · ${p.sour_reason[0]}` : 'not sour'));
   c.push(chip('salty', p.salty===true, p.salty===true?'var(--salty)':null,
     p.salty===true ? 'salty (known)' : 'salty — not in data'));
-  if(inDomain && typeof p.sweet_intensity === 'number')
-    c.push(chip('intensity', true, 'var(--sweet)', `sweetness ×${p.sweet_intensity} vs sucrose`));
+  if(inDomain && p.sweet >= 0.5 && typeof p.sweet_intensity === 'number'){
+    const x = Math.pow(10, p.sweet_intensity);
+    c.push(chip('intensity', true, 'var(--sweet)', `~${x>=10?Math.round(x):x.toFixed(1)}× as sweet as sucrose`));
+  }
   if(inDomain && p.multitaste) c.push(chip('multi', true, 'var(--aroma)', 'multi-taste'));
   $('chips').innerHTML = c.join('');
 
@@ -221,7 +235,7 @@ function render(p, neighbors, svg){
     $('neighbors').innerHTML = '<div class="empty">Build taste_master.parquet to enable substitution search.</div>';
   }else{
     $('neighbors').innerHTML = neighbors.map(x=>`
-      <div class="neighbor">
+      <div class="neighbor" data-smi="${x.smiles}" title="Click to analyze this molecule">
         <div class="nb-struct">${x.svg||''}</div>
         <div class="nb-info">
           <div class="nb-name">${x.name||'—'}</div>
@@ -270,6 +284,11 @@ function chip(key, on, color, label){
 
 go.addEventListener('click', run);
 q.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
+// click a substitution candidate -> analyze that molecule
+$('neighbors').addEventListener('click', e=>{
+  const nb = e.target.closest('.neighbor');
+  if(nb && nb.dataset.smi){ q.value = nb.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
+});
 </script>
 </body>
 </html>
