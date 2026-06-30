@@ -1,12 +1,15 @@
 """
-build_properties.py — measured boiling point / vapor pressure from PubChem.
+build_properties.py — measured properties + identity from PubChem.
 
-PubChem experimental properties are **public domain** (no commercial restriction), so
-this is a commercial-clean source. It pulls each molecule's experimental Boiling Point
+PubChem experimental properties AND compound identity are **public domain** (no commercial
+restriction), so this is a commercial-clean source. For each molecule it pulls the common
+name (Title) and IUPAC name from the property endpoint, plus the experimental Boiling Point
 (and, best-effort, Vapor Pressure) from PUG-View, parses to °C / Pa, and writes
-properties.parquet — the lookup table predict.py reads for MEASURED volatility. We use
-a measured lookup here on purpose: structure-based BP (Joback) was evaluated and
-rejected (~90 °C error), so a number is only ever reported when it's a real measurement.
+properties.parquet — the enrichment table predict.py reads for MEASURED volatility and the
+demo reads for instant offline names. We use a measured lookup for BP on purpose: structure-
+based BP (Joback) was evaluated and rejected (~90 °C error), so a number is only ever
+reported when it's a real measurement. Names default to live PubChem in the app; precomputing
+them here makes the substitution / palette / neighbor reads instant for the whole labeled set.
 
 Usage:
   python build_properties.py                                  # default: taste_master.parquet
@@ -125,12 +128,21 @@ def parse_vp_pa(strings):
     return round(vals[len(vals) // 2], 2) if vals else None
 
 
+def _names_for_cid(cid):
+    """(common Title, IUPAC) from PubChem's property endpoint — public-domain identity."""
+    d = _get(f"{_BASE}/pug/compound/cid/{cid}/property/Title,IUPACName/JSON")
+    p = ((d or {}).get("PropertyTable", {}).get("Properties") or [{}])[0]
+    return p.get("Title"), p.get("IUPACName")
+
+
 def fetch_props(inchikey):
     cid = _cid(inchikey)
     if not cid:
-        return None, None, None
+        return None, None, None, None, None
     bp, bp_press = parse_bp(_heading_strings(cid, "Boiling Point"))
-    return bp, bp_press, parse_vp_pa(_heading_strings(cid, "Vapor Pressure"))
+    vp = parse_vp_pa(_heading_strings(cid, "Vapor Pressure"))
+    common, iupac = _names_for_cid(cid)
+    return bp, bp_press, vp, common, iupac
 
 
 def load_keys(path):
@@ -165,9 +177,10 @@ if __name__ == "__main__":
                 print(f"{smi}: unparseable")
                 continue
             ik = Chem.MolToInchiKey(mol)
-            bp, bp_press, vp = fetch_props(ik)
+            bp, bp_press, vp, common, iupac = fetch_props(ik)
             cond = f" @{bp_press}mmHg" if bp_press else ""
-            print(f"{smi:32s} ik={ik}  bp_c={bp}{cond}  vp_pa={vp}")
+            print(f"{smi:32s} ik={ik}  name={common!r}  iupac={iupac!r}  "
+                  f"bp_c={bp}{cond}  vp_pa={vp}")
             time.sleep(0.3)
         sys.exit(0)
 
@@ -177,19 +190,25 @@ if __name__ == "__main__":
         sys.exit(1)
     keys = load_keys(src)
     rows = []
+    cols = ["inchikey", "common_name", "iupac_name", "boiling_point_c",
+            "boiling_point_pressure_mmhg", "vapor_pressure_pa"]
     for i, ik in enumerate(keys):
-        bp, bp_press, vp = fetch_props(ik)
-        if bp is not None or vp is not None:
-            rows.append({"inchikey": ik, "boiling_point_c": bp,
-                         "boiling_point_pressure_mmhg": bp_press, "vapor_pressure_pa": vp})
+        bp, bp_press, vp, common, iupac = fetch_props(ik)
+        if bp is not None or vp is not None or common or iupac:
+            rows.append({"inchikey": ik, "common_name": common, "iupac_name": iupac,
+                         "boiling_point_c": bp, "boiling_point_pressure_mmhg": bp_press,
+                         "vapor_pressure_pa": vp})
         if (i + 1) % 50 == 0:
-            print(f"  {i + 1}/{len(keys)} processed, {len(rows)} with measured props")
+            named = sum(1 for r in rows if r["common_name"])
+            print(f"  {i + 1}/{len(keys)} processed, {len(rows)} enriched ({named} named)")
         time.sleep(0.3)
-    new = pd.DataFrame(rows, columns=["inchikey", "boiling_point_c",
-                                      "boiling_point_pressure_mmhg", "vapor_pressure_pa"])
+    new = pd.DataFrame(rows, columns=cols)
     if Path(a.out).exists():  # accumulate across molecule sets
         old = pd.read_parquet(a.out)
         new = pd.concat([old, new], ignore_index=True).drop_duplicates("inchikey", keep="last")
+        new = new.reindex(columns=cols)  # keep a stable schema as older tables get names
     new.to_parquet(a.out)
-    print(f"{a.out}: {len(new)} molecules total with measured BP/VP "
+    named = int(new["common_name"].notna().sum())
+    print(f"{a.out}: {len(new)} molecules total (names: {named}, "
+          f"BP: {int(new['boiling_point_c'].notna().sum())}) "
           f"(+{len(rows)} from {src}; public-domain PubChem data)")
