@@ -69,6 +69,11 @@
   .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:10px}
   .kv .k{font-weight:600;font-size:13px}
   .kv .v{font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .structure{text-align:center;margin:0 0 14px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px}
+  .structure svg{max-width:100%;height:auto}
+  .structure:empty{display:none}
+  .domain-banner{background:#FFF6E6;border:1px solid #E8D38A;color:#7A5A12;border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:14px;line-height:1.5}
+  .hint code{font-family:var(--mono);background:var(--accent-soft);padding:1px 5px;border-radius:4px;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -82,14 +87,18 @@
            autocomplete="off" spellcheck="false">
     <button id="go">Read flavor</button>
   </div>
-  <div class="hint">Enter a molecule and read its profile before committing bench materials.</div>
+  <div class="hint">Type a <b>common or IUPAC name</b> (e.g. <code>vanillin</code>) or a
+    <b>SMILES</b> string (e.g. <code>O=Cc1ccc(O)c(OC)c1</code>). SMILES omit implicit
+    hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
 
   <div id="err" class="err" style="display:none"></div>
 
   <div class="grid" id="results" style="display:none">
     <div class="card">
       <h2>Flavor read</h2>
+      <div class="structure" id="structure"></div>
       <p class="smiles" id="smiles"></p>
+      <div id="domainBanner" class="domain-banner" style="display:none"></div>
       <div id="meters"></div>
       <div class="chips" id="chips"></div>
     </div>
@@ -112,6 +121,8 @@
     aroma model needs expert-labeled odor data — so we train it <b>on-premise, on your
     licensed or in-house data</b>, never leaving your firewall. The pipeline is built and
     ready; it lights up the moment the data is yours to use.</p>
+    <p class="aroma-note" style="margin-top:8px">A more robust <b>open-source academic
+    edition</b> — trained on richer research odor data (the GS-LF set) — is coming soon.</p>
   </div>
 
   <p class="note" id="footnote" style="display:none">
@@ -153,12 +164,13 @@ async function run(){
   go.disabled = true; go.textContent = 'Reading…';
   $('err').style.display='none';
   try{
-    const [p, n] = await Promise.all([
+    const [p, n, s] = await Promise.all([
       post('/api/predict',{smiles:text}),
-      post('/api/neighbors',{smiles:text, k:8})
+      post('/api/neighbors',{smiles:text, k:8}),
+      post('/api/structure',{smiles:text})
     ]);
     if(p.error){ throw new Error(p.error); }
-    render(p, n.neighbors||[]);
+    render(p, n.neighbors||[], (s&&s.svg)||null);
   }catch(e){
     $('results').style.display='none'; $('behaviorCard').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
     $('err').textContent = e.message; $('err').style.display='block';
@@ -167,24 +179,34 @@ async function run(){
   }
 }
 
-function render(p, neighbors){
+function render(p, neighbors, svg){
+  $('structure').innerHTML = svg || '';
   $('smiles').textContent = p.smiles;
-  const known = new Set(p.known_tastes||[]);
-  let m = '';
-  for(const t of MODEL_TASTES){
-    if(typeof p[t] === 'number') m += meter(t, p[t], known.has(t));
-  }
-  $('meters').innerHTML = m || '<div class="empty">No taste heads trained yet.</div>';
+  const inDomain = !(p.applicability && p.applicability.in_domain === false);
+  const db = $('domainBanner');
+  db.style.display = inDomain ? 'none' : 'block';
+  if(!inDomain) db.innerHTML = "⚠ <b>Outside the model's domain.</b> The trained taste/tox heads are fit on organic molecules, so their predictions for this structure are suppressed. The rule facts (sour/salty), structure, and computed properties below are still valid.";
 
-  // chips: sour (rule), salty (lookup), intensity, multitaste
+  const known = new Set(p.known_tastes||[]);
+  if(inDomain){
+    let m = '';
+    for(const t of MODEL_TASTES){
+      if(typeof p[t] === 'number') m += meter(t, p[t], known.has(t));
+    }
+    $('meters').innerHTML = m || '<div class="empty">No taste heads trained yet.</div>';
+  } else {
+    $('meters').innerHTML = '<div class="empty">Trained taste prediction not applicable to this molecule.</div>';
+  }
+
+  // chips: sour/salty are RULES (valid even out of domain); intensity/multitaste are model-derived
   let c = [];
   c.push(chip('sour', p.sour, p.sour?'var(--sour)':null,
     p.sour && p.sour_reason && p.sour_reason.length ? `sour · ${p.sour_reason[0]}` : 'not sour'));
   c.push(chip('salty', p.salty===true, p.salty===true?'var(--salty)':null,
     p.salty===true ? 'salty (known)' : 'salty — not in data'));
-  if(typeof p.sweet_intensity === 'number')
+  if(inDomain && typeof p.sweet_intensity === 'number')
     c.push(chip('intensity', true, 'var(--sweet)', `sweetness ×${p.sweet_intensity} vs sucrose`));
-  if(p.multitaste) c.push(chip('multi', true, 'var(--aroma)', 'multi-taste'));
+  if(inDomain && p.multitaste) c.push(chip('multi', true, 'var(--aroma)', 'multi-taste'));
   $('chips').innerHTML = c.join('');
 
   // neighbors
@@ -225,7 +247,7 @@ function renderBehavior(p){
   const alerts = sf.structural_alerts||[];
   if(alerts.length) html += '<div class="chips">'+alerts.map(a=>`<span class="chip" style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8">⚠ ${a}</span>`).join('')+'</div>';
   const tox = sf.tox_screen||{};
-  if(tox.available && (tox.flags||[]).length) html += '<div class="chips">'+tox.flags.map(f=>`<span class="chip" style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8">⚠ tox-assay: ${f}</span>`).join('')+'</div>';
+  if((p.applicability||{}).in_domain!==false && tox.available && (tox.flags||[]).length) html += '<div class="chips">'+tox.flags.map(f=>`<span class="chip" style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8">⚠ tox-assay: ${f}</span>`).join('')+'</div>';
   html += '<div class="empty" style="font-size:12px">Defensive screen — flags for review, never a clearance.</div>';
   $('behavior').innerHTML = html;
 }

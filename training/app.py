@@ -67,6 +67,24 @@ def api_neighbors(q: Query):
     return P.substitute(smi, k=q.k)
 
 
+@app.post("/api/structure")
+def api_structure(q: Query):
+    """2D structure depiction (SVG). Degrades to {svg: None} if RDKit's drawing module
+    can't load (e.g. a headless box missing libXrender) — never 500s the demo."""
+    smi = _resolve(q.smiles)
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is None:
+        return {"svg": None}
+    try:
+        from rdkit.Chem.Draw import rdMolDraw2D
+        d = rdMolDraw2D.MolDraw2DSVG(320, 220)
+        d.DrawMolecule(mol)
+        d.FinishDrawing()
+        return {"svg": d.GetDrawingText()}
+    except Exception:  # noqa: BLE001 — missing X11 libs etc.; degrade gracefully
+        return {"svg": None}
+
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     return Path("workbench.html").read_text()

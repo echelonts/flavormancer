@@ -31,6 +31,13 @@ def test_predict_includes_tox_screen():
     assert isinstance(out["safety"]["tox_screen"]["available"], bool)
 
 
+def test_applicability_domain_flag():
+    # inorganic / carbon-free molecules are flagged out-of-domain; organics are in-domain
+    assert predict.predict("O")["applicability"]["in_domain"] is False  # water
+    assert predict.predict("[Na+].[Cl-]")["applicability"]["in_domain"] is False  # NaCl
+    assert predict.predict("O=Cc1ccc(O)c(OC)c1")["applicability"]["in_domain"] is True  # vanillin
+
+
 def test_safety_structural_alert_fires():
     # regression: a nitro aromatic must trip the structural tox-alert screen. (The tox-models
     # dict was accidentally named _TOX, clobbering the structural-alert SMARTS dict; this

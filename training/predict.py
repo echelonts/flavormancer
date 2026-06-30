@@ -716,6 +716,15 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
         return {"error": f"unparseable SMILES: {smiles}"}
     x = _fp(mol)
     out = {"smiles": Chem.MolToSmiles(mol)}
+    # Applicability domain: the trained taste/tox heads are fit on ORGANIC tastants.
+    # For inorganic / carbon-free molecules (water, O2, N2, NaCl, ...) their output is
+    # meaningless, so flag it; the demo suppresses the trained heads for these.
+    out["applicability"] = {
+        "in_domain": _has_carbon(mol),
+        "note": ("Trained taste/tox heads are fit on organic molecules; predictions for "
+                 "inorganic / carbon-free structures are outside their domain — the rules "
+                 "(sour/salty), structure, and computed properties remain valid."),
+    }
     for name, clf in sorted(_CLASSIFIERS.items()):
         out[name] = round(float(clf.predict_proba(x)[0, 1]), 3)
     # Sour trains as a small-data INDICATIVE head, but its boolean stays the rule's
