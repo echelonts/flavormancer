@@ -340,25 +340,30 @@ $('neighbors').addEventListener('click', e=>{
   if(nb && nb.dataset.smi){ q.value = nb.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
 });
 
-// --- typeahead over the curated flavor-volatile list ---
+// --- name typeahead (datalist) over the curated flavor-volatile list, on any input ---
 let suggestT;
-q.addEventListener('input', ()=>{
-  clearTimeout(suggestT);
-  suggestT=setTimeout(async ()=>{
-    const v=q.value.trim();
-    if(v.length<2){ $('suggest').innerHTML=''; return; }
-    try{
-      const r=await fetch('/api/suggest?qs='+encodeURIComponent(v));
-      const d=await r.json();
-      $('suggest').innerHTML=(d.items||[]).map(it=>`<option value="${it.name}">`).join('');
-    }catch(_){}
-  }, 160);
-});
+function wireSuggest(input){
+  input.setAttribute('list','suggest');
+  input.addEventListener('input', ()=>{
+    clearTimeout(suggestT);
+    suggestT=setTimeout(async ()=>{
+      const v=input.value.trim();
+      if(v.length<2){ $('suggest').innerHTML=''; return; }
+      try{
+        const r=await fetch('/api/suggest?qs='+encodeURIComponent(v));
+        const d=await r.json();
+        $('suggest').innerHTML=(d.items||[]).map(it=>`<option value="${it.name}">`).join('');
+      }catch(_){}
+    }, 160);
+  });
+}
+wireSuggest(q);
 
 // --- mixture mode ---
 function mixAddRow(val){
   const div=document.createElement('div'); div.className='mix-row';
   const inp=document.createElement('input'); inp.placeholder='name or SMILES'; inp.value=val||'';
+  wireSuggest(inp);
   const rm=document.createElement('button'); rm.className='rm'; rm.textContent='×'; rm.title='remove';
   rm.onclick=()=>div.remove();
   div.append(inp, rm); $('mixRows').appendChild(div);
