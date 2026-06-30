@@ -62,9 +62,36 @@ def _svg(smi, w=320, h=220):
         return None
 
 
+def _load_name_table():
+    """inchikey-skeleton -> (common, IUPAC) from the precomputed enrichment table, so the
+    whole labeled set resolves instantly and offline. Empty until build_properties.py has
+    written name columns; live PubChem stays the fallback for anything not in the table."""
+    try:
+        import pandas as pd
+        df = pd.read_parquet("properties.parquet")
+        if "common_name" not in df.columns:
+            return {}
+        out = {}
+        for ik, c, u in zip(df["inchikey"], df["common_name"], df["iupac_name"]):
+            if isinstance(ik, str) and (isinstance(c, str) or isinstance(u, str)):
+                out[ik.split("-")[0]] = (c if isinstance(c, str) else None,
+                                         u if isinstance(u, str) else None)
+        return out
+    except Exception:  # noqa: BLE001 — no table / no pandas; just fall back to live lookups
+        return {}
+
+
+_NAME_TABLE = _load_name_table()
+
+
 @lru_cache(maxsize=8192)
 def _names(smi):
-    """(common, IUPAC) names from PubChem for a SMILES — cached, best-effort, short timeout."""
+    """(common, IUPAC) names — from the precomputed table first (instant), else live PubChem."""
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is not None:
+        hit = _NAME_TABLE.get(Chem.MolToInchiKey(mol).split("-")[0])
+        if hit:
+            return hit
     import json
     import urllib.parse
     import urllib.request
