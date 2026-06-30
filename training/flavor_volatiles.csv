@@ -1,0 +1,106 @@
+name,smiles
+ethyl acetate,CCOC(C)=O
+ethyl propionate,CCOC(=O)CC
+ethyl butyrate,CCCC(=O)OCC
+ethyl isovalerate,CC(C)CC(=O)OCC
+ethyl 2-methylbutyrate,CCC(C)C(=O)OCC
+ethyl hexanoate,CCCCCC(=O)OCC
+ethyl octanoate,CCCCCCCC(=O)OCC
+isoamyl acetate,CC(C)CCOC(C)=O
+isoamyl butyrate,CCCC(=O)OCCC(C)C
+butyl acetate,CCCCOC(C)=O
+hexyl acetate,CCCCCCOC(C)=O
+benzyl acetate,CC(=O)OCc1ccccc1
+phenethyl acetate,CC(=O)OCCc1ccccc1
+methyl benzoate,COC(=O)c1ccccc1
+methyl salicylate,COC(=O)c1ccccc1O
+methyl anthranilate,COC(=O)c1ccccc1N
+ethyl cinnamate,CCOC(=O)/C=C/c1ccccc1
+methyl cinnamate,COC(=O)/C=C/c1ccccc1
+allyl hexanoate,CCCCCC(=O)OCC=C
+geranyl acetate,CC(C)=CCC/C(C)=C/COC(C)=O
+linalyl acetate,C=CC(C)(CCC=C(C)C)OC(C)=O
+limonene,CC1=CCC(CC1)C(C)=C
+alpha-pinene,CC1=CCC2CC1C2(C)C
+beta-pinene,C=C1CCC2CC1C2(C)C
+myrcene,C=CC(=C)CCC=C(C)C
+p-cymene,Cc1ccc(C(C)C)cc1
+linalool,C=CC(C)(O)CCC=C(C)C
+geraniol,CC(C)=CCC/C(C)=C/CO
+nerol,CC(C)=CCC/C(C)=C\CO
+citronellol,CC(CCC=C(C)C)CCO
+citral,CC(C)=CCC/C(C)=C/C=O
+citronellal,CC(CCC=C(C)C)CC=O
+alpha-terpineol,CC1=CCC(CC1)C(C)(C)O
+menthol,CC(C)C1CCC(C)CC1O
+menthone,CC(C)C1CCC(C)CC1=O
+carvone,CC(=C)C1CC=C(C)C(=O)C1
+camphor,CC1(C)C2CCC1(C)C(=O)C2
+borneol,CC1(C)C2CCC1(C)C(O)C2
+benzaldehyde,O=Cc1ccccc1
+vanillin,O=Cc1ccc(O)c(OC)c1
+ethyl vanillin,CCOc1cc(C=O)ccc1O
+cinnamaldehyde,O=C/C=C/c1ccccc1
+anisaldehyde,O=Cc1ccc(OC)cc1
+phenylacetaldehyde,O=CCc1ccccc1
+hexanal,CCCCCC=O
+heptanal,CCCCCCC=O
+octanal,CCCCCCCC=O
+nonanal,CCCCCCCCC=O
+decanal,CCCCCCCCCC=O
+trans-2-hexenal,CCC/C=C/C=O
+2-methylbutanal,CCC(C)C=O
+3-methylbutanal,CC(C)CC=O
+furfural,O=Cc1ccco1
+5-methylfurfural,Cc1ccc(C=O)o1
+hexanol,CCCCCCO
+cis-3-hexen-1-ol,CC/C=C\CCO
+1-octen-3-ol,CCCCCC(O)C=C
+phenethyl alcohol,OCCc1ccccc1
+benzyl alcohol,OCc1ccccc1
+furfuryl alcohol,OCc1ccco1
+2-heptanone,CCCCCC(C)=O
+2-nonanone,CCCCCCCC(C)=O
+diacetyl,CC(=O)C(C)=O
+acetoin,CC(O)C(C)=O
+beta-ionone,CC1=C(/C=C/C(C)=O)C(C)(C)CCC1
+raspberry ketone,CC(=O)CCc1ccc(O)cc1
+maltol,CC1=C(O)C(=O)C=CO1
+ethyl maltol,CCC1=C(O)C(=O)C=CO1
+eugenol,C=CCc1ccc(O)c(OC)c1
+isoeugenol,C/C=C/c1ccc(O)c(OC)c1
+methyl eugenol,C=CCc1ccc(OC)c(OC)c1
+guaiacol,COc1ccccc1O
+creosol,Cc1ccc(O)c(OC)c1
+4-ethylguaiacol,CCc1ccc(O)c(OC)c1
+4-vinylguaiacol,C=Cc1ccc(O)c(OC)c1
+thymol,Cc1ccc(C(C)C)cc1O
+carvacrol,Cc1ccc(C(C)C)c(O)c1
+anethole,C/C=C/c1ccc(OC)cc1
+estragole,C=CCc1ccc(OC)cc1
+safrole,C=CCc1ccc2c(c1)OCO2
+gamma-nonalactone,CCCCCC1CCC(=O)O1
+gamma-decalactone,CCCCCCC1CCC(=O)O1
+gamma-undecalactone,CCCCCCCC1CCC(=O)O1
+delta-decalactone,CCCCCC1CCCC(=O)O1
+coumarin,O=c1ccc2ccccc2o1
+"2,3-dimethylpyrazine",Cc1nccnc1C
+"2,5-dimethylpyrazine",Cc1cnc(C)cn1
+trimethylpyrazine,Cc1ncc(C)nc1C
+2-acetylpyrazine,CC(=O)c1cnccn1
+2-isobutyl-3-methoxypyrazine,COc1nccnc1CC(C)C
+dimethyl sulfide,CSC
+dimethyl disulfide,CSSC
+dimethyl trisulfide,CSSSC
+furfuryl mercaptan,SCc1ccco1
+methional,CSCCC=O
+acetic acid,CC(=O)O
+propionic acid,CCC(=O)O
+butyric acid,CCCC(=O)O
+isovaleric acid,CC(C)CC(=O)O
+hexanoic acid,CCCCCC(=O)O
+octanoic acid,CCCCCCCC(=O)O
+2-acetylpyrrole,CC(=O)c1ccc[nH]1
+indole,c1ccc2[nH]ccc2c1
+skatole,Cc1c[nH]c2ccccc12
+benzothiazole,c1ccc2c(c1)ncs2
