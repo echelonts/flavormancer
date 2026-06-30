@@ -187,11 +187,11 @@ if TASTE.exists():
 
 # Caution-only toxicity-assay heads (Tox21, public domain). Loaded if trained.
 # INDICATIVE in-vitro signals — never a toxicity determination.
-_TOX = {}
+_TOX_MODELS = {}
 _TOX_DIR = Path("tox_models")
 if _TOX_DIR.exists():
     for p in _TOX_DIR.glob("*_rf.joblib"):
-        _TOX[p.stem.replace("_rf", "")] = joblib.load(p)
+        _TOX_MODELS[p.stem.replace("_rf", "")] = joblib.load(p)
 
 # Known-label lookup: ground truth for molecules we actually have data on. This
 # is how the salty/sour data works as a FLAG without a model — if a queried
@@ -623,12 +623,12 @@ _TOX_MEANING = {
 def predict_tox(mol, threshold=0.5):
     """Caution-only in-vitro tox-assay activity (Tox21 models). INDICATIVE flags for
     review — NEVER a toxicity/safety determination. Honest/empty if heads untrained."""
-    if not _TOX:
+    if not _TOX_MODELS:
         return {"available": False,
                 "note": "tox heads not trained — run train_tox.py (Tox21, public domain)"}
     x = _fp(mol)
     assays = []
-    for name, clf in sorted(_TOX.items()):
+    for name, clf in sorted(_TOX_MODELS.items()):
         p = round(float(clf.predict_proba(x)[0, 1]), 3)
         assays.append({"assay": name, "meaning": _TOX_MEANING.get(name, name), "probability": p})
     flags = [a["assay"] for a in assays if a["probability"] >= threshold]

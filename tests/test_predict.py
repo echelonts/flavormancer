@@ -29,3 +29,11 @@ def test_predict_includes_tox_screen():
     out = predict.predict("CCO")
     assert "tox_screen" in out["safety"]
     assert isinstance(out["safety"]["tox_screen"]["available"], bool)
+
+
+def test_safety_structural_alert_fires():
+    # regression: a nitro aromatic must trip the structural tox-alert screen. (The tox-models
+    # dict was accidentally named _TOX, clobbering the structural-alert SMARTS dict; this
+    # silently emptied structural_alerts with no models and crashed with them.)
+    out = predict.predict("O=[N+]([O-])c1ccccc1")  # nitrobenzene
+    assert out["safety"]["structural_alerts"]  # non-empty
