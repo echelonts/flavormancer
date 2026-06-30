@@ -36,6 +36,9 @@ _TEMP_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*(?:to\s*(-?\d+(?:\.\d+)?)\s*)?°?\s*
 _VP_RE = re.compile(r"(\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*(mm\s?hg|torr|kpa|hpa|pa|atm|bar)", re.I)
 _VP_TO_PA = {"mmhg": 133.322, "torr": 133.322, "kpa": 1000.0, "hpa": 100.0,
              "pa": 1.0, "atm": 101325.0, "bar": 100000.0}
+_PRESS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(mm\s?hg|torr|kpa|hpa|mbar|atm|bar)", re.I)
+_P_TO_MMHG = {"mmhg": 1.0, "torr": 1.0, "kpa": 7.50062, "hpa": 0.750062,
+              "mbar": 0.750062, "atm": 760.0, "bar": 750.062}
 
 
 def _get(url):
@@ -73,13 +76,23 @@ def _heading_strings(cid, heading):
     return out
 
 
-def parse_bp_c(strings):
-    """Median of all sane °C readings (converting °F, averaging ranges)."""
-    vals = []
+def _pressure_mmhg(s):
+    """Measurement pressure stated in the string; assume atmospheric (760) if none."""
+    m = _PRESS_RE.search(s)
+    if not m:
+        return 760.0
+    return float(m.group(1)) * _P_TO_MMHG.get(m.group(2).lower().replace(" ", ""), 1.0)
+
+
+def parse_bp(strings):
+    """Boiling point in °C, PREFERRING an atmospheric (~760 mmHg) reading. Returns
+    (bp_c, pressure_mmhg): pressure is None when atmospheric; otherwise the reading is at
+    a reduced/elevated pressure and that pressure is reported, so the value stays honest."""
+    readings = []  # (temp_c, pressure_mmhg)
     for s in strings:
+        press = _pressure_mmhg(s)
         for m in _TEMP_RE.finditer(s):
-            # skip a temperature that's a measurement CONDITION ("... at 20 °C"),
-            # not the boiling point itself
+            # skip a temperature that's a measurement CONDITION ("... at 20 °C")
             if s[max(0, m.start() - 4):m.start()].lower().rstrip().endswith("at"):
                 continue
             lo = float(m.group(1))
@@ -87,9 +100,16 @@ def parse_bp_c(strings):
             t = (lo + hi) / 2
             if m.group(3).upper() == "F":
                 t = (t - 32) * 5 / 9
-            vals.append(t)
-    vals = sorted(v for v in vals if -50 <= v <= 600)
-    return round(vals[len(vals) // 2], 1) if vals else None
+            if -50 <= t <= 600:
+                readings.append((round(t, 1), press))
+    if not readings:
+        return None, None
+    atm = sorted(t for t, p in readings if 700 <= p <= 820)
+    if atm:
+        return atm[len(atm) // 2], None
+    # only non-atmospheric data: report the highest-pressure reading (closest to 1 atm)
+    t, p = max(readings, key=lambda r: r[1])
+    return t, round(p, 1)
 
 
 def parse_vp_pa(strings):
@@ -108,9 +128,9 @@ def parse_vp_pa(strings):
 def fetch_props(inchikey):
     cid = _cid(inchikey)
     if not cid:
-        return None, None
-    return parse_bp_c(_heading_strings(cid, "Boiling Point")), \
-        parse_vp_pa(_heading_strings(cid, "Vapor Pressure"))
+        return None, None, None
+    bp, bp_press = parse_bp(_heading_strings(cid, "Boiling Point"))
+    return bp, bp_press, parse_vp_pa(_heading_strings(cid, "Vapor Pressure"))
 
 
 def load_keys(path):
@@ -145,8 +165,9 @@ if __name__ == "__main__":
                 print(f"{smi}: unparseable")
                 continue
             ik = Chem.MolToInchiKey(mol)
-            bp, vp = fetch_props(ik)
-            print(f"{smi:32s} ik={ik}  bp_c={bp}  vp_pa={vp}")
+            bp, bp_press, vp = fetch_props(ik)
+            cond = f" @{bp_press}mmHg" if bp_press else ""
+            print(f"{smi:32s} ik={ik}  bp_c={bp}{cond}  vp_pa={vp}")
             time.sleep(0.3)
         sys.exit(0)
 
@@ -157,13 +178,15 @@ if __name__ == "__main__":
     keys = load_keys(src)
     rows = []
     for i, ik in enumerate(keys):
-        bp, vp = fetch_props(ik)
+        bp, bp_press, vp = fetch_props(ik)
         if bp is not None or vp is not None:
-            rows.append({"inchikey": ik, "boiling_point_c": bp, "vapor_pressure_pa": vp})
+            rows.append({"inchikey": ik, "boiling_point_c": bp,
+                         "boiling_point_pressure_mmhg": bp_press, "vapor_pressure_pa": vp})
         if (i + 1) % 50 == 0:
             print(f"  {i + 1}/{len(keys)} processed, {len(rows)} with measured props")
         time.sleep(0.3)
-    new = pd.DataFrame(rows, columns=["inchikey", "boiling_point_c", "vapor_pressure_pa"])
+    new = pd.DataFrame(rows, columns=["inchikey", "boiling_point_c",
+                                      "boiling_point_pressure_mmhg", "vapor_pressure_pa"])
     if Path(a.out).exists():  # accumulate across molecule sets
         old = pd.read_parquet(a.out)
         new = pd.concat([old, new], ignore_index=True).drop_duplicates("inchikey", keep="last")
