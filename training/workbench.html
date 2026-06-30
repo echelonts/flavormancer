@@ -82,6 +82,18 @@
   .structure:empty{display:none}
   .domain-banner{background:#FFF6E6;border:1px solid #E8D38A;color:#7A5A12;border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:14px;line-height:1.5}
   .hint code{font-family:var(--mono);background:var(--accent-soft);padding:1px 5px;border-radius:4px;color:var(--accent)}
+  .toggle{font-family:var(--mono);font-size:12px;color:var(--muted);margin:12px 2px 0;display:flex;align-items:center;gap:7px;cursor:pointer}
+  #mixPanel{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .mix-row{display:flex;gap:8px;margin-bottom:8px}
+  .mix-row input{flex:1;font-family:var(--mono);font-size:14px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+  .mix-row .rm{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:0 13px;cursor:pointer;color:var(--muted)}
+  .mix-add{font-family:var(--ui);font-size:13px;padding:7px 12px;border:1px dashed var(--line);background:var(--surface);border-radius:8px;cursor:pointer;margin:2px 0 12px}
+  .mix-proc{font-family:var(--mono);font-size:12px;color:var(--muted);margin:4px 0 14px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .mix-btn{font-family:var(--ui);font-weight:600;font-size:14px;padding:9px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+  .mix-btn:disabled{opacity:.5}
+  #mixResults{margin-top:14px}
+  .hazard{border:1px solid #E7C4B8;background:#FBEDE9;color:#8A3A22;border-radius:8px;padding:10px 13px;margin-bottom:8px;font-size:13px;line-height:1.5}
+  .hazard.cond{border-color:#E8D38A;background:#FFF6E6;color:#7A5A12}
 </style>
 </head>
 <body>
@@ -91,13 +103,28 @@
 </header>
 <main>
   <div class="bar">
-    <input id="q" placeholder="Compound name or SMILES — e.g. vanillin, or OC(=O)CC(O)(CC(=O)O)C(=O)O"
+    <input id="q" list="suggest" placeholder="Compound name or SMILES — e.g. vanillin, or OC(=O)CC(O)(CC(=O)O)C(=O)O"
            autocomplete="off" spellcheck="false">
+    <datalist id="suggest"></datalist>
     <button id="go">Read flavor</button>
   </div>
   <div class="hint">Type a <b>common or IUPAC name</b> (e.g. <code>vanillin</code>) or a
     <b>SMILES</b> string (e.g. <code>O=Cc1ccc(O)c(OC)c1</code>). SMILES omit implicit
     hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
+
+  <label class="toggle"><input type="checkbox" id="mixToggle"> Mixture mode — screen 2+ ingredients for documented hazards</label>
+
+  <div id="mixPanel" style="display:none">
+    <div id="mixRows"></div>
+    <button class="mix-add" id="mixAdd">+ add ingredient</button>
+    <div class="mix-proc">Process applied:
+      <label><input type="checkbox" class="proc" value="high_heat"> high heat</label>
+      <label><input type="checkbox" class="proc" value="refining"> refining</label>
+      <label><input type="checkbox" class="proc" value="fermentation"> fermentation</label>
+    </div>
+    <button class="mix-btn" id="mixCheck">Check mixture</button>
+    <div id="mixResults"></div>
+  </div>
 
   <div id="err" class="err" style="display:none"></div>
 
@@ -288,6 +315,54 @@ q.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
 $('neighbors').addEventListener('click', e=>{
   const nb = e.target.closest('.neighbor');
   if(nb && nb.dataset.smi){ q.value = nb.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
+});
+
+// --- typeahead over the curated flavor-volatile list ---
+let suggestT;
+q.addEventListener('input', ()=>{
+  clearTimeout(suggestT);
+  suggestT=setTimeout(async ()=>{
+    const v=q.value.trim();
+    if(v.length<2){ $('suggest').innerHTML=''; return; }
+    try{
+      const r=await fetch('/api/suggest?qs='+encodeURIComponent(v));
+      const d=await r.json();
+      $('suggest').innerHTML=(d.items||[]).map(it=>`<option value="${it.name}">`).join('');
+    }catch(_){}
+  }, 160);
+});
+
+// --- mixture mode ---
+function mixAddRow(val){
+  const div=document.createElement('div'); div.className='mix-row';
+  const inp=document.createElement('input'); inp.placeholder='name or SMILES'; inp.value=val||'';
+  const rm=document.createElement('button'); rm.className='rm'; rm.textContent='×'; rm.title='remove';
+  rm.onclick=()=>div.remove();
+  div.append(inp, rm); $('mixRows').appendChild(div);
+}
+$('mixAdd').addEventListener('click', ()=>mixAddRow());
+$('mixToggle').addEventListener('change', e=>{
+  const on=e.target.checked;
+  $('mixPanel').style.display=on?'block':'none';
+  document.querySelector('.bar').style.display=on?'none':'flex';
+  ['results','behaviorCard','aromaCard','footnote','err'].forEach(id=>$(id).style.display='none');
+  if(on && !$('mixRows').children.length){ mixAddRow(); mixAddRow(); }
+});
+$('mixCheck').addEventListener('click', async ()=>{
+  const ings=[...$('mixRows').querySelectorAll('input')].map(i=>i.value.trim()).filter(Boolean);
+  const procs=[...document.querySelectorAll('.proc:checked')].map(c=>c.value);
+  if(ings.length<2){ $('mixResults').innerHTML='<div class="empty">Add at least two ingredients.</div>'; return; }
+  $('mixCheck').disabled=true; $('mixCheck').textContent='Checking…';
+  try{
+    const r=await post('/api/mixture',{ingredients:ings, processes:procs});
+    const A=r.active_hazards||[], C=r.conditional_hazards||[];
+    let html='';
+    if(!A.length && !C.length) html='<div class="empty">No documented hazards for these ingredients/processes. (Absence of a flag is not a safety clearance.)</div>';
+    A.forEach(h=>html+=`<div class="hazard">⚠ <b>${h.possible_product}</b> — from ${h.precursors.join(' + ')}. ${h.note}</div>`);
+    C.forEach(h=>html+=`<div class="hazard cond">○ <b>${h.possible_product}</b> — from ${h.precursors.join(' + ')}; <b>would form with</b>: ${(h.requires_process||[]).join(', ')}. ${h.note}</div>`);
+    $('mixResults').innerHTML=html;
+  }catch(e){ $('mixResults').innerHTML='<div class="err">'+e.message+'</div>'; }
+  finally{ $('mixCheck').disabled=false; $('mixCheck').textContent='Check mixture'; }
 });
 </script>
 </body>

@@ -117,6 +117,39 @@ def api_structure(q: Query):
     return {"svg": _svg(_resolve(q.smiles))}
 
 
+class MixtureQuery(BaseModel):
+    ingredients: list[str]
+    processes: list[str] = []
+
+
+@app.post("/api/mixture")
+def api_mixture(m: MixtureQuery):
+    """Documented dangerous-mixture screen over 2..n ingredients (predict.check_mixture)."""
+    smis = [s for s in (_resolve(x) for x in m.ingredients) if s]
+    return P.check_mixture(smis, m.processes)
+
+
+def _load_suggest():
+    import csv
+    try:
+        with open("flavor_volatiles.csv", encoding="utf-8") as f:
+            return [(r["name"], r["smiles"]) for r in csv.DictReader(f)]
+    except Exception:  # noqa: BLE001 — no file / bad rows; typeahead just stays empty
+        return []
+
+
+_SUGGEST = _load_suggest()
+
+
+@app.get("/api/suggest")
+def api_suggest(qs: str = ""):
+    """Name typeahead over the curated flavor-volatile list."""
+    t = qs.strip().lower()
+    if len(t) < 2:
+        return {"items": []}
+    return {"items": [{"name": n, "smiles": s} for n, s in _SUGGEST if t in n.lower()][:8]}
+
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     return Path("workbench.html").read_text()
