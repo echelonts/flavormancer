@@ -125,9 +125,33 @@ class MixtureQuery(BaseModel):
 
 @app.post("/api/mixture")
 def api_mixture(m: MixtureQuery):
-    """Documented dangerous-mixture screen over 2..n ingredients (predict.check_mixture)."""
+    """Per-ingredient reads + documented-hazard screen + a single-molecule palette match."""
     smis = [s for s in (_resolve(x) for x in m.ingredients) if s]
-    return P.check_mixture(smis, m.processes)
+    out = P.check_mixture(smis, m.processes)
+    reads, palette = [], set()
+    for s in smis:
+        r = P.predict(s)
+        tp = r.get("taste_profile", [])
+        tastes = [t for t in ("sweet", "bitter", "umami") if isinstance(r.get(t), (int, float)) and r[t] >= 0.5]
+        if r.get("sour"):
+            tastes.append("sour")
+        if r.get("salty") is True:
+            tastes.append("salty")
+        for t in (r.get("known_tastes") or []):
+            if t not in tastes:
+                tastes.append(t)
+        palette.update(tastes)
+        reads.append({"smiles": r["smiles"], "name": _names(s)[0], "svg": _svg(s, 110, 80),
+                      "top_taste": tp[0]["taste"] if tp else None, "tastes": tastes,
+                      "gras": r["safety"]["gras_status"], "alerts": r["safety"]["structural_alerts"],
+                      "tox_flags": r["safety"]["tox_screen"].get("flags", []) if r["applicability"]["in_domain"] else []})
+    pal = P.palette_match(sorted(palette), k=5)
+    for mt in pal.get("matches", []):
+        mt["svg"] = _svg(mt["smiles"], 110, 80)
+        mt["name"] = _names(mt["smiles"])[0]
+    out["ingredients"] = reads
+    out["palette"] = pal
+    return out
 
 
 def _load_suggest():
