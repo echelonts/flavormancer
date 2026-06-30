@@ -189,6 +189,57 @@ def api_suggest(qs: str = ""):
     return {"items": items}
 
 
+# --- Aroma PREVIEW (illustrative, NOT a trained model) -------------------------
+# Well-known odor characters for a handful of famous flavor molecules, so the demo can
+# SHOW what an unlocked aroma read looks like. These are common-knowledge descriptors
+# used as an illustration — the real model trains on a customer's expert-labeled odor
+# data (see docs/AROMA.md). Clearly flagged "preview" in the UI; never passed off as live.
+_AROMA_PREVIEW_RAW = [
+    ("O=Cc1ccc(O)c(OC)c1", [("vanilla", 0.95), ("sweet", 0.6), ("creamy", 0.4), ("woody", 0.25)]),
+    ("CC1=CCC(CC1)C(C)=C", [("citrus", 0.9), ("orange", 0.7), ("fresh", 0.5), ("terpene", 0.3)]),
+    ("CC(C)C1CCC(C)CC1O", [("minty", 0.9), ("cooling", 0.7), ("fresh", 0.5), ("herbal", 0.3)]),
+    ("C=CCc1ccc(O)c(OC)c1", [("clove", 0.9), ("spicy", 0.7), ("woody", 0.4), ("sweet", 0.3)]),
+    ("O=Cc1ccccc1", [("almond", 0.95), ("cherry", 0.5), ("sweet", 0.4)]),
+    ("O=C/C=C/c1ccccc1", [("cinnamon", 0.95), ("spicy", 0.6), ("sweet", 0.4), ("warm", 0.3)]),
+    ("CC(C)=CCCC(C)(O)C=C", [("floral", 0.85), ("lavender", 0.6), ("citrus", 0.4), ("woody", 0.25)]),
+    ("CCCC(=O)OCC", [("fruity", 0.9), ("pineapple", 0.7), ("sweet", 0.5)]),
+    ("CC(=O)C(C)=O", [("buttery", 0.95), ("creamy", 0.6)]),
+    ("CC(C)=CCC/C(C)=C/CO", [("rose", 0.85), ("floral", 0.7), ("citrus", 0.3)]),
+    ("CCOC(C)=O", [("solvent", 0.6), ("fruity", 0.5), ("sweet", 0.3)]),
+    ("O=Cc1ccco1", [("almond", 0.7), ("bready", 0.6), ("caramel", 0.5), ("sweet", 0.3)]),
+    ("Cc1ccc(C(C)C)cc1O", [("thyme", 0.85), ("herbal", 0.7), ("medicinal", 0.4), ("spicy", 0.3)]),
+    ("COc1ccccc1O", [("smoky", 0.85), ("medicinal", 0.6), ("woody", 0.5), ("spicy", 0.3)]),
+    ("C/C=C/c1ccc(OC)cc1", [("anise", 0.9), ("licorice", 0.7), ("sweet", 0.5)]),
+    ("CC(=O)CCc1ccc(O)cc1", [("raspberry", 0.9), ("jammy", 0.6), ("sweet", 0.5)]),
+]
+
+
+def _aroma_index():
+    out = {}
+    for smi, descs in _AROMA_PREVIEW_RAW:
+        m = Chem.MolFromSmiles(smi)
+        if m is not None:
+            out[Chem.MolToInchiKey(m).split("-")[0]] = descs
+    return out
+
+
+_AROMA_PREVIEW = _aroma_index()
+
+
+@app.post("/api/aroma")
+def api_aroma(q: Query):
+    """ILLUSTRATIVE aroma preview for a few well-known molecules — NOT a live model."""
+    smi = _resolve(q.smiles)
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is None:
+        return {"available": False}
+    descs = _AROMA_PREVIEW.get(Chem.MolToInchiKey(mol).split("-")[0])
+    if not descs:
+        return {"available": False}
+    return {"available": True, "preview": True,
+            "descriptors": [{"odor": n, "score": s} for n, s in descs]}
+
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     return Path("workbench.html").read_text()

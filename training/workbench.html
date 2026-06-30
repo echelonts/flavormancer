@@ -74,6 +74,13 @@
   .aroma-lead b{color:var(--aroma)}
   .aroma-note{font-size:13px;color:var(--muted);margin:0;line-height:1.55;max-width:760px}
   .aroma-note b{color:var(--ink)}
+  .aroma-prev-tag{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--aroma);margin:0 0 10px}
+  .ameter{margin:8px 0}
+  .arow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+  .aname{font-weight:600;font-size:13px;text-transform:capitalize}
+  .aval{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .atrack{height:8px;background:#EDEFEC;border-radius:5px;overflow:hidden}
+  .afill{height:100%;background:var(--aroma);border-radius:5px;transition:width .5s ease}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:10px}
   .kv .k{font-weight:600;font-size:13px}
   .kv .v{font-family:var(--mono);font-size:13px;color:var(--muted)}
@@ -166,6 +173,7 @@
 
   <div class="card aroma-card" id="aromaCard" style="display:none">
     <h2>Aroma</h2>
+    <div id="aromaPreview" style="display:none;margin-bottom:14px"></div>
     <div class="aroma-lead">Aroma prediction unlocks with <b>your</b> data.</div>
     <p class="aroma-note">The public demo predicts <b>taste</b> from open data. A useful
     aroma model needs expert-labeled odor data — so we train it <b>on-premise, on your
@@ -217,14 +225,16 @@ async function run(){
   go.disabled = true; go.textContent = 'Reading…';
   $('err').style.display='none';
   try{
-    const [p, n, s, nm] = await Promise.all([
+    const [p, n, s, nm, ar] = await Promise.all([
       post('/api/predict',{smiles:text}),
       post('/api/neighbors',{smiles:text, k:8}),
       post('/api/structure',{smiles:text}),
-      post('/api/names',{smiles:text})
+      post('/api/names',{smiles:text}),
+      post('/api/aroma',{smiles:text})
     ]);
     if(p.error){ throw new Error(p.error); }
     render(p, n.neighbors||[], (s&&s.svg)||null, nm||{});
+    renderAroma(ar||{});
   }catch(e){
     $('results').style.display='none'; $('behaviorCard').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
     $('err').textContent = e.message; $('err').style.display='block';
@@ -338,6 +348,15 @@ function renderBehavior(p){
   if((p.applicability||{}).in_domain!==false && tox.available && (tox.flags||[]).length) html += chips(tox.flags.map(f=>'⚠ tox-assay: '+f), WARN);
   html += '<div class="empty" style="font-size:12px">'+(sf.disclaimer||'Defensive screen — flags for review, never a clearance.')+'</div>';
   $('behavior').innerHTML = html;
+}
+
+function renderAroma(ar){
+  const box=$('aromaPreview');
+  if(ar && ar.available && (ar.descriptors||[]).length){
+    box.innerHTML='<div class="aroma-prev-tag">▸ preview — illustrative of the unlocked read (not a live prediction)</div>'+
+      ar.descriptors.map(d=>{ const pct=Math.round(d.score*100); return `<div class="ameter"><div class="arow"><span class="aname">${d.odor}</span><span class="aval">${pct}%</span></div><div class="atrack"><div class="afill" style="width:${pct}%"></div></div></div>`; }).join('');
+    box.style.display='block';
+  } else { box.style.display='none'; }
 }
 
 function chip(key, on, color, label){
