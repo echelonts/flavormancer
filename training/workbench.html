@@ -93,6 +93,9 @@
   .mix-btn{font-family:var(--ui);font-weight:600;font-size:14px;padding:9px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
   .mix-btn:disabled{opacity:.5}
   #mixResults{margin-top:14px}
+  .mix-ings{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+  .mix-ing{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+  .mix-ing:hover{background:var(--accent-soft)}
   .hazard{border:1px solid #E7C4B8;background:#FBEDE9;color:#8A3A22;border-radius:8px;padding:10px 13px;margin-bottom:8px;font-size:13px;line-height:1.5}
   .hazard.cond{border-color:#E8D38A;background:#FFF6E6;color:#7A5A12}
   .suggest-dd{position:absolute;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px #00000022;max-height:340px;overflow:auto}
@@ -396,6 +399,10 @@ $('mixToggle').addEventListener('change', e=>{
   ['results','behaviorCard','aromaCard','footnote','err'].forEach(id=>$(id).style.display='none');
   if(on && !$('mixRows').children.length){ mixAddRow(); mixAddRow(); }
 });
+$('mixResults').addEventListener('click', e=>{
+  const card=e.target.closest('.mix-ing[data-smi]');
+  if(card && card.dataset.smi){ $('mixToggle').checked=false; $('mixToggle').dispatchEvent(new Event('change')); q.value=card.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
+});
 $('mixCheck').addEventListener('click', async ()=>{
   const ings=[...$('mixRows').querySelectorAll('input')].map(i=>i.value.trim()).filter(Boolean);
   const procs=[...document.querySelectorAll('.proc:checked')].map(c=>c.value);
@@ -403,11 +410,31 @@ $('mixCheck').addEventListener('click', async ()=>{
   $('mixCheck').disabled=true; $('mixCheck').textContent='Checking…';
   try{
     const r=await post('/api/mixture',{ingredients:ings, processes:procs});
-    const A=r.active_hazards||[], C=r.conditional_hazards||[];
     let html='';
-    if(!A.length && !C.length) html='<div class="empty">No documented hazards for these ingredients/processes. (Absence of a flag is not a safety clearance.)</div>';
+    const ing=r.ingredients||[];
+    if(ing.length){
+      html+='<div class="bsub">Ingredients (read individually)</div><div class="mix-ings">'+ing.map(it=>`
+        <div class="mix-ing">
+          <div class="nb-struct">${it.svg||''}</div>
+          <div class="nb-info"><div class="nb-name">${it.name||it.smiles}</div>
+            <div class="kt">${(it.tastes||[]).join(' · ')||'—'}${(it.gras||'').indexOf('in GRAS')===0?' · GRAS':''}</div>
+            ${((it.alerts||[]).length||(it.tox_flags||[]).length)?`<div class="kt" style="color:#8A3A22">⚠ ${[...(it.alerts||[]),...(it.tox_flags||[]).map(f=>'tox:'+f)].join(', ')}</div>`:''}
+          </div></div>`).join('')+'</div>';
+    }
+    const A=r.active_hazards||[], C=r.conditional_hazards||[];
+    html+='<div class="bsub">Documented mixture hazards</div>';
+    if(!A.length && !C.length) html+='<div class="empty">None documented for these ingredients/processes. (Not a safety clearance.)</div>';
     A.forEach(h=>html+=`<div class="hazard">⚠ <b>${h.possible_product}</b> — from ${h.precursors.join(' + ')}. ${h.note}</div>`);
     C.forEach(h=>html+=`<div class="hazard cond">○ <b>${h.possible_product}</b> — from ${h.precursors.join(' + ')}; <b>would form with</b>: ${(h.requires_process||[]).join(', ')}. ${h.note}</div>`);
+    const pal=r.palette||{}, M=pal.matches||[];
+    if(M.length){
+      html+=`<div class="bsub">Single molecules with a similar taste palette (${(pal.target||[]).join(' · ')||'—'})</div><div class="mix-ings">`+M.map(it=>`
+        <div class="mix-ing" data-smi="${it.smiles}" style="cursor:pointer" title="Click to analyze">
+          <div class="nb-struct">${it.svg||''}</div>
+          <div class="nb-info"><div class="nb-name">${it.name||it.smiles}</div><div class="kt">${(it.tastes||[]).join(' · ')}</div></div>
+          <div class="sim">${Math.round(it.match*100)}% match</div></div>`).join('')+'</div>';
+    }
+    html+='<div class="empty" style="font-size:12px">Each ingredient is read individually and screened for documented hazards. How the blend actually <i>tastes</i> together (suppression / synergy) needs your formulation data — not predictable from public data.</div>';
     $('mixResults').innerHTML=html;
   }catch(e){ $('mixResults').innerHTML='<div class="err">'+e.message+'</div>'; }
   finally{ $('mixCheck').disabled=false; $('mixCheck').textContent='Check mixture'; }

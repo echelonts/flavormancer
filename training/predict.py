@@ -710,6 +710,31 @@ def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
             "basis": "Tanimoto / Morgan r2 2048-bit over labeled molecules"}
 
 
+def palette_match(tastes, k=5):
+    """Single molecules whose KNOWN taste-label set best matches a target taste set
+    (Jaccard over sweet/bitter/umami/sour/salty). NOT a blend-perception model — a
+    label-set similarity over the labeled molecules, for the 'one molecule like this
+    mixture' view. A blend's actual palette isn't the union of its parts (suppression /
+    synergy); this is an honest structural-label approximation."""
+    if _SUB_INDEX is None:
+        _build_sub_index()
+    _, smis, tlist = _SUB_INDEX
+    target = set(tastes)
+    if not target or not smis:
+        return {"target": sorted(target), "matches": []}
+    scored = []
+    for smi, ts in zip(smis, tlist):
+        s = set(ts)
+        if not s:
+            continue
+        j = len(target & s) / len(target | s)
+        if j > 0:
+            scored.append((j, smi, sorted(s)))
+    scored.sort(key=lambda e: -e[0])
+    return {"target": sorted(target),
+            "matches": [{"smiles": sm, "tastes": ts, "match": round(j, 2)} for j, sm, ts in scored[:k]]}
+
+
 def predict(smiles: str, include_aroma: bool = False) -> dict:
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
