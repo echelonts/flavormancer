@@ -9,9 +9,16 @@ a measured lookup here on purpose: structure-based BP (Joback) was evaluated and
 rejected (~90 °C error), so a number is only ever reported when it's a real measurement.
 
 Usage:
-  python build_properties.py                       # build for all of taste_master.parquet
-  python build_properties.py "O=Cc1ccc(O)c(OC)c1"  # test mode: print props for SMILES args
+  python build_properties.py                                  # default: taste_master.parquet
+  python build_properties.py --molecules flavor_volatiles.csv # ANY SMILES/InChIKey set
+  python build_properties.py "O=Cc1ccc(O)c(OC)c1"             # test mode: print props for SMILES
+The output (properties.parquet) is MERGED when it already exists, so you can accumulate
+sets — taste molecules, aroma / GS-LF molecules, a customer's list — by pointing
+--molecules at each in turn. (PubChem physical properties are public domain, so building
+BP/VP for GS-LF molecules is clean even in the academic edition; only the GS-LF *odor
+labels* are NonCommercial, not these properties.)
 """
+import argparse
 import json
 import re
 import sys
@@ -106,10 +113,33 @@ def fetch_props(inchikey):
         parse_vp_pa(_heading_strings(cid, "Vapor Pressure"))
 
 
+def load_keys(path):
+    """Unique InChIKeys from a CSV/parquet with a 'smiles' (preferred) or 'inchikey' column."""
+    df = pd.read_parquet(path) if str(path).endswith(".parquet") else pd.read_csv(path)
+    cols = {c.lower().strip(): c for c in df.columns}
+    sc = cols.get("smiles") or cols.get("canonical smiles") or cols.get("isomeric smiles")
+    if sc:
+        keys = []
+        for s in df[sc].dropna():
+            m = Chem.MolFromSmiles(str(s))
+            if m is not None:
+                keys.append(Chem.MolToInchiKey(m))
+        return sorted(set(keys))
+    if "inchikey" in cols:
+        return sorted(set(df[cols["inchikey"]].dropna().astype(str)))
+    raise SystemExit(f"{path}: need a 'smiles' or 'inchikey' column")
+
+
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    if args:  # test mode
-        for smi in args:
+    ap = argparse.ArgumentParser(description="Measured BP/VP from PubChem (public domain).")
+    ap.add_argument("--molecules", help="CSV/parquet with a 'smiles' or 'inchikey' column "
+                                        "(default: taste_master.parquet)")
+    ap.add_argument("--out", default="properties.parquet", help="output table (merged if it exists)")
+    ap.add_argument("smiles", nargs="*", help="SMILES to test-print (no build)")
+    a = ap.parse_args()
+
+    if a.smiles:  # test mode
+        for smi in a.smiles:
             mol = Chem.MolFromSmiles(smi)
             if mol is None:
                 print(f"{smi}: unparseable")
@@ -120,11 +150,11 @@ if __name__ == "__main__":
             time.sleep(0.3)
         sys.exit(0)
 
-    master = Path("taste_master.parquet")
-    if not master.exists():
-        print("taste_master.parquet not found — run build_taste_dataset.py first")
+    src = a.molecules or "taste_master.parquet"
+    if not Path(src).exists():
+        print(f"{src} not found")
         sys.exit(1)
-    keys = pd.read_parquet(master)["inchikey"].dropna().unique()
+    keys = load_keys(src)
     rows = []
     for i, ik in enumerate(keys):
         bp, vp = fetch_props(ik)
@@ -133,6 +163,10 @@ if __name__ == "__main__":
         if (i + 1) % 50 == 0:
             print(f"  {i + 1}/{len(keys)} processed, {len(rows)} with measured props")
         time.sleep(0.3)
-    pd.DataFrame(rows).to_parquet("properties.parquet")
-    print(f"properties.parquet written: {len(rows)} molecules with measured BP/VP "
-          f"(public-domain PubChem experimental data)")
+    new = pd.DataFrame(rows, columns=["inchikey", "boiling_point_c", "vapor_pressure_pa"])
+    if Path(a.out).exists():  # accumulate across molecule sets
+        old = pd.read_parquet(a.out)
+        new = pd.concat([old, new], ignore_index=True).drop_duplicates("inchikey", keep="last")
+    new.to_parquet(a.out)
+    print(f"{a.out}: {len(new)} molecules total with measured BP/VP "
+          f"(+{len(rows)} from {src}; public-domain PubChem data)")
