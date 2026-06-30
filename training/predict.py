@@ -227,7 +227,8 @@ if _GRAS_FILE.exists():
 # because structure-based volatility (e.g. Joback) is too inaccurate for flavor
 # molecules to report as a number — benzaldehyde misses by ~90 C.
 _PROPS = {}
-_PROP_COLS = ("odor_threshold_ppm", "fema_use_max_ppm", "boiling_point_c", "vapor_pressure_pa")
+_PROP_COLS = ("odor_threshold_ppm", "fema_use_max_ppm", "boiling_point_c",
+              "boiling_point_pressure_mmhg", "vapor_pressure_pa")
 for _ext in ("properties.parquet", "properties.csv"):
     _pf = Path(_ext)
     if _pf.exists():

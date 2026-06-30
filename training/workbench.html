@@ -213,7 +213,10 @@ function renderBehavior(p){
   const rows = [];
   if(typeof comp.mol_weight==='number') rows.push(['MW', comp.mol_weight+' g/mol']);
   if(typeof comp.logP==='number') rows.push(['logP', comp.logP]);
-  if(typeof meas.boiling_point_c==='number') rows.push(['Boiling point', meas.boiling_point_c+' °C'+MEAS]);
+  if(typeof meas.boiling_point_c==='number'){
+    const atP = (typeof meas.boiling_point_pressure_mmhg==='number') ? ` (at ${meas.boiling_point_pressure_mmhg} mmHg)` : '';
+    rows.push(['Boiling point', meas.boiling_point_c+' °C'+atP+MEAS]);
+  }
   if(qual.aroma_volatility) rows.push(['Volatility', qual.aroma_volatility]);
   if(typeof meas.vapor_pressure_pa==='number') rows.push(['Vapor pressure', meas.vapor_pressure_pa+' Pa'+MEAS]);
   if(sf.gras_status) rows.push(['Food-use status', sf.gras_status]);
