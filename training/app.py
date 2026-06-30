@@ -18,6 +18,7 @@ instance) for the demo; deployment puts this behind login + per-user history, an
 prediction core doesn't change.
 """
 
+from functools import lru_cache
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -45,6 +46,37 @@ def _resolve(text: str):
     return None
 
 
+def _svg(smi, w=320, h=220):
+    """2D structure SVG; None if drawing is unavailable (headless box w/o libXrender)."""
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is None:
+        return None
+    try:
+        from rdkit.Chem.Draw import rdMolDraw2D
+        d = rdMolDraw2D.MolDraw2DSVG(w, h)
+        d.DrawMolecule(mol)
+        d.FinishDrawing()
+        return d.GetDrawingText()
+    except Exception:  # noqa: BLE001 — missing X11 libs etc.; degrade gracefully
+        return None
+
+
+@lru_cache(maxsize=8192)
+def _name(smi):
+    """PubChem common name (Title) for a SMILES — cached, best-effort, short timeout."""
+    import json
+    import urllib.parse
+    import urllib.request
+    url = ("https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/"
+           f"{urllib.parse.quote(smi)}/property/Title/JSON")
+    try:
+        with urllib.request.urlopen(url, timeout=4) as r:
+            d = json.load(r)
+        return d["PropertyTable"]["Properties"][0].get("Title")
+    except Exception:  # noqa: BLE001 — not found / timeout / throttled
+        return None
+
+
 class Query(BaseModel):
     smiles: str
     k: int = 8
@@ -64,25 +96,17 @@ def api_neighbors(q: Query):
     smi = _resolve(q.smiles)
     if not smi:
         return {"neighbors": []}
-    return P.substitute(smi, k=q.k)
+    res = P.substitute(smi, k=q.k)
+    for n in res.get("neighbors", []):  # enrich each candidate with a structure + a name
+        n["svg"] = _svg(n["smiles"], 132, 96)
+        n["name"] = _name(n["smiles"])
+    return res
 
 
 @app.post("/api/structure")
 def api_structure(q: Query):
-    """2D structure depiction (SVG). Degrades to {svg: None} if RDKit's drawing module
-    can't load (e.g. a headless box missing libXrender) — never 500s the demo."""
-    smi = _resolve(q.smiles)
-    mol = Chem.MolFromSmiles(smi) if smi else None
-    if mol is None:
-        return {"svg": None}
-    try:
-        from rdkit.Chem.Draw import rdMolDraw2D
-        d = rdMolDraw2D.MolDraw2DSVG(320, 220)
-        d.DrawMolecule(mol)
-        d.FinishDrawing()
-        return {"svg": d.GetDrawingText()}
-    except Exception:  # noqa: BLE001 — missing X11 libs etc.; degrade gracefully
-        return {"svg": None}
+    """2D structure depiction (SVG); {svg: None} if drawing is unavailable."""
+    return {"svg": _svg(_resolve(q.smiles))}
 
 
 @app.get("/", response_class=HTMLResponse)

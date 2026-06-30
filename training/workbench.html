@@ -49,10 +49,14 @@
   .chip{font-family:var(--mono);font-size:12px;padding:5px 11px;border-radius:20px;
     border:1px solid var(--line);background:var(--surface)}
   .chip.on{color:#fff;border-color:transparent}
-  .neighbor{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  .neighbor{display:flex;align-items:center;gap:12px;
     padding:11px 0;border-bottom:1px solid var(--line)}
   .neighbor:last-child{border-bottom:none}
-  .neighbor .s{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+  .neighbor .nb-struct{flex:0 0 auto;width:64px;height:48px;background:#fff;border:1px solid var(--line);border-radius:6px}
+  .neighbor .nb-struct svg{width:64px;height:48px}
+  .neighbor .nb-info{flex:1;min-width:0}
+  .neighbor .nb-name{font-weight:600;font-size:13px;text-transform:capitalize;color:var(--ink)}
+  .neighbor .s{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all}
   .neighbor .sim{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap}
   .neighbor .kt{font-family:var(--mono);font-size:11px;color:var(--muted)}
   .empty{color:var(--muted);font-size:14px;padding:8px 0}
@@ -127,10 +131,13 @@
 
   <p class="note" id="footnote" style="display:none">
     Bars are model predictions; a <b>measured</b> tag means the molecule is in the
-    curated data (ground truth, not a guess). Salty is lookup-only and sour is a
-    rule. Substitutions rank by structural similarity (Tanimoto over molecular
-    fingerprints). Aroma isn't in the public demo — it trains on your licensed or
-    in-house odor data, on-prem. Results are leads for the bench, not verdicts.
+    curated data (ground truth, not a guess). The trained taste/tox heads are fit on
+    <b>organic</b> molecules — carbon-free inputs are flagged out-of-domain. Salty is
+    lookup-only, sour is a rule. Tox-assay flags are <b>indicative, caution-only</b>
+    (Tox21 in-vitro models) — never a determination. Quantitative dosing / odor-activity
+    needs odor-threshold tables (licensed or customer data), so it stays qualitative here.
+    Substitutions rank by structural similarity (Tanimoto). Aroma isn't in the public
+    demo — it trains on your data, on-prem. Results are leads for the bench, not verdicts.
   </p>
 </main>
 
@@ -215,8 +222,12 @@ function render(p, neighbors, svg){
   }else{
     $('neighbors').innerHTML = neighbors.map(x=>`
       <div class="neighbor">
-        <div><div class="s">${x.smiles}</div>
-        <div class="kt">${x.known_tastes.length?x.known_tastes.join(' · '):'—'}</div></div>
+        <div class="nb-struct">${x.svg||''}</div>
+        <div class="nb-info">
+          <div class="nb-name">${x.name||'—'}</div>
+          <div class="s">${x.smiles}</div>
+          <div class="kt">${x.known_tastes.length?x.known_tastes.join(' · '):'—'}</div>
+        </div>
         <div class="sim">${Math.round(x.similarity*100)}% match</div>
       </div>`).join('');
   }
