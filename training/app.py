@@ -223,15 +223,31 @@ def api_suggest(qs: str = ""):
 # model — presence/absence learned from these same descriptions, or intensity from a
 # customer's expert-labeled data — is the next step (see docs/AROMA.md).
 def _load_odor_table():
-    """inchikey-skeleton -> (documented odor text, source) from odor_notes.parquet — real,
-    cited, public-domain (HSDB/CAMEO) descriptions. Empty until build_odor_notes.py has run."""
+    """inchikey-skeleton -> {odor, odor_source, threshold_ppm, threshold_source} from
+    odor_notes.parquet — real, cited, public-domain (HSDB/Haz-Map/CAMEO) data. Empty until
+    build_odor_notes.py has run; tolerant of older tables without the threshold columns."""
     try:
         import pandas as pd
         df = pd.read_parquet("odor_notes.parquet")
+
+        def col(name):
+            return df[name] if name in df.columns else [None] * len(df)
+
         out = {}
-        for ik, odor, src in zip(df["inchikey"], df["odor"], df["odor_source"]):
-            if isinstance(ik, str) and isinstance(odor, str):
-                out[ik.split("-")[0]] = (odor, src if isinstance(src, str) else None)
+        for ik, odor, osrc, thr, tsrc in zip(df["inchikey"], col("odor"), col("odor_source"),
+                                             col("odor_threshold_ppm"),
+                                             col("odor_threshold_source")):
+            if not isinstance(ik, str):
+                continue
+            rec = {}
+            if isinstance(odor, str):
+                rec["odor"] = odor
+                rec["odor_source"] = osrc if isinstance(osrc, str) else None
+            if isinstance(thr, (int, float)) and thr == thr:  # numeric and not NaN
+                rec["threshold_ppm"] = float(thr)
+                rec["threshold_source"] = tsrc if isinstance(tsrc, str) else None
+            if rec:
+                out[ik.split("-")[0]] = rec
         return out
     except Exception:  # noqa: BLE001 — no table / no pandas
         return {}
@@ -248,12 +264,17 @@ def api_aroma(q: Query):
     mol = Chem.MolFromSmiles(smi) if smi else None
     if mol is None:
         return {"available": False}
-    doc = _ODOR_TABLE.get(Chem.MolToInchiKey(mol).split("-")[0])
-    if not doc:
+    rec = _ODOR_TABLE.get(Chem.MolToInchiKey(mol).split("-")[0])
+    if not rec:
         return {"available": False}
-    notes = [s.strip() for s in doc[0].split("\n") if s.strip()]
-    concise = [n for n in notes if len(n) <= 90] or notes  # lead with punchy descriptors
-    return {"available": True, "documented": {"notes": concise[:4], "source": doc[1]}}
+    out = {"available": True}
+    if rec.get("odor"):
+        notes = [s.strip() for s in rec["odor"].split("\n") if s.strip()]
+        concise = [n for n in notes if len(n) <= 90] or notes  # lead with punchy descriptors
+        out["documented"] = {"notes": concise[:4], "source": rec.get("odor_source")}
+    if rec.get("threshold_ppm") is not None:
+        out["threshold"] = {"ppm": rec["threshold_ppm"], "source": rec.get("threshold_source")}
+    return out
 
 
 @app.get("/", response_class=HTMLResponse)

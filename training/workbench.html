@@ -79,6 +79,9 @@
   .aroma-doc-tag{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px}
   .aroma-doc{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
   .odor-note{background:#F1F4EF;border:1px solid #DDE3D8;border-radius:6px;padding:4px 9px;font-size:12.5px;line-height:1.35}
+  .odor-thr{font-size:13px;line-height:1.4}
+  .odor-thr b{font-family:var(--mono);color:var(--aroma)}
+  .odor-thr span{color:var(--muted);font-size:12px}
   .ameter{margin:8px 0}
   .arow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
   .aname{font-weight:600;font-size:13px;text-transform:capitalize}
@@ -365,6 +368,13 @@ function renderAroma(ar){
   if(doc && (doc.notes||[]).length){
     html += `<div class="aroma-doc-tag">Documented odor · ${doc.source||'public domain'}</div>`;
     html += '<div class="aroma-doc">'+ doc.notes.map(n=>`<span class="odor-note">${n}</span>`).join('') +'</div>';
+  }
+  const thr = ar.threshold;
+  if(thr && thr.ppm!=null){
+    const p = thr.ppm;
+    const s = p<0.001 ? p.toExponential(1) : (p<1 ? p.toPrecision(2) : (''+p));
+    html += `<div class="aroma-doc-tag" style="margin-top:13px">Odor detection threshold · ${thr.source||'public domain'}</div>`;
+    html += `<div class="odor-thr">≈ <b>${s} ppm</b> <span>— lowest concentration at which it's detectable (published values vary by source)</span></div>`;
   }
   box.innerHTML=html;
   box.style.display = html ? 'block' : 'none';
