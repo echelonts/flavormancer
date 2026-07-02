@@ -38,6 +38,7 @@
   .cname{font-size:16px;font-weight:650;color:var(--ink);margin:0 0 4px}
   .iupac{font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 0 14px;word-break:break-all}
   .meter{margin:13px 0}
+  .meters-note{font-size:11.5px;color:var(--muted);line-height:1.5;margin:10px 2px 2px;border-top:1px solid #EEF0EC;padding-top:9px}
   .meter .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
   .meter .name{font-weight:600;font-size:14px;text-transform:capitalize}
   .meter .val{font-family:var(--mono);font-size:13px;color:var(--muted)}
@@ -74,7 +75,10 @@
   .aroma-lead b{color:var(--aroma)}
   .aroma-note{font-size:13px;color:var(--muted);margin:0;line-height:1.55;max-width:760px}
   .aroma-note b{color:var(--ink)}
-  .aroma-prev-tag{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--aroma);margin:0 0 10px}
+  .aroma-prev-tag{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--aroma);margin:14px 0 10px}
+  .aroma-doc-tag{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px}
+  .aroma-doc{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+  .odor-note{background:#F1F4EF;border:1px solid #DDE3D8;border-radius:6px;padding:4px 9px;font-size:12.5px;line-height:1.35}
   .ameter{margin:8px 0}
   .arow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
   .aname{font-weight:600;font-size:13px;text-transform:capitalize}
@@ -174,11 +178,13 @@
   <div class="card aroma-card" id="aromaCard" style="display:none">
     <h2>Aroma</h2>
     <div id="aromaPreview" style="display:none;margin-bottom:14px"></div>
-    <div class="aroma-lead">Aroma prediction unlocks with <b>your</b> data.</div>
-    <p class="aroma-note">The public demo predicts <b>taste</b> from open data. A useful
-    aroma model needs expert-labeled odor data — so we train it <b>on-premise, on your
-    licensed or in-house data</b>, never leaving your firewall. The pipeline is built and
-    ready; it lights up the moment the data is yours to use.</p>
+    <div class="aroma-lead">Documented odor above is a public reference; aroma <b>prediction</b> unlocks with <b>your</b> data.</div>
+    <p class="aroma-note">The public demo predicts <b>taste</b> from open data and shows
+    <b>documented odor</b> where a public-domain reference exists (HSDB). <b>Predicting</b>
+    odor for new or unmeasured molecules needs a trained model: presence/absence learned
+    from those same documented descriptions, and true intensity from expert-labeled panel
+    data — trained <b>on-premise, on your licensed or in-house data</b>, never leaving your
+    firewall.</p>
     <p class="aroma-note" style="margin-top:8px">A more robust <b>open-source academic
     edition</b> — trained on richer research odor data (the GS-LF set) — is coming soon.</p>
   </div>
@@ -262,6 +268,7 @@ function render(p, neighbors, svg, names){
     for(const t of MODEL_TASTES){
       if(typeof p[t] === 'number') m += meter(t, p[t], known.has(t));
     }
+    if(m) m += '<div class="meters-note">Each is an independent confidence that the molecule carries that taste — they don\'t sum to 100%. A molecule can be both (sweet <i>and</i> bitter) or weakly any.</div>';
     $('meters').innerHTML = m || '<div class="empty">No taste heads trained yet.</div>';
   } else {
     $('meters').innerHTML = '<div class="empty">Trained taste prediction not applicable to this molecule.</div>';
@@ -352,11 +359,15 @@ function renderBehavior(p){
 
 function renderAroma(ar){
   const box=$('aromaPreview');
-  if(ar && ar.available && (ar.descriptors||[]).length){
-    box.innerHTML='<div class="aroma-prev-tag">▸ preview — illustrative of the unlocked read (not a live prediction)</div>'+
-      ar.descriptors.map(d=>{ const pct=Math.round(d.score*100); return `<div class="ameter"><div class="arow"><span class="aname">${d.odor}</span><span class="aval">${pct}%</span></div><div class="atrack"><div class="afill" style="width:${pct}%"></div></div></div>`; }).join('');
-    box.style.display='block';
-  } else { box.style.display='none'; }
+  if(!ar || !ar.available){ box.style.display='none'; return; }
+  let html='';
+  const doc = ar.documented;
+  if(doc && (doc.notes||[]).length){
+    html += `<div class="aroma-doc-tag">Documented odor · ${doc.source||'public domain'}</div>`;
+    html += '<div class="aroma-doc">'+ doc.notes.map(n=>`<span class="odor-note">${n}</span>`).join('') +'</div>';
+  }
+  box.innerHTML=html;
+  box.style.display = html ? 'block' : 'none';
 }
 
 function chip(key, on, color, label){
