@@ -60,8 +60,10 @@ def _get(url):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=20) as r:
                 return json.load(r)
-        except urllib.error.HTTPError as e:  # 503 = throttled: back off harder, then retry
-            time.sleep((2.0 if e.code == 503 else 0.6) * (attempt + 1))
+        except urllib.error.HTTPError as e:  # 503 = throttled: brief backoff, then retry
+            # keep the 503 backoff GENTLE (capped): a transient throttle should cost a second
+            # or two, not stall the crawl — an over-aggressive backoff turns a blip into a hang
+            time.sleep(min((attempt + 1) * (1.0 if e.code == 503 else 0.6), 4.0))
         except Exception:  # noqa: BLE001 — network/parse; retry then give up
             time.sleep(0.6 * (attempt + 1))
     return None
