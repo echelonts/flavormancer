@@ -26,6 +26,7 @@ import json
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -44,12 +45,24 @@ _P_TO_MMHG = {"mmhg": 1.0, "torr": 1.0, "kpa": 7.50062, "hpa": 0.750062,
               "mbar": 0.750062, "atm": 760.0, "bar": 750.062}
 
 
+_last_req = [0.0]
+_MIN_INTERVAL = 0.22  # ~4.5 req/s — under PubChem's 5/s ceiling. Steady pacing avoids the
+#                       503 throttling that a 4-calls-per-molecule burst triggers; once
+#                       throttled, every retry's backoff costs far more than this spacing.
+
+
 def _get(url):
-    for attempt in range(4):
+    for attempt in range(5):
+        wait = _MIN_INTERVAL - (time.time() - _last_req[0])
+        if wait > 0:
+            time.sleep(wait)
+        _last_req[0] = time.time()
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=20) as r:
                 return json.load(r)
-        except Exception:  # noqa: BLE001 — network/HTTP/parse; retry then give up
+        except urllib.error.HTTPError as e:  # 503 = throttled: back off harder, then retry
+            time.sleep((2.0 if e.code == 503 else 0.6) * (attempt + 1))
+        except Exception:  # noqa: BLE001 — network/parse; retry then give up
             time.sleep(0.6 * (attempt + 1))
     return None
 
@@ -189,26 +202,41 @@ if __name__ == "__main__":
         print(f"{src} not found")
         sys.exit(1)
     keys = load_keys(src)
-    rows = []
     cols = ["inchikey", "common_name", "iupac_name", "boiling_point_c",
             "boiling_point_pressure_mmhg", "vapor_pressure_pa"]
-    for i, ik in enumerate(keys):
+
+    def checkpoint(rows):
+        """Merge new rows into the output table and persist — called every CHUNK so a
+        multi-hour crawl survives interruption and can resume where it left off."""
+        new = pd.DataFrame(rows, columns=cols)
+        if Path(a.out).exists():  # accumulate across molecule sets / prior checkpoints
+            old = pd.read_parquet(a.out)
+            new = pd.concat([old, new], ignore_index=True).drop_duplicates("inchikey", keep="last")
+        return new.reindex(columns=cols)  # stable schema as older tables gain name columns
+
+    done = set()  # resume: skip molecules already carrying a name in the existing table
+    if Path(a.out).exists():
+        ex = pd.read_parquet(a.out)
+        if "common_name" in ex.columns:
+            done = set(ex.loc[ex["common_name"].notna(), "inchikey"])
+    todo = [k for k in keys if k not in done]
+    print(f"{len(keys)} molecules in {src}; {len(done)} already named, {len(todo)} to fetch")
+
+    CHUNK, rows = 100, []
+    for i, ik in enumerate(todo):
         bp, bp_press, vp, common, iupac = fetch_props(ik)
         if bp is not None or vp is not None or common or iupac:
             rows.append({"inchikey": ik, "common_name": common, "iupac_name": iupac,
                          "boiling_point_c": bp, "boiling_point_pressure_mmhg": bp_press,
                          "vapor_pressure_pa": vp})
-        if (i + 1) % 50 == 0:
-            named = sum(1 for r in rows if r["common_name"])
-            print(f"  {i + 1}/{len(keys)} processed, {len(rows)} enriched ({named} named)")
-        time.sleep(0.3)
-    new = pd.DataFrame(rows, columns=cols)
-    if Path(a.out).exists():  # accumulate across molecule sets
-        old = pd.read_parquet(a.out)
-        new = pd.concat([old, new], ignore_index=True).drop_duplicates("inchikey", keep="last")
-        new = new.reindex(columns=cols)  # keep a stable schema as older tables get names
-    new.to_parquet(a.out)
-    named = int(new["common_name"].notna().sum())
-    print(f"{a.out}: {len(new)} molecules total (names: {named}, "
-          f"BP: {int(new['boiling_point_c'].notna().sum())}) "
-          f"(+{len(rows)} from {src}; public-domain PubChem data)")
+        if (i + 1) % CHUNK == 0 or (i + 1) == len(todo):
+            merged = checkpoint(rows)
+            merged.to_parquet(a.out)
+            rows = []
+            print(f"  {i + 1}/{len(todo)} fetched; checkpoint -> {len(merged)} rows, "
+                  f"{int(merged['common_name'].notna().sum())} named, "
+                  f"{int(merged['boiling_point_c'].notna().sum())} with BP", flush=True)
+    final = pd.read_parquet(a.out)
+    print(f"{a.out}: {len(final)} molecules total "
+          f"(names: {int(final['common_name'].notna().sum())}, "
+          f"BP: {int(final['boiling_point_c'].notna().sum())}); public-domain PubChem data")
