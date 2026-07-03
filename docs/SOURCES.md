@@ -23,6 +23,9 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 - **PubChem / FDA SAF** — data sources for measured properties + GRAS; cited under *Data sources*.
 
 **Product / serving side**
+- **3Dmol.js** (David Koes et al.) — interactive WebGL 3D viewer for the demo workbench;
+  renders the RDKit-embedded conformer from `/api/structure3d`. Vendored + served locally so
+  the demo stays self-contained. (BSD-3-Clause; see `training/static/README.md`.)
 - **ONNX** + **ONNX Runtime** — run taste models in-process in .NET. (MIT.)
 - **ASP.NET Core / .NET** — the app/API backbone. (MIT.)
 - **React** — frontend. (MIT.)

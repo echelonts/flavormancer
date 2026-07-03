@@ -95,6 +95,13 @@
   .structure{text-align:center;margin:0 0 14px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px}
   .structure svg{max-width:100%;height:auto}
   .structure:empty{display:none}
+  .struct-toggle{display:flex;gap:0;justify-content:center;margin:0 0 8px}
+  .st-tab{font:inherit;font-size:12px;font-weight:600;padding:4px 14px;border:1px solid var(--line);background:#fff;color:var(--muted);cursor:pointer}
+  .st-tab:first-child{border-radius:6px 0 0 6px;border-right:none}
+  .st-tab:last-child{border-radius:0 6px 6px 0}
+  .st-tab.on{background:var(--aroma);color:#fff;border-color:var(--aroma)}
+  .structure3d{position:relative;width:100%;height:280px;margin:0 0 14px;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .s3-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
   .domain-banner{background:#FFF6E6;border:1px solid #E8D38A;color:#7A5A12;border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:14px;line-height:1.5}
   .hint code{font-family:var(--mono);background:var(--accent-soft);padding:1px 5px;border-radius:4px;color:var(--accent)}
   .toggle{font-family:var(--mono);font-size:12px;color:var(--muted);margin:12px 2px 0;display:flex;align-items:center;gap:7px;cursor:pointer}
@@ -158,7 +165,12 @@
   <div class="grid" id="results" style="display:none">
     <div class="card">
       <h2>Flavor read</h2>
+      <div class="struct-toggle" id="structToggle" style="display:none">
+        <button type="button" id="btn2d" class="st-tab on">2D</button>
+        <button type="button" id="btn3d" class="st-tab">3D</button>
+      </div>
       <div class="structure" id="structure"></div>
+      <div class="structure3d" id="structure3d" style="display:none"></div>
       <div class="cname" id="cname"></div>
       <p class="smiles" id="smiles"></p>
       <p class="iupac" id="iupac"></p>
@@ -204,6 +216,7 @@
   </p>
 </main>
 
+<script src="/static/3Dmol-min.js"></script>
 <script>
 const TASTE_COLORS = {sweet:'var(--sweet)',bitter:'var(--bitter)',umami:'var(--umami)',
   sour:'var(--sour)',salty:'var(--salty)'};
@@ -234,16 +247,18 @@ async function run(){
   go.disabled = true; go.textContent = 'Reading…';
   $('err').style.display='none';
   try{
-    const [p, n, s, nm, ar] = await Promise.all([
+    const [p, n, s, nm, ar, s3] = await Promise.all([
       post('/api/predict',{smiles:text}),
       post('/api/neighbors',{smiles:text, k:8}),
       post('/api/structure',{smiles:text}),
       post('/api/names',{smiles:text}),
-      post('/api/aroma',{smiles:text})
+      post('/api/aroma',{smiles:text}),
+      post('/api/structure3d',{smiles:text})
     ]);
     if(p.error){ throw new Error(p.error); }
     render(p, n.neighbors||[], (s&&s.svg)||null, nm||{});
     renderAroma(ar||{});
+    setStructure3D((s3&&s3.molblock)||null);
   }catch(e){
     $('results').style.display='none'; $('behaviorCard').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
     $('err').textContent = e.message; $('err').style.display='block';
@@ -384,6 +399,38 @@ function chip(key, on, color, label){
   const style = on && color ? `style="background:${color}"` : '';
   return `<span class="chip ${on?'on':''}" ${style}>${label}</span>`;
 }
+
+// --- interactive 3D structure (3Dmol.js over an RDKit-embedded conformer) ---
+let _mol3d = null, _v3d = null;
+const _has3Dmol = typeof $3Dmol !== 'undefined';
+function setStructure3D(molblock){
+  _mol3d = molblock;
+  // reset to the 2D view on every new molecule; show the toggle only if 3D is possible
+  document.getElementById('structToggle').style.display = (_has3Dmol && molblock) ? 'flex' : 'none';
+  setView('2d');
+}
+function setView(mode){
+  const is3 = mode === '3d';
+  document.getElementById('structure').style.display = is3 ? 'none' : 'block';
+  document.getElementById('structure3d').style.display = is3 ? 'block' : 'none';
+  document.getElementById('btn2d').classList.toggle('on', !is3);
+  document.getElementById('btn3d').classList.toggle('on', is3);
+  if(is3) show3D();
+}
+function show3D(){
+  const el = document.getElementById('structure3d');
+  if(!_has3Dmol || !_mol3d){ el.innerHTML = '<div class="s3-empty">3D view unavailable for this structure.</div>'; return; }
+  if(!_v3d){ _v3d = $3Dmol.createViewer(el, {backgroundColor:'white'}); }
+  _v3d.removeAllModels();
+  _v3d.addModel(_mol3d, 'sdf');
+  _v3d.setStyle({}, {stick:{radius:0.13}, sphere:{scale:0.24}});
+  _v3d.zoomTo();
+  _v3d.render();
+  _v3d.resize();            // container was display:none until now — re-measure
+  _v3d.spin('y', 0.4);
+}
+document.getElementById('btn2d').addEventListener('click', ()=>setView('2d'));
+document.getElementById('btn3d').addEventListener('click', ()=>setView('3d'));
 
 go.addEventListener('click', run);
 q.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });

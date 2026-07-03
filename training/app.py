@@ -145,6 +145,37 @@ def api_structure(q: Query):
     return {"svg": _svg(_resolve(q.smiles))}
 
 
+@app.post("/api/structure3d")
+def api_structure3d(q: Query):
+    """3D conformer as an SDF mol block — RDKit ETKDG embed + MMFF optimize. Rendered
+    interactively in the browser (3Dmol.js). {molblock: None} if a 3D embed isn't possible."""
+    smi = _resolve(q.smiles)
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is None:
+        return {"molblock": None}
+    try:
+        from rdkit.Chem import AllChem
+        mol = Chem.AddHs(mol)
+        params = AllChem.ETKDGv3()
+        params.randomSeed = 42  # deterministic conformer
+        if AllChem.EmbedMolecule(mol, params) != 0 and AllChem.EmbedMolecule(mol, AllChem.ETKDG()) != 0:
+            return {"molblock": None}  # embedding failed (e.g. tricky cage/macrocycle)
+        try:
+            AllChem.MMFFOptimizeMolecule(mol)
+        except Exception:  # noqa: BLE001 — no MMFF params for some atoms; unoptimized still fine
+            pass
+        return {"molblock": Chem.MolToMolBlock(mol)}
+    except Exception:  # noqa: BLE001 — RDKit build without embedding etc.; degrade gracefully
+        return {"molblock": None}
+
+
+@app.get("/static/3Dmol-min.js")
+def _threedmol_js():
+    """Serve the vendored 3Dmol.js (BSD-3-Clause) locally so the demo stays self-contained."""
+    from fastapi.responses import FileResponse
+    return FileResponse("static/3Dmol-min.js", media_type="application/javascript")
+
+
 class MixtureQuery(BaseModel):
     ingredients: list[str]
     processes: list[str] = []
