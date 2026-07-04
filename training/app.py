@@ -134,8 +134,14 @@ def api_neighbors(q: Query):
 @app.post("/api/names")
 def api_names(q: Query):
     """Common (PubChem Title) + IUPAC names for the queried molecule."""
-    smi = _resolve(q.smiles)
+    raw = (q.smiles or "").strip()
+    smi = _resolve(raw)
     common, iupac = _names(smi) if smi else (None, None)
+    # If the user searched by NAME (not a SMILES), that IS the best common name — PubChem's
+    # Title for a flattened structure is often the systematic name (e.g. "cinnamaldehyde"
+    # resolves to Title "3-Phenylprop-2-Enal"), which then looks like the IUPAC name repeated.
+    if smi and raw and Chem.MolFromSmiles(raw) is None:
+        common = raw[:1].upper() + raw[1:]
     return {"common": common, "iupac": iupac, "smiles": smi}
 
 
