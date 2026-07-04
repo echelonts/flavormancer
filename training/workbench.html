@@ -270,11 +270,15 @@ async function run(){
 function render(p, neighbors, svg, names){
   names = names || {};
   $('structure').innerHTML = svg || '';
-  $('cname').textContent = names.common || '';
-  $('cname').style.display = names.common ? 'block' : 'none';
+  const common = names.common || '', iupac = names.iupac || '';
+  // don't show the same string twice: PubChem's "Title" for a flattened structure is often
+  // the systematic name, so common can equal the IUPAC name — show it once in that case.
+  const dupe = common && iupac && common.trim().toLowerCase() === iupac.trim().toLowerCase();
+  $('cname').textContent = common;
+  $('cname').style.display = common ? 'block' : 'none';
   $('smiles').textContent = p.smiles;
-  $('iupac').textContent = names.iupac ? ('IUPAC: ' + names.iupac) : '';
-  $('iupac').style.display = names.iupac ? 'block' : 'none';
+  $('iupac').textContent = (iupac && !dupe) ? ('IUPAC: ' + iupac) : '';
+  $('iupac').style.display = (iupac && !dupe) ? 'block' : 'none';
   const inDomain = !(p.applicability && p.applicability.in_domain === false);
   const db = $('domainBanner');
   db.style.display = inDomain ? 'none' : 'block';

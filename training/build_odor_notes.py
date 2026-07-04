@@ -25,6 +25,7 @@ import argparse
 import re
 import statistics
 import sys
+import urllib.parse
 from pathlib import Path
 
 import pandas as pd
@@ -138,6 +139,78 @@ def fetch_record(inchikey):
             "odor_threshold_source": thr_src}
 
 
+_ANNO = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/annotations/heading/JSON"
+
+
+def annotation_records(heading):
+    """Yield (cid, [strings], source) from PubChem's annotations API — inline data across ALL
+    pages, public-domain sources only. The whole 'Odor' set is ~3 requests, not ~3k crawls."""
+    page = 1
+    while True:
+        d = _get(f"{_ANNO}?heading_type=Compound&heading={urllib.parse.quote(heading)}&page={page}")
+        ann = (d or {}).get("Annotations", {})
+        for rec in ann.get("Annotation", []):
+            src = (rec.get("SourceName") or "").strip()
+            if not _pd_source(src):
+                continue
+            cids = rec.get("LinkedRecords", {}).get("CID", [])
+            if not cids:
+                continue
+            strs = []
+            for dd in rec.get("Data", []):
+                for s in dd.get("Value", {}).get("StringWithMarkup", []) or []:
+                    t = " ".join((s.get("String") or "").split()).strip()
+                    if t:
+                        strs.append(t)
+            if strs:
+                yield cids[0], strs, src
+        if page >= ann.get("TotalPages", 1):
+            break
+        page += 1
+
+
+def cids_to_inchikeys(cids, chunk=100):
+    """{cid: InChIKey} via batched PubChem property calls (~1 request per 100 CIDs)."""
+    out = {}
+    for i in range(0, len(cids), chunk):
+        ch = cids[i:i + chunk]
+        d = _get(f"{_BASE}/pug/compound/cid/{','.join(map(str, ch))}/property/InChIKey/JSON")
+        for p in (d or {}).get("PropertyTable", {}).get("Properties", []):
+            if p.get("InChIKey"):
+                out[p["CID"]] = p["InChIKey"]
+    return out
+
+
+def build_from_pubchem_annotations():
+    """Rows for the WHOLE public-domain PubChem odor set via the annotations API (inline data).
+    ~3 requests for odor + ~1 for threshold + a batched CID->InChIKey resolve — not a 3k crawl."""
+    odor_by_cid = {}
+    for cid, strs, src in annotation_records("Odor"):
+        o, s = odor_by_cid.get(cid, ([], set()))
+        odor_by_cid[cid] = (o + strs, s | {src})
+    thr_by_cid = {}
+    for cid, strs, src in annotation_records("Odor Threshold"):
+        thr_by_cid.setdefault(cid, []).extend((src, t) for t in strs)
+    all_cids = sorted(set(odor_by_cid) | set(thr_by_cid))
+    print(f"annotations: {len(odor_by_cid)} odor + {len(thr_by_cid)} threshold CIDs "
+          f"(public-domain); resolving {len(all_cids)} InChIKeys...", flush=True)
+    cid2ik = cids_to_inchikeys(all_cids)
+    rows = []
+    for cid in all_cids:
+        ik = cid2ik.get(cid)
+        if not ik:
+            continue
+        ostrs, osrcs = odor_by_cid.get(cid, ([], set()))
+        thr_pairs = thr_by_cid.get(cid, [])
+        rows.append({"inchikey": ik,
+                     "odor": "\n".join(sorted(set(ostrs), key=len)) or None,
+                     "odor_source": "; ".join(sorted(osrcs)) or None,
+                     "odor_threshold_ppm": _parse_threshold_ppm(thr_pairs),
+                     "odor_threshold_note": "\n".join(dict.fromkeys(t for _, t in thr_pairs)) or None,
+                     "odor_threshold_source": "; ".join(sorted({s for s, _ in thr_pairs})) or None})
+    return rows
+
+
 COLS = ["inchikey", "odor", "odor_source", "odor_threshold_ppm",
         "odor_threshold_note", "odor_threshold_source"]
 
@@ -146,8 +219,22 @@ if __name__ == "__main__":
     ap.add_argument("--molecules", help="CSV/parquet with 'smiles' or 'inchikey' "
                                         "(default: flavor_volatiles.csv)")
     ap.add_argument("--out", default="odor_notes.parquet", help="output (merged if it exists)")
+    ap.add_argument("--pubchem-all", action="store_true",
+                    help="pull the ENTIRE public-domain PubChem odor set via the annotations API")
     ap.add_argument("smiles", nargs="*", help="SMILES to test-print (no build)")
     a = ap.parse_args()
+
+    if a.pubchem_all:  # whole public-domain odor set, via the annotations API (cheap)
+        rows = build_from_pubchem_annotations()
+        new = pd.DataFrame(rows, columns=COLS)
+        if Path(a.out).exists():
+            old = pd.read_parquet(a.out)
+            new = pd.concat([old, new], ignore_index=True).drop_duplicates("inchikey", keep="last")
+            new = new.reindex(columns=COLS)
+        new.to_parquet(a.out)
+        print(f"{a.out}: {len(new)} molecules ({int(new['odor'].notna().sum())} odor, "
+              f"{int(new['odor_threshold_ppm'].notna().sum())} threshold); public-domain")
+        sys.exit(0)
 
     if a.smiles:  # test mode
         for smi in a.smiles:
