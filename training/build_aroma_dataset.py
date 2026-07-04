@@ -1,60 +1,82 @@
 """
-build_aroma_dataset.py — assemble the clean aroma (odor-descriptor) training table.
+build_aroma_dataset.py — turn documented odor free-text into a multi-label descriptor dataset.
 
-Source: keller_2016 (Keller & Vosshall 2016, BMC Neuroscience, CC-BY-4.0) — the only
-commercially-clean odor-descriptor dataset available (~480 molecules, 20 descriptors).
-Each molecule gets a mean 0-100 panel rating per descriptor.
+Reads odor_notes.parquet (public-domain HSDB/Haz-Map odor descriptions + SMILES, built by
+build_odor_notes.py --pubchem-all) and normalizes each molecule's free-text odor into a
+CONTROLLED descriptor vocabulary by word-boundary keyword matching. Output aroma_train.parquet
+= (inchikey, smiles, <one 0/1 column per descriptor>) — a multi-label presence/absence dataset
+for train_aroma.py.
 
-Output: aroma_master.parquet  (smiles + 20 descriptor columns, 0-100)
+Honest scope: PRESENCE/ABSENCE learned from free text, not intensity — HSDB text has no scored
+descriptors. It's weak labeling (a missing keyword is treated as a negative), so noisier than
+expert panel data (GS-LF), but real and commercial-clean (public domain). (The earlier
+keller_2016 CC-BY approach was dropped — negative-R² on naive-subject ratings; this HSDB set is
+larger and yes/no rather than noisy 0-100 scores.)
+
+Usage: python build_aroma_dataset.py            # odor_notes.parquet -> aroma_train.parquet
 """
+import re
+import sys
 from pathlib import Path
 
 import pandas as pd
 from rdkit import Chem
 
-KELLER = Path("aroma/keller_2016")
-DESCRIPTORS = ["ACID", "AMMONIA/URINOUS", "BAKERY", "BURNT", "CHEMICAL", "COLD",
-               "DECAYED", "EDIBLE", "FISH", "FLOWER", "FRUIT", "GARLIC", "GRASS",
-               "MUSKY", "SOUR", "SPICES", "SWEATY", "SWEET", "WARM", "WOOD"]
+# controlled odor-descriptor vocabulary: descriptor -> keyword cues matched with word boundaries
+VOCAB = {
+    "fruity": ["fruity", "fruit"], "sweet": ["sweet"], "floral": ["floral", "flower", "flowery"],
+    "citrus": ["citrus", "lemon", "orange", "lime", "grapefruit"], "green": ["green"],
+    "minty": ["mint", "minty", "menthol", "peppermint", "spearmint"], "herbal": ["herb", "herbal"],
+    "woody": ["wood", "woody"], "spicy": ["spicy", "spice"], "rose": ["rose", "rosy"],
+    "almond": ["almond"], "vanilla": ["vanilla"], "caramel": ["caramel", "caramellic"],
+    "nutty": ["nut", "nutty"], "buttery": ["butter", "buttery"], "fatty": ["fatty"],
+    "rancid": ["rancid"], "sulfurous": ["sulfur", "sulphur", "sulfurous", "sulfury"],
+    "garlic": ["garlic"], "onion": ["onion"], "fishy": ["fish", "fishy"],
+    "earthy": ["earth", "earthy", "musty", "moldy"], "camphor": ["camphor", "camphoraceous"],
+    "pine": ["pine", "piney"], "balsamic": ["balsam", "balsamic"],
+    "medicinal": ["medicinal", "phenol", "phenolic"], "smoky": ["smoke", "smoky", "smoked"],
+    "pungent": ["pungent", "sharp", "acrid"], "ethereal": ["ether", "ethereal", "solvent"],
+    "winey": ["wine", "winey", "vinous"], "honey": ["honey"], "coconut": ["coconut"],
+    "banana": ["banana"], "apple": ["apple"], "cherry": ["cherry"], "clove": ["clove"],
+    "cinnamon": ["cinnamon", "cinnamic"], "anise": ["anise", "licorice", "aniseed"],
+    "coffee": ["coffee"], "cocoa": ["cocoa", "chocolate"], "meaty": ["meat", "meaty"],
+    "cheesy": ["cheese", "cheesy"], "creamy": ["cream", "creamy"], "waxy": ["wax", "waxy"],
+    "fresh": ["fresh"], "grassy": ["grass", "grassy", "hay"],
+    "burnt": ["burnt", "roasted", "toasted"], "tarry": ["tar", "tarry", "creosote"],
+    "ammoniacal": ["ammonia", "ammoniacal"], "fecal": ["fecal", "feces", "faecal", "manure"],
+}
+PATS = {d: re.compile(r"\b(" + "|".join(k) + r")\b", re.I) for d, k in VOCAB.items()}
 
 
-def canon(smiles):
-    if not isinstance(smiles, str):
-        return None
-    m = Chem.MolFromSmiles(smiles)
-    return Chem.MolToSmiles(m) if m else None
-
-
-def build():
-    mol = pd.read_csv(KELLER / "molecules.csv")
-    sti = pd.read_csv(KELLER / "stimuli.csv")
-    beh = pd.read_csv(KELLER / "behavior.csv")
-
-    beh = beh[beh["MeasurementValue"].isin(DESCRIPTORS)].copy()
-    beh["Value"] = pd.to_numeric(beh["Value"], errors="coerce")
-    beh = beh.dropna(subset=["Value"])
-
-    # mean rating per (Stimulus, descriptor) across the panel
-    sm = beh.groupby(["Stimulus", "MeasurementValue"])["Value"].mean().unstack()
-
-    # Stimulus -> CID (single-molecule) -> canonical SMILES
-    sti = sti[["Stimulus", "CIDs"]].copy()
-    sti["CID"] = pd.to_numeric(sti["CIDs"], errors="coerce")
-    sm = sm.join(sti.set_index("Stimulus")[["CID"]]).dropna(subset=["CID"])
-    sm["CID"] = sm["CID"].astype(int)
-    mol_map = mol.dropna(subset=["CID"]).drop_duplicates("CID").set_index("CID")["CanonicalSMILES"]
-    sm["smiles"] = sm["CID"].map(mol_map).map(canon)
-    sm = sm.dropna(subset=["smiles"])
-
-    # molecule level: mean across the molecule's stimuli (concentrations)
-    agg = sm.groupby("smiles")[DESCRIPTORS].mean().reset_index()
-    agg.to_parquet("aroma_master.parquet")
-
-    print(f"aroma_master.parquet: {len(agg)} molecules x {len(DESCRIPTORS)} descriptors")
-    for d in DESCRIPTORS:
-        print(f"  {d:16s} mean={agg[d].mean():5.1f}  max={agg[d].max():5.1f}  "
-              f">=15: {int((agg[d] >= 15).sum())}")
+def tag(text):
+    """Set of descriptors whose keywords appear in the odor text."""
+    t = (text or "").replace("\n", " ")
+    return {d for d, p in PATS.items() if p.search(t)}
 
 
 if __name__ == "__main__":
-    build()
+    src = "odor_notes.parquet"
+    if not Path(src).exists():
+        print(f"{src} not found — run build_odor_notes.py --pubchem-all first")
+        sys.exit(1)
+    df = pd.read_parquet(src)
+    df = df[df["odor"].notna() & df["smiles"].notna()].copy()
+    rows = []
+    for _, r in df.iterrows():
+        if Chem.MolFromSmiles(str(r["smiles"])) is None:
+            continue
+        tags = tag(r["odor"])
+        if not tags:  # no descriptor keyword -> uninformative ("characteristic odor"); skip to
+            continue  # limit false-negative noise (absence-as-negative only among tagged mols)
+        row = {"inchikey": r["inchikey"], "smiles": r["smiles"]}
+        for d in VOCAB:
+            row[d] = int(d in tags)
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    out.to_parquet("aroma_train.parquet")
+    counts = {d: int(out[d].sum()) for d in VOCAB}
+    print(f"aroma_train.parquet: {len(out)} molecules with >=1 descriptor "
+          f"(of {len(df)} with odor text), {len(VOCAB)} descriptors")
+    print("descriptor positives (sorted):")
+    for d, n in sorted(counts.items(), key=lambda x: -x[1]):
+        print(f"  {n:5d}  {d}")

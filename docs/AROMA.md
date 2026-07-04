@@ -1,9 +1,33 @@
-# Aroma — evaluated and deferred
+# Aroma — a public-domain model, and the intensity ceiling
 
 Flavor = taste **+** aroma. The taste side ships and is clean (sweet/bitter/umami
-~0.95 AUROC + intensity + sour/salty). The aroma side is **deliberately deferred** —
-not for lack of effort, but because the public, commercially-clean data is
-insufficient. This documents the evaluation, so the decision is legible.
+~0.95 AUROC + intensity + sour/salty). A commercial-clean **aroma descriptor model now
+ships too** (see the update below); what still needs licensed/customer data is scored
+**intensity**. This documents the evaluation and the decision, so both are legible.
+
+## UPDATE (2026-07): a public-domain aroma model now ships
+
+The earlier audit missed a clean source hiding in plain sight: **PubChem's "Odor"
+annotation is public domain (HSDB / Haz-Map, US-government) for ~2,200 compounds**,
+enumerable via the annotations API. Pipeline:
+- `build_odor_notes.py --pubchem-all` — pulls that corpus (odor text + detection
+  thresholds), source-filtered to public domain, dropping GoodScents/Leffingwell/FEMA.
+- `build_aroma_dataset.py` — keyword-normalizes the free text into a controlled
+  multi-label descriptor vocabulary (presence/absence).
+- `train_aroma.py` — one RandomForest per descriptor on Morgan fingerprints (the taste
+  stack). **13 heads clear CV-AUROC ≥ 0.70**: ammoniacal 0.96, medicinal 0.96, almond
+  0.91, citrus 0.90, garlic 0.88, fishy 0.85, fruity/minty/camphor 0.84, ethereal 0.82,
+  floral 0.80, pungent 0.80. `predict_aroma()` surfaces them for **any** molecule.
+
+**Honest ceiling:** this is **presence/absence** (which notes apply), not **intensity**
+(how strong). HSDB free text carries no scored ratings, and the corpus skews industrial
+(pungent/ammoniacal/ethereal are the big classes; vanilla/caramel are sparse). A **scored
+intensity** map still needs expert-labeled panel data — licensed **PMP 2001** or the
+customer's own — the "comes with your data" upgrade. Everything below explains why that
+richer data is walled off. (The earlier `keller_2016` regressor is superseded — it scored
+negative-R² on naive-subject 0-100 ratings; the HSDB presence/absence framing works.)
+
+---
 
 ## What an aroma model needs
 

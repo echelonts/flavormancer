@@ -1,11 +1,18 @@
 """
-train_aroma.py — odor-descriptor regressors (one per descriptor) on Morgan fingerprints.
+train_aroma.py — multi-label odor-descriptor CLASSIFIERS on Morgan fingerprints.
 
-Reads aroma_master.parquet (keller_2016, CC-BY); trains a RandomForestRegressor per
-descriptor predicting its 0-100 panel rating; reports HONEST 5-fold CV R2 (small,
-noisy panel-mean data — expect modest, descriptor-dependent scores). Saves the ones
-that clear a minimum CV-R2 to aroma_models/.
+Reads aroma_train.parquet (build_aroma_dataset.py: public-domain HSDB odor text keyword-
+normalized to presence/absence descriptor labels). Trains one RandomForest classifier per
+descriptor that has enough positives, reports HONEST 5-fold CV AUROC, and keeps only the
+descriptors that clear a minimum AUROC. Saves the kept heads to aroma_models/ + a manifest.
+
+This is the same modeling stack as taste (Morgan FP + RandomForest), but PRESENCE/ABSENCE
+per descriptor (the free text carries no intensity). It's the commercial-clean, public-domain
+aroma read; a stronger intensity model still needs licensed/customer panel data.
+
+Usage: python train_aroma.py
 """
+import json
 from pathlib import Path
 
 import joblib
@@ -13,24 +20,21 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import DataStructs, rdFingerprintGenerator
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
-MIN_R2 = 0.10  # below this a descriptor is too noisy to ship an honest head
+MIN_POS = 20       # need enough positives for a stable 5-fold estimate
+MIN_AUROC = 0.70   # below this the descriptor isn't learnable from structure -> don't ship it
 OUT = Path("aroma_models")
 OUT.mkdir(exist_ok=True)
-for s in OUT.glob("*_reg.joblib"):
+for s in OUT.glob("*_clf.joblib"):
     s.unlink()
-
-DESCRIPTORS = ["ACID", "AMMONIA/URINOUS", "BAKERY", "BURNT", "CHEMICAL", "COLD",
-               "DECAYED", "EDIBLE", "FISH", "FLOWER", "FRUIT", "GARLIC", "GRASS",
-               "MUSKY", "SOUR", "SPICES", "SWEATY", "SWEET", "WARM", "WOOD"]
 
 
 def fp(smiles):
-    m = Chem.MolFromSmiles(smiles)
+    m = Chem.MolFromSmiles(str(smiles))
     if m is None:
         return None
     bv = _MORGAN.GetFingerprint(m)
@@ -39,7 +43,8 @@ def fp(smiles):
     return arr
 
 
-df = pd.read_parquet("aroma_master.parquet")
+df = pd.read_parquet("aroma_train.parquet")
+descriptors = [c for c in df.columns if c not in ("inchikey", "smiles")]
 feats, keep = [], []
 for i, s in enumerate(df["smiles"]):
     f = fp(s)
@@ -49,18 +54,23 @@ for i, s in enumerate(df["smiles"]):
 X = np.array(feats)
 df = df.iloc[keep].reset_index(drop=True)
 
-print(f"training odor-descriptor regressors on {len(df)} molecules:")
-kept = 0
-for d in DESCRIPTORS:
-    y = df[d].values
-    mask = ~np.isnan(y)
-    Xd, yd = X[mask], y[mask]
-    r2 = cross_val_score(RandomForestRegressor(n_estimators=400, n_jobs=-1, random_state=42),
-                         Xd, yd, cv=5, scoring="r2").mean()
-    flag = "kept" if r2 >= MIN_R2 else "drop (too noisy)"
-    if r2 >= MIN_R2:
-        reg = RandomForestRegressor(n_estimators=400, n_jobs=-1, random_state=42).fit(Xd, yd)
-        joblib.dump(reg, OUT / f"{d.replace('/', '_')}_reg.joblib")
-        kept += 1
-    print(f"  {d:16s} n={int(mask.sum()):3d}  CV-R2={r2:+.2f}  -> {flag}")
-print(f"\nkept {kept}/{len(DESCRIPTORS)} descriptor heads (CV-R2 >= {MIN_R2}) -> aroma_models/")
+print(f"training odor-descriptor classifiers on {len(df)} molecules "
+      f"(min {MIN_POS} positives, keep CV-AUROC >= {MIN_AUROC}):")
+manifest = {"fp_bits": FP_BITS, "fp_radius": FP_RADIUS, "descriptors": {}}
+for d in sorted(descriptors, key=lambda c: -int(df[c].sum())):
+    y = df[d].values.astype(int)
+    npos = int(y.sum())
+    if npos < MIN_POS:
+        continue
+    clf = RandomForestClassifier(n_estimators=400, n_jobs=-1, random_state=42,
+                                 class_weight="balanced")
+    auroc = cross_val_score(clf, X, y, cv=5, scoring="roc_auc", n_jobs=-1).mean()
+    flag = "kept" if auroc >= MIN_AUROC else "drop (not learnable)"
+    if auroc >= MIN_AUROC:
+        clf.fit(X, y)
+        joblib.dump(clf, OUT / f"{d}_clf.joblib")
+        manifest["descriptors"][d] = {"auroc": round(float(auroc), 3), "n_pos": npos}
+    print(f"  {d:12s} n_pos={npos:4d}  CV-AUROC={auroc:.3f}  -> {flag}")
+
+(OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
+print(f"\nkept {len(manifest['descriptors'])} descriptor heads -> aroma_models/ (+ manifest.json)")

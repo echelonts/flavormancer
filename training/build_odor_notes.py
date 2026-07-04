@@ -169,15 +169,17 @@ def annotation_records(heading):
         page += 1
 
 
-def cids_to_inchikeys(cids, chunk=100):
-    """{cid: InChIKey} via batched PubChem property calls (~1 request per 100 CIDs)."""
+def cids_to_structs(cids, chunk=100):
+    """{cid: (InChIKey, CanonicalSMILES)} via batched PubChem property calls (~1 per 100 CIDs).
+    SMILES is needed downstream to fingerprint these molecules for the aroma descriptor model."""
     out = {}
     for i in range(0, len(cids), chunk):
         ch = cids[i:i + chunk]
-        d = _get(f"{_BASE}/pug/compound/cid/{','.join(map(str, ch))}/property/InChIKey/JSON")
+        d = _get(f"{_BASE}/pug/compound/cid/{','.join(map(str, ch))}"
+                 f"/property/InChIKey,SMILES/JSON")
         for p in (d or {}).get("PropertyTable", {}).get("Properties", []):
-            if p.get("InChIKey"):
-                out[p["CID"]] = p["InChIKey"]
+            if p.get("InChIKey"):  # PubChem renamed the SMILES fields; accept either
+                out[p["CID"]] = (p["InChIKey"], p.get("SMILES") or p.get("ConnectivitySMILES"))
     return out
 
 
@@ -193,16 +195,17 @@ def build_from_pubchem_annotations():
         thr_by_cid.setdefault(cid, []).extend((src, t) for t in strs)
     all_cids = sorted(set(odor_by_cid) | set(thr_by_cid))
     print(f"annotations: {len(odor_by_cid)} odor + {len(thr_by_cid)} threshold CIDs "
-          f"(public-domain); resolving {len(all_cids)} InChIKeys...", flush=True)
-    cid2ik = cids_to_inchikeys(all_cids)
+          f"(public-domain); resolving {len(all_cids)} structures...", flush=True)
+    cid2s = cids_to_structs(all_cids)
     rows = []
     for cid in all_cids:
-        ik = cid2ik.get(cid)
-        if not ik:
+        st = cid2s.get(cid)
+        if not st:
             continue
+        ik, smi = st
         ostrs, osrcs = odor_by_cid.get(cid, ([], set()))
         thr_pairs = thr_by_cid.get(cid, [])
-        rows.append({"inchikey": ik,
+        rows.append({"inchikey": ik, "smiles": smi,
                      "odor": "\n".join(sorted(set(ostrs), key=len)) or None,
                      "odor_source": "; ".join(sorted(osrcs)) or None,
                      "odor_threshold_ppm": _parse_threshold_ppm(thr_pairs),
@@ -211,7 +214,7 @@ def build_from_pubchem_annotations():
     return rows
 
 
-COLS = ["inchikey", "odor", "odor_source", "odor_threshold_ppm",
+COLS = ["inchikey", "smiles", "odor", "odor_source", "odor_threshold_ppm",
         "odor_threshold_note", "odor_threshold_source"]
 
 if __name__ == "__main__":
