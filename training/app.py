@@ -125,9 +125,10 @@ def api_neighbors(q: Query):
     if not smi:
         return {"neighbors": []}
     res = P.substitute(smi, k=q.k)
-    for n in res.get("neighbors", []):  # enrich each candidate with a structure + a name
+    for n in res.get("neighbors", []):  # enrich each candidate with a structure + names
         n["svg"] = _svg(n["smiles"], 132, 96)
-        n["name"] = _names(n["smiles"])[0]
+        nm = _names(n["smiles"])
+        n["name"], n["iupac"] = nm[0], nm[1]
     return res
 
 
@@ -295,22 +296,29 @@ _ODOR_TABLE = _load_odor_table()
 
 @app.post("/api/aroma")
 def api_aroma(q: Query):
-    """Real, cited documented odor (public-domain HSDB/CAMEO) when available — NOT a trained
-    model and NOT invented scores. A trained descriptor model comes next (see docs/AROMA.md)."""
+    """Aroma read: (1) real cited DOCUMENTED odor + threshold (public-domain HSDB/Haz-Map) when
+    the molecule is in the corpus, and (2) PREDICTED descriptors from RandomForest heads trained
+    on that corpus — which work for ANY molecule, including ones with no documented entry. The
+    predicted heads are presence/absence (not intensity); each carries its CV-AUROC."""
     smi = _resolve(q.smiles)
     mol = Chem.MolFromSmiles(smi) if smi else None
     if mol is None:
         return {"available": False}
+    out = {"available": False}
     rec = _ODOR_TABLE.get(Chem.MolToInchiKey(mol).split("-")[0])
-    if not rec:
-        return {"available": False}
-    out = {"available": True}
-    if rec.get("odor"):
-        notes = [s.strip() for s in rec["odor"].split("\n") if s.strip()]
-        concise = [n for n in notes if len(n) <= 90] or notes  # lead with punchy descriptors
-        out["documented"] = {"notes": concise[:4], "source": rec.get("odor_source")}
-    if rec.get("threshold_ppm") is not None:
-        out["threshold"] = {"ppm": rec["threshold_ppm"], "source": rec.get("threshold_source")}
+    if rec:
+        if rec.get("odor"):
+            notes = [s.strip() for s in rec["odor"].split("\n") if s.strip()]
+            concise = [n for n in notes if len(n) <= 90] or notes  # lead with punchy descriptors
+            out["documented"] = {"notes": concise[:4], "source": rec.get("odor_source")}
+            out["available"] = True
+        if rec.get("threshold_ppm") is not None:
+            out["threshold"] = {"ppm": rec["threshold_ppm"], "source": rec.get("threshold_source")}
+            out["available"] = True
+    pa = P.predict_aroma(smi)
+    if pa.get("available") and pa.get("descriptors"):
+        out["predicted"] = {"descriptors": pa["descriptors"], "note": pa.get("note")}
+        out["available"] = True
     return out
 
 

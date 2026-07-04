@@ -193,6 +193,19 @@ if _TOX_DIR.exists():
     for p in _TOX_DIR.glob("*_rf.joblib"):
         _TOX_MODELS[p.stem.replace("_rf", "")] = joblib.load(p)
 
+# Odor-descriptor heads (public-domain HSDB corpus, presence/absence). Loaded if trained.
+# Real, commercial-clean aroma predictions — NOT intensity (see docs/AROMA.md).
+_AROMA_MODELS = {}
+_AROMA_META = {}
+_AROMA_DIR = Path("aroma_models")
+if _AROMA_DIR.exists():
+    for p in _AROMA_DIR.glob("*_clf.joblib"):
+        _AROMA_MODELS[p.stem.replace("_clf", "")] = joblib.load(p)
+    _mf = _AROMA_DIR / "manifest.json"
+    if _mf.exists():
+        import json as _json
+        _AROMA_META = _json.loads(_mf.read_text()).get("descriptors", {})
+
 # Known-label lookup: ground truth for molecules we actually have data on. This
 # is how the salty/sour data works as a FLAG without a model — if a queried
 # molecule is in our labeled set, we report the verified fact instead of a guess.
@@ -594,17 +607,29 @@ def analyze_balance(ingredients):
     }
 
 
-def predict_aroma(smiles, top_k=8):
-    """Aroma is deferred. No commercially-clean *public* odor data yields a working
-    model (see docs/AROMA.md), so rather than fabricate smells we return an honest
-    'not available'. A real head gets trained on licensed (PMP 2001) or customer
-    odor data — OpenPOM's MIT architecture for large sets, RandomForest for small —
-    and wired in here then. predict() never calls this unless include_aroma=True."""
+def predict_aroma(smiles, top_k=8, threshold=0.5):
+    """Predicted odor descriptors from RandomForest heads trained on the PUBLIC-DOMAIN HSDB
+    odor corpus (see docs/AROMA.md). Returns the descriptors the model scores above threshold,
+    each with its probability and the head's CV-AUROC. This is PRESENCE/ABSENCE (the free-text
+    corpus carries no intensity), not a scored intensity map — honest about that ceiling; a
+    stronger intensity model needs licensed (PMP 2001) or customer panel data. Returns
+    available:False until the heads are trained into aroma_models/ (train_aroma.py)."""
     m = Chem.MolFromSmiles(smiles)
     if m is None:
         return {"error": f"unparseable SMILES: {smiles}"}
-    return {"available": False,
-            "note": "aroma deferred — needs licensed/customer odor data; see docs/AROMA.md"}
+    if not _AROMA_MODELS:
+        return {"available": False,
+                "note": "aroma model not trained here — build with train_aroma.py"}
+    fp = _fp(m)
+    preds = []
+    for name, clf in _AROMA_MODELS.items():
+        p = float(clf.predict_proba(fp)[0][1])
+        if p >= threshold:
+            preds.append({"odor": name, "score": round(p, 3),
+                          "auroc": _AROMA_META.get(name, {}).get("auroc")})
+    preds.sort(key=lambda d: -d["score"])
+    return {"available": True, "predicted": True, "descriptors": preds[:top_k],
+            "note": "presence/absence model on public-domain HSDB odor text; not intensity"}
 
 
 # Plain-language meaning of each Tox21 assay, for caution context.

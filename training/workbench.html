@@ -61,6 +61,7 @@
   .neighbor .nb-struct svg{width:64px;height:48px}
   .neighbor .nb-info{flex:1;min-width:0}
   .neighbor .nb-name{font-weight:600;font-size:13px;text-transform:capitalize;color:var(--ink)}
+  .neighbor .nb-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all;margin:1px 0}
   .neighbor .s{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all}
   .neighbor .sim{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap}
   .neighbor .kt{font-family:var(--mono);font-size:11px;color:var(--muted)}
@@ -193,13 +194,13 @@
   <div class="card aroma-card" id="aromaCard" style="display:none">
     <h2>Aroma</h2>
     <div id="aromaPreview" style="display:none;margin-bottom:14px"></div>
-    <div class="aroma-lead">Documented odor above is a public reference; aroma <b>prediction</b> unlocks with <b>your</b> data.</div>
-    <p class="aroma-note">The public demo predicts <b>taste</b> from open data and shows
-    <b>documented odor</b> where a public-domain reference exists (HSDB). <b>Predicting</b>
-    odor for new or unmeasured molecules needs a trained model: presence/absence learned
-    from those same documented descriptions, and true intensity from expert-labeled panel
-    data — trained <b>on-premise, on your licensed or in-house data</b>, never leaving your
-    firewall.</p>
+    <div class="aroma-lead">Odor descriptors are <b>predicted</b> from structure; <b>intensity</b> comes with <b>your</b> data.</div>
+    <p class="aroma-note">The predicted descriptors above come from RandomForest heads trained
+    on <b>public-domain</b> odor data (HSDB), the same stack as the taste engine — so aroma is
+    predicted for <b>any</b> molecule, not just ones with a documented entry. This is
+    <b>presence/absence</b> (which notes apply), validated per descriptor (CV-AUROC). A
+    <b>scored intensity</b> map — how strong each note is — needs expert-labeled panel data,
+    trained <b>on-premise, on your licensed or in-house data</b>, never leaving your firewall.</p>
     <p class="aroma-note" style="margin-top:8px">A more robust <b>open-source academic
     edition</b> — trained on richer research odor data (the GS-LF set) — is coming soon.</p>
   </div>
@@ -319,6 +320,7 @@ function render(p, neighbors, svg, names){
         <div class="nb-struct">${x.svg||''}</div>
         <div class="nb-info">
           <div class="nb-name">${x.name||'—'}</div>
+          ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
           <div class="s">${x.smiles}</div>
           <div class="kt">${x.known_tastes.length?x.known_tastes.join(' · '):'—'}</div>
         </div>
@@ -383,9 +385,14 @@ function renderAroma(ar){
   const box=$('aromaPreview');
   if(!ar || !ar.available){ box.style.display='none'; return; }
   let html='';
+  const pred = ar.predicted;
+  if(pred && (pred.descriptors||[]).length){
+    html += '<div class="aroma-prev-tag">Predicted descriptors · model (presence/absence, public-domain HSDB)</div>';
+    html += pred.descriptors.map(d=>{ const pct=Math.round(d.score*100); const au=d.auroc?` · AUROC ${d.auroc}`:''; return `<div class="ameter"><div class="arow"><span class="aname">${d.odor}</span><span class="aval">${pct}%${au}</span></div><div class="atrack"><div class="afill" style="width:${pct}%"></div></div></div>`; }).join('');
+  }
   const doc = ar.documented;
   if(doc && (doc.notes||[]).length){
-    html += `<div class="aroma-doc-tag">Documented odor · ${doc.source||'public domain'}</div>`;
+    html += `<div class="aroma-doc-tag" style="margin-top:14px">Documented odor · ${doc.source||'public domain'}</div>`;
     html += '<div class="aroma-doc">'+ doc.notes.map(n=>`<span class="odor-note">${n}</span>`).join('') +'</div>';
   }
   const thr = ar.threshold;
