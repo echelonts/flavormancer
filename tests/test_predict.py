@@ -18,10 +18,16 @@ def test_predict_rejects_bad_smiles():
     assert "error" in out
 
 
-def test_predict_aroma_is_honest_placeholder():
+def test_predict_aroma_honest_about_model_presence():
+    # With no trained heads present (as in CI), aroma is honestly unavailable rather than
+    # fabricated; when aroma_models/ IS built, it returns a descriptor list.
     out = predict.predict_aroma("CCO")
-    assert out["available"] is False
-    assert "AROMA.md" in out["note"]
+    if predict._AROMA_MODELS:
+        assert out["available"] is True
+        assert isinstance(out.get("descriptors"), list)
+    else:
+        assert out["available"] is False
+        assert "note" in out
 
 
 def test_predict_includes_tox_screen():
