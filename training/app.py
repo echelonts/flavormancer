@@ -389,18 +389,25 @@ def api_top(category: str = "", limit: int = 24):
 
 
 def _load_flavor_map():
-    """The 2D flavor-space embedding (flavor_map.parquet, built by build_flavor_map.py),
-    coordinates normalized to 0..1 with names attached — served as an interactive scatter."""
+    """The flavor-space embedding (flavor_map.parquet, built by build_flavor_map.py): 2D (x,y)
+    + 3D (x3,y3,z3) coordinates normalized to 0..1 with names — an interactive scatter / cloud."""
     try:
         import pandas as pd
         df = pd.read_parquet("flavor_map.parquet")
-        xs, ys = df["x"], df["y"]
-        x0, xr = xs.min(), (xs.max() - xs.min()) or 1.0
-        y0, yr = ys.min(), (ys.max() - ys.min()) or 1.0
+
+        def norm(col):
+            v = df[col]
+            lo, rng = v.min(), (v.max() - v.min()) or 1.0
+            return ((v - lo) / rng).round(4)
+
+        cols = {c: norm(c).tolist() for c in ("x", "y", "x3", "y3", "z3") if c in df.columns}
+        smis, labs = df["smiles"].tolist(), df["label"].tolist()
         pts = []
-        for smi, lab, x, y in zip(df["smiles"], df["label"], xs, ys):
-            pts.append({"x": round((x - x0) / xr, 4), "y": round((y - y0) / yr, 4),
-                        "label": lab, "smiles": smi, "name": _table_name(smi) or ""})
+        for i in range(len(smis)):
+            p = {"label": labs[i], "smiles": smis[i], "name": _table_name(smis[i]) or ""}
+            for c, v in cols.items():
+                p[c] = v[i]
+            pts.append(p)
         return pts
     except Exception:  # noqa: BLE001 — no map built yet
         return []
