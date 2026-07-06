@@ -66,7 +66,9 @@
   .nb-aroma{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
   .nb-aroma .atag{font-size:10px;padding:1px 7px;border-radius:20px;background:#EAF3F0;color:var(--aroma);border:1px solid #CFE6DF;text-transform:capitalize}
   .browse{margin:6px 0 8px}
-  .browse-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 9px}
+  .browse-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 9px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .browse-toggle{display:inline-flex}
+  .browse-toggle .st-tab{padding:3px 11px}
   .browse-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
   .cat{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;text-transform:capitalize}
   .cat:hover{border-color:var(--aroma)}
@@ -163,7 +165,9 @@
     hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
 
   <div id="browse" class="browse">
-    <div class="browse-head">Or browse the library — pick a category, then a molecule</div>
+    <div class="browse-head">Or browse the library — pick a category, then a molecule
+      <span class="browse-toggle"><button type="button" id="bmode2d" class="st-tab on">2D</button><button type="button" id="bmode3d" class="st-tab">3D</button></span>
+    </div>
     <div id="browseCats" class="browse-cats"></div>
     <div id="browseGrid" class="browse-grid"></div>
   </div>
@@ -253,14 +257,15 @@ async function post(path, body){
   return r.json();
 }
 
-function meter(name, value, measured, auroc){
+function meter(name, value, measured, auroc, note){
   const pct = Math.round(value*100);
   const tag = measured ? '<span class="tag measured">measured</span>'
                        : '<span class="tag predicted">predicted</span>';
   // show the head's held-out AUROC on model predictions (not on measured ground truth)
   const au = (auroc && !measured) ? ` <span class="au">· AUROC ${auroc}</span>` : '';
+  const nt = note ? ` <span class="au">· ${note}</span>` : '';
   return `<div class="meter">
-    <div class="row"><span class="name">${name}${tag}</span><span class="val">${pct}%${au}</span></div>
+    <div class="row"><span class="name">${name}${tag}</span><span class="val">${pct}%${au}${nt}</span></div>
     <div class="track"><div class="fill" style="background:${TASTE_COLORS[name]}"
       data-w="${pct}"></div></div></div>`;
 }
@@ -314,7 +319,12 @@ function render(p, neighbors, svg, names){
     for(const t of MODEL_TASTES){
       if(typeof p[t] === 'number') m += meter(t, p[t], known.has(t), (p.taste_meta&&p.taste_meta[t]||{}).auroc);
     }
-    if(m) m += '<div class="meters-note">Each is an independent confidence that the molecule carries that taste — they don\'t sum to 100%. A molecule can be both (sweet <i>and</i> bitter) or weakly any.</div>';
+    // sour: a trained head (sour_predicted) shown as a bar, with the acidity RULE as a cross-check
+    if(typeof p.sour_predicted === 'number'){
+      const rule = p.sour ? 'rule ✓ acid group' : 'rule: no acid group';
+      m += meter('sour', p.sour_predicted, known.has('sour'), (p.taste_meta&&p.taste_meta.sour||{}).auroc, rule);
+    }
+    if(m) m += '<div class="meters-note">Each is an independent confidence that the molecule carries that taste — they don\'t sum to 100%. A molecule can be both (sweet <i>and</i> bitter) or weakly any. Sour pairs the trained head with an acidity rule as a cross-check.</div>';
     $('meters').innerHTML = m || '<div class="empty">No taste heads trained yet.</div>';
   } else {
     $('meters').innerHTML = '<div class="empty">Trained taste prediction not applicable to this molecule.</div>';
@@ -322,7 +332,8 @@ function render(p, neighbors, svg, names){
 
   // chips: sour/salty are RULES (valid even out of domain); intensity/multitaste are model-derived
   let c = [];
-  c.push(chip('sour', p.sour, p.sour?'var(--sour)':null,
+  // out of domain there's no meter, so keep the sour RULE flag as a chip there
+  if(!inDomain) c.push(chip('sour', p.sour, p.sour?'var(--sour)':null,
     p.sour && p.sour_reason && p.sour_reason.length ? `sour · ${p.sour_reason[0]}` : 'not sour'));
   c.push(chip('salty', p.salty===true, p.salty===true?'var(--salty)':null,
     p.salty===true ? 'salty (known)' : 'salty — not in data'));
@@ -521,18 +532,45 @@ async function initBrowse(){
     if(el.querySelector('.cat')) showCategory(el.querySelector('.cat'));  // open first by default
   }catch(e){ setTimeout(initBrowse, 3000); }
 }
+let _browseMode='2d', _browseCat=null;
+const _has3D = typeof $3Dmol !== 'undefined';
+function setBrowseMode(mode){
+  _browseMode = mode;
+  $('bmode2d').classList.toggle('on', mode==='2d');
+  $('bmode3d').classList.toggle('on', mode==='3d');
+  if(_browseCat) showCategory(_browseCat);
+}
+$('bmode2d').addEventListener('click', ()=>setBrowseMode('2d'));
+$('bmode3d').addEventListener('click', ()=>setBrowseMode(_has3D?'3d':'2d'));
+
 async function showCategory(btn){
+  _browseCat = btn;
   document.querySelectorAll('.cat').forEach(c=>c.classList.remove('on'));
   btn.classList.add('on');
-  const grid = $('browseGrid');
+  const grid = $('browseGrid'), threeD = _browseMode==='3d' && _has3D;
   grid.innerHTML = '<div class="empty">Loading…</div>';
-  const d = await getJSON('/api/top?category='+encodeURIComponent(btn.dataset.key)+'&limit=24');
-  grid.innerHTML = (d.items||[]).map(it=>`
-    <div class="bcell" data-smi="${it.smiles.replace(/"/g,'&quot;')}" title="Analyze ${it.name}">
-      <div class="bstruct">${it.svg||''}</div><div class="bname">${it.name}</div></div>`).join('')
+  const d = await getJSON('/api/top?category='+encodeURIComponent(btn.dataset.key)+'&limit='+(threeD?9:24));
+  const items = d.items||[];
+  const esc = s => s.replace(/"/g,'&quot;');
+  grid.innerHTML = items.map((it,i)=>`
+    <div class="bcell" data-smi="${esc(it.smiles)}">
+      <div class="bstruct" id="b3d${i}">${threeD?'':(it.svg||'')}</div>
+      <div class="bname" title="Analyze ${it.name}">${it.name}</div></div>`).join('')
     || '<div class="empty">No molecules.</div>';
-  grid.querySelectorAll('.bcell').forEach(c=> c.addEventListener('click', ()=>{
-    q.value = c.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
+  // click the NAME to analyze (leaves the 3D structure free to rotate)
+  grid.querySelectorAll('.bname').forEach((el,i)=> el.addEventListener('click', ()=>{
+    q.value = items[i].smiles; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
+  if(threeD){  // render up to 9 interactive conformers (WebGL context budget)
+    items.forEach(async (it,i)=>{
+      const s3 = await post('/api/structure3d',{smiles:it.smiles});
+      const el = document.getElementById('b3d'+i);
+      if(s3 && s3.molblock && el){
+        const v = $3Dmol.createViewer(el,{backgroundColor:'white'});
+        v.addModel(s3.molblock,'sdf'); v.setStyle({},{stick:{radius:0.12},sphere:{scale:0.22}});
+        v.zoomTo(); v.render(); v.resize();
+      } else if(el){ el.innerHTML='<div class="s3-empty">no 3D</div>'; }
+    });
+  }
 }
 initBrowse();
 
