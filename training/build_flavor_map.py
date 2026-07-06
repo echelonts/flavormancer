@@ -1,10 +1,14 @@
 """
-build_flavor_map.py — a 2D "flavor-space" embedding of the labeled molecules.
+build_flavor_map.py — a flavor-space embedding of the labeled molecules (2D + 3D).
 
-Projects each molecule's 2048-bit Morgan fingerprint to 2D (PCA -> t-SNE) and labels it by
-its dominant known taste, so structurally similar molecules land near each other and the taste
-classes separate visually. Output flavor_map.parquet (smiles, label, x, y); the app normalizes
-+ serves it as an interactive scatter (hover = name, click = full read).
+Projects each molecule's 2048-bit Morgan fingerprint into 2D and 3D with UMAP (Jaccard metric,
+which is the right similarity for binary fingerprints — same family as Tanimoto), and labels it
+by its dominant known taste. Structurally similar molecules land near each other and the taste
+classes separate visually. Output flavor_map.parquet (smiles, label, x, y, x3, y3, z3); the app
+normalizes + serves it as an interactive scatter (2D zoom/pan, or a rotatable 3D point cloud).
+
+Needs `pip install umap-learn` (a build-time dependency only — the server just reads the
+resulting parquet, so UMAP is not required to run the demo).
 
 Usage: python build_flavor_map.py            # taste_master.parquet -> flavor_map.parquet
 """
@@ -13,10 +17,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import umap
 from rdkit import Chem
 from rdkit.Chem import DataStructs, rdFingerprintGenerator
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 
 TASTES = ["sweet", "bitter", "umami", "sour", "salty"]
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
@@ -24,9 +27,14 @@ _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
 def _fp(m):
     bv = _MORGAN.GetFingerprint(m)
-    a = np.zeros((2048,), dtype=np.int8)
+    a = np.zeros((2048,), dtype=np.float32)  # float for UMAP's jaccard metric
     DataStructs.ConvertToNumpyArray(bv, a)
     return a
+
+
+def _umap(X, n):
+    return umap.UMAP(n_components=n, n_neighbors=15, min_dist=0.15,
+                     metric="jaccard", random_state=42).fit_transform(X)
 
 
 if __name__ == "__main__":
@@ -44,12 +52,14 @@ if __name__ == "__main__":
         labels.append(next((t for t in TASTES if r.get(t) == 1), "other"))
         feats.append(_fp(m))
     X = np.array(feats)
-    print(f"embedding {len(X)} molecules (PCA-50 -> t-SNE 2D)...", flush=True)
-    x50 = PCA(n_components=50, random_state=42).fit_transform(X)
-    xy = TSNE(n_components=2, random_state=42, perplexity=30, init="pca").fit_transform(x50)
+    print(f"embedding {len(X)} molecules with UMAP (Jaccard) — 2D then 3D...", flush=True)
+    xy = _umap(X, 2)
+    xyz = _umap(X, 3)
     out = pd.DataFrame({"smiles": smiles, "label": labels,
-                        "x": xy[:, 0].astype(float), "y": xy[:, 1].astype(float)})
+                        "x": xy[:, 0].astype(float), "y": xy[:, 1].astype(float),
+                        "x3": xyz[:, 0].astype(float), "y3": xyz[:, 1].astype(float),
+                        "z3": xyz[:, 2].astype(float)})
     out.to_parquet("flavor_map.parquet")
     print(f"flavor_map.parquet: {len(out)} points  "
-          f"({', '.join(f'{t}={int((out.label==t).sum())}' for t in TASTES)}, "
-          f"other={int((out.label=='other').sum())})")
+          f"({', '.join(f'{t}={int((out.label == t).sum())}' for t in TASTES)}, "
+          f"other={int((out.label == 'other').sum())})")
