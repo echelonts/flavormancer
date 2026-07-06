@@ -78,7 +78,17 @@
   .bcell{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:#fff;text-align:center;transition:border-color .15s}
   .bcell:hover{border-color:var(--aroma)}
   .bcell .bstruct{height:68px}.bcell .bstruct svg{max-width:100%;height:68px}
-  .bcell .bname{font-size:12px;font-weight:600;margin-top:5px;line-height:1.25;text-transform:capitalize}
+  .bcell .bname{font-size:12px;font-weight:600;margin-top:5px;line-height:1.25;text-transform:capitalize;cursor:pointer}
+  .bcell .bname:hover{color:var(--aroma)}
+  .map-section{margin:16px 0 8px;border-top:1px solid #EEF0EC;padding-top:12px}
+  .map-head{font-size:13px;font-weight:650;cursor:pointer;color:var(--ink)}
+  .map-head .mapsub{font-weight:400;font-size:12px;color:var(--muted)}
+  .map-legend{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 6px;font-size:12px}
+  .map-legend span{display:inline-flex;align-items:center;gap:5px}
+  .map-legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .map-canvas-wrap{position:relative;width:100%;overflow-x:auto}
+  #flavorMap{max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:crosshair}
+  .map-tip{position:absolute;pointer-events:none;background:#1c2620;color:#fff;font-size:11px;padding:3px 7px;border-radius:5px;white-space:nowrap;transform:translate(-50%,-140%)}
   .neighbor .s{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all}
   .neighbor .sim{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap}
   .neighbor .kt{font-family:var(--mono);font-size:11px;color:var(--muted)}
@@ -170,6 +180,16 @@
     </div>
     <div id="browseCats" class="browse-cats"></div>
     <div id="browseGrid" class="browse-grid"></div>
+  </div>
+
+  <div class="map-section">
+    <div class="map-head" id="mapToggle"><span id="mapCaret">▸</span> Flavor-space map
+      <span class="mapsub">— every labeled molecule placed by structural similarity; taste classes separate. Hover a point, click to read.</span></div>
+    <div id="mapWrap" style="display:none">
+      <div id="mapLegend" class="map-legend"></div>
+      <div class="map-canvas-wrap"><canvas id="flavorMap" width="920" height="520"></canvas>
+        <div id="mapTip" class="map-tip" style="display:none"></div></div>
+    </div>
   </div>
 
   <label class="toggle"><input type="checkbox" id="mixToggle"> Mixture mode — screen 2+ ingredients for documented hazards</label>
@@ -573,6 +593,44 @@ async function showCategory(btn){
   }
 }
 initBrowse();
+
+// --- flavor-space map (t-SNE of fingerprints, colored by taste) ---
+const MAP_COLORS = {sweet:'#E0972E',bitter:'#6B4E9E',umami:'#C0563B',sour:'#9FB024',salty:'#4E84B0',other:'#C3C9C0'};
+let _mapPts=null, _mapDrawn=false;
+$('mapToggle').addEventListener('click', async ()=>{
+  const w=$('mapWrap'); const open = w.style.display==='none';
+  w.style.display = open?'block':'none'; $('mapCaret').textContent = open?'▾':'▸';
+  if(open && !_mapDrawn){ await drawMap(); }
+});
+async function drawMap(){
+  const cv=$('flavorMap'); const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#8a938c'; ctx.font='13px sans-serif'; ctx.fillText('Loading…',12,22);
+  const d = await getJSON('/api/map'); _mapPts = d.points||[];
+  if(!_mapPts.length){ ctx.clearRect(0,0,cv.width,cv.height); ctx.fillStyle='#8a938c'; ctx.fillText('Map not built yet (build_flavor_map.py).',12,22); return; }
+  const pad=14, W=cv.width, H=cv.height;
+  const px = p => pad + p.x*(W-2*pad), py = p => H-pad - p.y*(H-2*pad);
+  ctx.clearRect(0,0,W,H);
+  for(const p of _mapPts){ ctx.beginPath(); ctx.arc(px(p),py(p),2.6,0,7); ctx.fillStyle=MAP_COLORS[p.label]||MAP_COLORS.other; ctx.globalAlpha=.82; ctx.fill(); }
+  ctx.globalAlpha=1;
+  // legend
+  const counts={}; _mapPts.forEach(p=>counts[p.label]=(counts[p.label]||0)+1);
+  $('mapLegend').innerHTML = Object.keys(MAP_COLORS).filter(l=>counts[l]).map(l=>
+    `<span><i style="background:${MAP_COLORS[l]}"></i>${l} (${counts[l]})</span>`).join('');
+  _mapDrawn=true;
+  // interactivity: nearest point in canvas space
+  const nearest = ev=>{
+    const r=cv.getBoundingClientRect(), sx=cv.width/r.width, sy=cv.height/r.height;
+    const mx=(ev.clientX-r.left)*sx, my=(ev.clientY-r.top)*sy;
+    let best=null,bd=100;
+    for(const p of _mapPts){ const dx=px(p)-mx, dy=py(p)-my, dd=dx*dx+dy*dy; if(dd<bd){bd=dd;best=p;} }
+    return best;
+  };
+  const tip=$('mapTip');
+  cv.onmousemove = ev=>{ const p=nearest(ev); if(p){ const r=cv.getBoundingClientRect(); tip.style.display='block'; tip.style.left=(ev.clientX-r.left)+'px'; tip.style.top=(ev.clientY-r.top)+'px'; tip.textContent=(p.name||p.smiles)+' · '+p.label; } else tip.style.display='none'; };
+  cv.onmouseleave = ()=> tip.style.display='none';
+  cv.onclick = ev=>{ const p=nearest(ev); if(p){ q.value=p.smiles; window.scrollTo({top:0,behavior:'smooth'}); run(); } };
+}
 
 // --- mixture mode ---
 function mixAddRow(val){

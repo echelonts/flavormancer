@@ -384,6 +384,36 @@ def api_top(category: str = "", limit: int = 24):
     return {"label": lst["label"], "items": items}
 
 
+def _load_flavor_map():
+    """The 2D flavor-space embedding (flavor_map.parquet, built by build_flavor_map.py),
+    coordinates normalized to 0..1 with names attached — served as an interactive scatter."""
+    try:
+        import pandas as pd
+        df = pd.read_parquet("flavor_map.parquet")
+        xs, ys = df["x"], df["y"]
+        x0, xr = xs.min(), (xs.max() - xs.min()) or 1.0
+        y0, yr = ys.min(), (ys.max() - ys.min()) or 1.0
+        pts = []
+        for smi, lab, x, y in zip(df["smiles"], df["label"], xs, ys):
+            pts.append({"x": round((x - x0) / xr, 4), "y": round((y - y0) / yr, 4),
+                        "label": lab, "smiles": smi, "name": _table_name(smi) or ""})
+        return pts
+    except Exception:  # noqa: BLE001 — no map built yet
+        return []
+
+
+_FLAVOR_MAP = None
+
+
+@app.get("/api/map")
+def api_map():
+    """The flavor-space map points (built + name-resolved once, then cached)."""
+    global _FLAVOR_MAP
+    if _FLAVOR_MAP is None:
+        _FLAVOR_MAP = _load_flavor_map()
+    return {"points": _FLAVOR_MAP}
+
+
 # --- Aroma: REAL documented odor only (public-domain HSDB/CAMEO) ---------------
 # Hand-set illustrative descriptor "scores" were removed on purpose: made-up numbers
 # have no place in the read. The aroma card now shows only real, cited documented odor
