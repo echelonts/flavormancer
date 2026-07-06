@@ -197,11 +197,15 @@ def api_structure3d(q: Query):
         return {"molblock": None}
 
 
-@app.get("/static/3Dmol-min.js")
-def _threedmol_js():
-    """Serve the vendored 3Dmol.js (BSD-3-Clause) locally so the demo stays self-contained."""
+@app.get("/static/{fname}")
+def _static(fname: str):
+    """Serve vendored static assets (3Dmol.js, the logo) locally so the demo is self-contained."""
+    from fastapi import HTTPException
     from fastapi.responses import FileResponse
-    return FileResponse("static/3Dmol-min.js", media_type="application/javascript")
+    p = Path("static") / Path(fname).name  # basename only — no path traversal
+    if p.exists():
+        return FileResponse(str(p))
+    raise HTTPException(status_code=404)
 
 
 class MixtureQuery(BaseModel):
