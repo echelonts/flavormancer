@@ -80,7 +80,15 @@
   .cat.on{background:var(--aroma);color:#fff;border-color:var(--aroma)}
   .cat.taste.on{background:var(--sweet);border-color:var(--sweet)}
   .browse-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-  .bcell{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:#fff;text-align:center;transition:border-color .15s}
+  .bcell{position:relative;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:#fff;text-align:center;transition:border-color .15s}
+  .mini-3d{position:absolute;top:6px;right:6px;z-index:2;font:inherit;font-size:10px;font-weight:600;padding:1px 6px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--muted);cursor:pointer}
+  .mini-3d:hover{border-color:var(--aroma);color:var(--aroma)}
+  .bcell .bstruct{position:relative}
+  .bcell .bstruct.is3d{height:130px}
+  .nb-structwrap{position:relative;flex:0 0 auto}
+  .nb-3d{top:2px;right:2px;padding:0 5px}
+  .neighbor .nb-struct{position:relative}
+  .neighbor .nb-struct.is3d{width:108px;height:88px}
   .bcell:hover{border-color:var(--aroma)}
   .bcell .bstruct{height:68px}.bcell .bstruct svg{max-width:100%;height:68px}
   .bcell .bname{font-size:12px;font-weight:600;margin-top:5px;line-height:1.25;text-transform:capitalize;cursor:pointer}
@@ -196,9 +204,7 @@
   </div>
 
   <div id="browse" class="browse">
-    <div class="browse-head">Or browse the library — pick a category, then a molecule
-      <span class="browse-toggle"><button type="button" id="bmode2d" class="st-tab on">2D</button><button type="button" id="bmode3d" class="st-tab">3D</button></span>
-    </div>
+    <div class="browse-head">Or browse the library — pick a category, then a molecule (each card has a 2D/3D toggle)</div>
     <div id="browseCats" class="browse-cats"></div>
     <div id="browseGrid" class="browse-grid"></div>
   </div>
@@ -388,9 +394,13 @@ function render(p, neighbors, svg, names){
   if(!neighbors.length){
     $('neighbors').innerHTML = '<div class="empty">Build taste_master.parquet to enable substitution search.</div>';
   }else{
-    $('neighbors').innerHTML = neighbors.map(x=>`
+    window._nbrs = neighbors;  // for the per-card 3D toggle handler
+    $('neighbors').innerHTML = neighbors.map((x,i)=>`
       <div class="neighbor" data-smi="${x.smiles}" title="Click to analyze this molecule">
-        <div class="nb-struct">${x.svg||''}</div>
+        <div class="nb-structwrap">
+          <div class="nb-struct" id="nbs${i}">${x.svg||''}</div>
+          ${_has3D?`<button type="button" class="mini-3d nb-3d" data-i="${i}" data-m="2d">3D</button>`:''}
+        </div>
         <div class="nb-info">
           <div class="nb-name">${x.name||'—'}</div>
           ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
@@ -520,8 +530,12 @@ document.getElementById('btn3d').addEventListener('click', ()=>setView('3d'));
 
 go.addEventListener('click', run);
 q.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
-// click a substitution candidate -> analyze that molecule
+// substitution card: 3D toggle button, rotate-in-place (no analyze), or click card -> analyze
 $('neighbors').addEventListener('click', e=>{
+  const btn = e.target.closest('.mini-3d');
+  if(btn){ e.stopPropagation(); const i=+btn.dataset.i; const x=(window._nbrs||[])[i]||{};
+    cardToggle3D(btn, $('nbs'+i), x.smiles, x.svg||''); return; }
+  if(e.target.closest('.nb-struct.is3d')) return;  // rotating the 3D model, not analyzing
   const nb = e.target.closest('.neighbor');
   if(nb && nb.dataset.smi){ q.value = nb.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
 });
@@ -571,45 +585,42 @@ async function initBrowse(){
     if(el.querySelector('.cat')) showCategory(el.querySelector('.cat'));  // open first by default
   }catch(e){ setTimeout(initBrowse, 3000); }
 }
-let _browseMode='2d', _browseCat=null;
 const _has3D = typeof $3Dmol !== 'undefined';
-function setBrowseMode(mode){
-  _browseMode = mode;
-  $('bmode2d').classList.toggle('on', mode==='2d');
-  $('bmode3d').classList.toggle('on', mode==='3d');
-  if(_browseCat) showCategory(_browseCat);
+// mount an interactive 3D conformer INTO a container. The container is sized + position:relative
+// via CSS (.is3d) BEFORE createViewer — that's what keeps 3Dmol from rendering in the page corner.
+async function mount3D(el, smiles){
+  if(!_has3D){ el.innerHTML='<div class="s3-empty">3D unavailable</div>'; return; }
+  el.innerHTML='<div class="s3-empty">…</div>';
+  const s3 = await post('/api/structure3d',{smiles});
+  if(!s3 || !s3.molblock){ el.innerHTML='<div class="s3-empty">no 3D</div>'; return; }
+  el.innerHTML='';
+  const v = $3Dmol.createViewer(el, {backgroundColor:'white'});
+  v.addModel(s3.molblock,'sdf'); v.setStyle({},{stick:{radius:0.13},sphere:{scale:0.23}});
+  v.zoomTo(); v.render(); v.resize();
 }
-$('bmode2d').addEventListener('click', ()=>setBrowseMode('2d'));
-$('bmode3d').addEventListener('click', ()=>setBrowseMode(_has3D?'3d':'2d'));
+// per-card 2D/3D toggle: swaps a struct element between its 2D svg and an in-card 3D viewer
+function cardToggle3D(btn, structEl, smiles, svgHtml){
+  if(btn.dataset.m==='3d'){ btn.dataset.m='2d'; btn.textContent='3D'; structEl.classList.remove('is3d'); structEl.innerHTML=svgHtml; }
+  else { btn.dataset.m='3d'; btn.textContent='2D'; structEl.classList.add('is3d'); mount3D(structEl, smiles); }
+}
 
 async function showCategory(btn){
-  _browseCat = btn;
   document.querySelectorAll('.cat').forEach(c=>c.classList.remove('on'));
   btn.classList.add('on');
-  const grid = $('browseGrid'), threeD = _browseMode==='3d' && _has3D;
+  const grid = $('browseGrid');
   grid.innerHTML = '<div class="empty">Loading…</div>';
-  const d = await getJSON('/api/top?category='+encodeURIComponent(btn.dataset.key)+'&limit='+(threeD?9:24));
+  const d = await getJSON('/api/top?category='+encodeURIComponent(btn.dataset.key)+'&limit=24');
   const items = d.items||[];
-  const esc = s => s.replace(/"/g,'&quot;');
   grid.innerHTML = items.map((it,i)=>`
-    <div class="bcell" data-smi="${esc(it.smiles)}">
-      <div class="bstruct" id="b3d${i}">${threeD?'':(it.svg||'')}</div>
+    <div class="bcell">
+      <div class="bstruct" id="bs${i}">${it.svg||''}</div>
+      ${_has3D?`<button type="button" class="mini-3d" data-i="${i}" data-m="2d">3D</button>`:''}
       <div class="bname" title="Analyze ${it.name}">${it.name}</div></div>`).join('')
     || '<div class="empty">No molecules.</div>';
-  // click the NAME to analyze (leaves the 3D structure free to rotate)
   grid.querySelectorAll('.bname').forEach((el,i)=> el.addEventListener('click', ()=>{
     q.value = items[i].smiles; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
-  if(threeD){  // render up to 9 interactive conformers (WebGL context budget)
-    items.forEach(async (it,i)=>{
-      const s3 = await post('/api/structure3d',{smiles:it.smiles});
-      const el = document.getElementById('b3d'+i);
-      if(s3 && s3.molblock && el){
-        const v = $3Dmol.createViewer(el,{backgroundColor:'white'});
-        v.addModel(s3.molblock,'sdf'); v.setStyle({},{stick:{radius:0.12},sphere:{scale:0.22}});
-        v.zoomTo(); v.render(); v.resize();
-      } else if(el){ el.innerHTML='<div class="s3-empty">no 3D</div>'; }
-    });
-  }
+  grid.querySelectorAll('.mini-3d').forEach(b=>{ const i=+b.dataset.i;
+    b.addEventListener('click', ()=> cardToggle3D(b, $('bs'+i), items[i].smiles, items[i].svg||'')); });
 }
 initBrowse();
 
