@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Flavor Workbench</title>
+<title>Flavormancer</title>
 <style>
   :root{
     --surface:#F4F6F4; --panel:#FFFFFF; --line:#DCE3DE; --ink:#172019;
@@ -63,6 +63,20 @@
   .neighbor .nb-info{flex:1;min-width:0}
   .neighbor .nb-name{font-weight:600;font-size:13px;text-transform:capitalize;color:var(--ink)}
   .neighbor .nb-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all;margin:1px 0}
+  .nb-aroma{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+  .nb-aroma .atag{font-size:10px;padding:1px 7px;border-radius:20px;background:#EAF3F0;color:var(--aroma);border:1px solid #CFE6DF;text-transform:capitalize}
+  .browse{margin:6px 0 8px}
+  .browse-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 9px}
+  .browse-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .cat{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;text-transform:capitalize}
+  .cat:hover{border-color:var(--aroma)}
+  .cat.on{background:var(--aroma);color:#fff;border-color:var(--aroma)}
+  .cat.taste.on{background:var(--sweet);border-color:var(--sweet)}
+  .browse-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .bcell{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;background:#fff;text-align:center;transition:border-color .15s}
+  .bcell:hover{border-color:var(--aroma)}
+  .bcell .bstruct{height:68px}.bcell .bstruct svg{max-width:100%;height:68px}
+  .bcell .bname{font-size:12px;font-weight:600;margin-top:5px;line-height:1.25;text-transform:capitalize}
   .neighbor .s{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all}
   .neighbor .sim{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap}
   .neighbor .kt{font-family:var(--mono);font-size:11px;color:var(--muted)}
@@ -135,8 +149,8 @@
 </head>
 <body>
 <header>
-  <h1>Flavor Workbench</h1>
-  <span class="sub">taste prediction &amp; substitution — before you pour</span>
+  <h1>Flavormancer</h1>
+  <span class="sub">taste &amp; aroma prediction from chemical structure — before you pour</span>
 </header>
 <main>
   <div class="bar">
@@ -147,6 +161,12 @@
   <div class="hint">Type a <b>common or IUPAC name</b> (e.g. <code>vanillin</code>) or a
     <b>SMILES</b> string (e.g. <code>O=Cc1ccc(O)c(OC)c1</code>). SMILES omit implicit
     hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
+
+  <div id="browse" class="browse">
+    <div class="browse-head">Or browse the library — pick a category, then a molecule</div>
+    <div id="browseCats" class="browse-cats"></div>
+    <div id="browseGrid" class="browse-grid"></div>
+  </div>
 
   <label class="toggle"><input type="checkbox" id="mixToggle"> Mixture mode — screen 2+ ingredients for documented hazards</label>
 
@@ -326,6 +346,7 @@ function render(p, neighbors, svg, names){
           ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
           <div class="s">${x.smiles}</div>
           <div class="kt">${x.known_tastes.length?x.known_tastes.join(' · '):'—'}</div>
+          ${(x.aroma&&x.aroma.length)?`<div class="nb-aroma" title="aroma (found = documented, else predicted)">${x.aroma.map(a=>`<span class="atag">${a.odor}${a.source==='predicted'?' •':''}</span>`).join('')}</div>`:''}
         </div>
         <div class="sim">${Math.round(x.similarity*100)}% match</div>
       </div>`).join('');
@@ -390,7 +411,8 @@ function renderAroma(ar){
   let html='';
   const pred = ar.predicted;
   if(pred && (pred.descriptors||[]).length){
-    html += '<div class="aroma-prev-tag">Predicted descriptors · model (presence/absence, public-domain HSDB)</div>';
+    const lowconf = pred.any_confident===false;
+    html += `<div class="aroma-prev-tag">Predicted descriptors · model (presence/absence, public-domain HSDB)${lowconf?' — low confidence (no strong descriptor)':''}</div>`;
     html += pred.descriptors.map(d=>{ const pct=Math.round(d.score*100); const au=d.auroc?` · AUROC ${d.auroc}`:''; return `<div class="ameter"><div class="arow"><span class="aname">${d.odor}</span><span class="aval">${pct}%${au}</span></div><div class="atrack"><div class="afill" style="width:${pct}%"></div></div></div>`; }).join('');
   }
   const doc = ar.documented;
@@ -482,6 +504,37 @@ function attachRichSuggest(input, onPick){
   window.addEventListener('scroll', ()=>{ if(dd.style.display!=='none') place(); }, true);
 }
 attachRichSuggest(q, ()=>run());
+
+// --- landing browse: model-ranked taste lists + documented aroma lists ---
+async function getJSON(url){ const r = await fetch(url); return r.json(); }
+async function initBrowse(){
+  try{
+    const d = await getJSON('/api/categories');
+    const cats = d.categories||[];
+    if(cats.length < 4){ setTimeout(initBrowse, 3000); return; }  // precompute still warming up
+    const taste = cats.filter(c=>c.key.startsWith('taste:'));
+    const aroma = cats.filter(c=>c.key.startsWith('aroma:'));
+    const el = $('browseCats');
+    el.innerHTML = taste.map(c=>`<button class="cat taste" data-key="${c.key}">${c.label}</button>`).join('')
+      + aroma.map(c=>`<button class="cat" data-key="${c.key}">${c.label}</button>`).join('');
+    el.querySelectorAll('.cat').forEach(b=> b.addEventListener('click', ()=>showCategory(b)));
+    if(el.querySelector('.cat')) showCategory(el.querySelector('.cat'));  // open first by default
+  }catch(e){ setTimeout(initBrowse, 3000); }
+}
+async function showCategory(btn){
+  document.querySelectorAll('.cat').forEach(c=>c.classList.remove('on'));
+  btn.classList.add('on');
+  const grid = $('browseGrid');
+  grid.innerHTML = '<div class="empty">Loading…</div>';
+  const d = await getJSON('/api/top?category='+encodeURIComponent(btn.dataset.key)+'&limit=24');
+  grid.innerHTML = (d.items||[]).map(it=>`
+    <div class="bcell" data-smi="${it.smiles.replace(/"/g,'&quot;')}" title="Analyze ${it.name}">
+      <div class="bstruct">${it.svg||''}</div><div class="bname">${it.name}</div></div>`).join('')
+    || '<div class="empty">No molecules.</div>';
+  grid.querySelectorAll('.bcell').forEach(c=> c.addEventListener('click', ()=>{
+    q.value = c.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
+}
+initBrowse();
 
 // --- mixture mode ---
 function mixAddRow(val){
