@@ -7,7 +7,9 @@
 <style>
   :root{
     --surface:#F4F6F4; --panel:#FFFFFF; --line:#DCE3DE; --ink:#172019;
-    --muted:#5C6B63; --accent:#0F5C4D; --accent-soft:#0F5C4D14;
+    --muted:#5C6B63; --accent:#2A7C86; --accent-soft:#2A7C8614;
+    --brand-1:#3A2E7C; --brand-2:#1AA0A8; --brand-accent:#E0913C;
+    --brand-grad:linear-gradient(100deg,#3A2E7C 0%,#2A5E9E 45%,#1AA0A8 100%);
     --sweet:#E0972E; --bitter:#6B4E9E; --umami:#C0563B; --sour:#9FB024; --salty:#4E84B0; --aroma:#2E7D6B;
     --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
@@ -15,9 +17,12 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--ui);
     font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  header{padding:22px 28px;border-bottom:1px solid var(--line);display:flex;
-    align-items:baseline;gap:14px}
-  header h1{margin:0;font-size:18px;font-weight:650;letter-spacing:-.01em}
+  header{padding:16px 28px;border-bottom:1px solid var(--line);display:flex;
+    align-items:center;gap:15px;background:linear-gradient(180deg,#FBFCFB,#F4F6F4)}
+  header .logo{width:54px;height:54px;flex:0 0 auto}
+  header .brand{display:flex;flex-direction:column;gap:1px;min-width:0}
+  header h1{margin:0;font-size:23px;font-weight:750;letter-spacing:-.01em;line-height:1.1;
+    background:var(--brand-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   header .sub{font-family:var(--mono);font-size:12px;color:var(--muted)}
   main{max-width:980px;margin:0 auto;padding:26px 28px 60px}
   .bar{display:flex;gap:10px;align-items:stretch}
@@ -25,7 +30,7 @@
     border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)}
   .bar input:focus{outline:2px solid var(--accent);border-color:transparent}
   .bar button{font-family:var(--ui);font-weight:600;font-size:15px;padding:0 22px;
-    border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer}
+    border:none;border-radius:9px;background:var(--brand-grad);color:#fff;cursor:pointer}
   .bar button:disabled{opacity:.5;cursor:default}
   .hint{font-family:var(--mono);font-size:12px;color:var(--muted);margin:8px 2px 0}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}
@@ -161,8 +166,11 @@
 </head>
 <body>
 <header>
-  <h1>Flavormancer</h1>
-  <span class="sub">taste &amp; aroma prediction from chemical structure — before you pour</span>
+  <img class="logo" src="/static/logo.png" alt="Flavormancer logo">
+  <div class="brand">
+    <h1>Flavormancer</h1>
+    <span class="sub">taste &amp; aroma prediction from chemical structure — before you pour</span>
+  </div>
 </header>
 <main>
   <div class="bar">
@@ -173,6 +181,19 @@
   <div class="hint">Type a <b>common or IUPAC name</b> (e.g. <code>vanillin</code>) or a
     <b>SMILES</b> string (e.g. <code>O=Cc1ccc(O)c(OC)c1</code>). SMILES omit implicit
     hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
+
+  <label class="toggle"><input type="checkbox" id="mixToggle"> Mixture mode — screen 2+ ingredients for documented hazards</label>
+  <div id="mixPanel" style="display:none">
+    <div id="mixRows"></div>
+    <button class="mix-add" id="mixAdd">+ add ingredient</button>
+    <div class="mix-proc">Process applied:
+      <label><input type="checkbox" class="proc" value="high_heat"> high heat</label>
+      <label><input type="checkbox" class="proc" value="refining"> refining</label>
+      <label><input type="checkbox" class="proc" value="fermentation"> fermentation</label>
+    </div>
+    <button class="mix-btn" id="mixCheck">Check mixture</button>
+    <div id="mixResults"></div>
+  </div>
 
   <div id="browse" class="browse">
     <div class="browse-head">Or browse the library — pick a category, then a molecule
@@ -190,20 +211,6 @@
       <div class="map-canvas-wrap"><canvas id="flavorMap" width="920" height="520"></canvas>
         <div id="mapTip" class="map-tip" style="display:none"></div></div>
     </div>
-  </div>
-
-  <label class="toggle"><input type="checkbox" id="mixToggle"> Mixture mode — screen 2+ ingredients for documented hazards</label>
-
-  <div id="mixPanel" style="display:none">
-    <div id="mixRows"></div>
-    <button class="mix-add" id="mixAdd">+ add ingredient</button>
-    <div class="mix-proc">Process applied:
-      <label><input type="checkbox" class="proc" value="high_heat"> high heat</label>
-      <label><input type="checkbox" class="proc" value="refining"> refining</label>
-      <label><input type="checkbox" class="proc" value="fermentation"> fermentation</label>
-    </div>
-    <button class="mix-btn" id="mixCheck">Check mixture</button>
-    <div id="mixResults"></div>
   </div>
 
   <div id="err" class="err" style="display:none"></div>
@@ -267,6 +274,18 @@
 const TASTE_COLORS = {sweet:'var(--sweet)',bitter:'var(--bitter)',umami:'var(--umami)',
   sour:'var(--sour)',salty:'var(--salty)'};
 const MODEL_TASTES = ['sweet','bitter','umami'];
+// a distinct color per aroma descriptor, so each note reads at a glance
+const AROMA_COLORS = {fruity:'#E8913C',citrus:'#EFC01F',floral:'#E86AA6',minty:'#2FB37E',
+  sweet:'#E0972E',woody:'#9C6B3F',spicy:'#D9534F',almond:'#C9A66B',vanilla:'#D6A93C',
+  camphor:'#4FB0C4',medicinal:'#7E57C2',ammoniacal:'#8A97A3',ethereal:'#66C2D6',
+  pungent:'#E4572E',garlic:'#8FA31E',fishy:'#4F8FC0',sulfurous:'#B8A93A',rose:'#E07A9E',
+  herbal:'#5AA469',green:'#6DB33F',earthy:'#8B7355',caramel:'#C68A3E',nutty:'#B0813F',
+  buttery:'#E6C34D',balsamic:'#9A6B8C',smoky:'#7A6B5D',anise:'#C05A6E',coconut:'#CBB994',
+  cinnamon:'#B5561F',clove:'#8A5A2B',coffee:'#6A4632',cocoa:'#6B4226',meaty:'#A0522D',
+  cheesy:'#D9B84D',creamy:'#E3CE9A',waxy:'#C4BE96',fresh:'#4FC0B0',grassy:'#7DAF3A',
+  rancid:'#9A8B5A',tarry:'#4A4038',winey:'#8E4B6E',honey:'#E0A83C',apple:'#8DBF4A',
+  cherry:'#C0392B',pine:'#3FA06B',banana:'#E6C84D'};
+const aromaColor = n => AROMA_COLORS[n] || 'var(--aroma)';
 
 const $ = id => document.getElementById(id);
 const go = $('go'), q = $('q');
@@ -377,7 +396,7 @@ function render(p, neighbors, svg, names){
           ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
           <div class="s">${x.smiles}</div>
           <div class="kt">${x.known_tastes.length?x.known_tastes.join(' · '):'—'}</div>
-          ${(x.aroma&&x.aroma.length)?`<div class="nb-aroma" title="aroma (found = documented, else predicted)">${x.aroma.map(a=>`<span class="atag">${a.odor}${a.source==='predicted'?' •':''}</span>`).join('')}</div>`:''}
+          ${(x.aroma&&x.aroma.length)?`<div class="nb-aroma" title="aroma (found = documented, else predicted •)">${x.aroma.map(a=>`<span class="atag" style="color:${aromaColor(a.odor)};border-color:${aromaColor(a.odor)}44">${a.odor}${a.source==='predicted'?' •':''}</span>`).join('')}</div>`:''}
         </div>
         <div class="sim">${Math.round(x.similarity*100)}% match</div>
       </div>`).join('');
@@ -444,7 +463,7 @@ function renderAroma(ar){
   if(pred && (pred.descriptors||[]).length){
     const lowconf = pred.any_confident===false;
     html += `<div class="aroma-prev-tag">Predicted descriptors · model (presence/absence, public-domain HSDB)${lowconf?' — low confidence (no strong descriptor)':''}</div>`;
-    html += pred.descriptors.map(d=>{ const pct=Math.round(d.score*100); const au=d.auroc?` · AUROC ${d.auroc}`:''; return `<div class="ameter"><div class="arow"><span class="aname">${d.odor}</span><span class="aval">${pct}%${au}</span></div><div class="atrack"><div class="afill" style="width:${pct}%"></div></div></div>`; }).join('');
+    html += pred.descriptors.map(d=>{ const pct=Math.round(d.score*100); const col=aromaColor(d.odor); const au=d.auroc?` · AUROC ${d.auroc}`:''; return `<div class="ameter"><div class="arow"><span class="aname" style="color:${col}">${d.odor}</span><span class="aval">${pct}%${au}</span></div><div class="atrack"><div class="afill" style="width:${pct}%;background:${col}"></div></div></div>`; }).join('');
   }
   const doc = ar.documented;
   if(doc && (doc.notes||[]).length){
