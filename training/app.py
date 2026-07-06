@@ -119,16 +119,37 @@ def api_predict(q: Query):
     return P.predict(smi, include_aroma=False)
 
 
+def _aroma_tags(smi, k=3):
+    """A few aroma descriptor tags for a molecule: keyword-derived from documented HSDB odor
+    when the molecule is in the corpus (source 'found'), else the model's confident predictions."""
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is None:
+        return []
+    rec = _ODOR_TABLE.get(Chem.MolToInchiKey(mol).split("-")[0])
+    if rec and rec.get("odor"):
+        try:
+            from build_aroma_dataset import tag as _odor_tag
+            found = sorted(_odor_tag(rec["odor"]))[:k]
+            if found:
+                return [{"odor": t, "source": "found"} for t in found]
+        except Exception:  # noqa: BLE001 — vocab module missing; fall through to predicted
+            pass
+    pa = P.predict_aroma(smi)
+    return [{"odor": d["odor"], "source": "predicted"}
+            for d in pa.get("descriptors", []) if d.get("confident")][:k]
+
+
 @app.post("/api/neighbors")
 def api_neighbors(q: Query):
     smi = _resolve(q.smiles)
     if not smi:
         return {"neighbors": []}
     res = P.substitute(smi, k=q.k)
-    for n in res.get("neighbors", []):  # enrich each candidate with a structure + names
+    for n in res.get("neighbors", []):  # enrich each candidate: structure + names + aroma tags
         n["svg"] = _svg(n["smiles"], 132, 96)
         nm = _names(n["smiles"])
         n["name"], n["iupac"] = nm[0], nm[1]
+        n["aroma"] = _aroma_tags(n["smiles"])
     return res
 
 
@@ -254,6 +275,109 @@ def api_suggest(qs: str = ""):
     return {"items": items}
 
 
+# --- Browsable "top" lists for the landing page (model-ranked; discovery, not just search) ---
+_TOP_LISTS = {}  # category -> {"label", "items":[{name, smiles, score}]}
+_TOP_N = 40      # nicely-named molecules to keep per category
+_CAND = 600      # rank this many by probability, then keep the recognizable ones
+
+
+def _table_name(smi):
+    """Common name from the precomputed tables only (instant, offline) — the properties name
+    table first, then the odor corpus's PubChem Titles — so the precompute never hits the network."""
+    m = Chem.MolFromSmiles(str(smi)) if isinstance(smi, str) else None
+    if m is None:
+        return None
+    skel = Chem.MolToInchiKey(m).split("-")[0]
+    hit = _NAME_TABLE.get(skel)
+    if hit and hit[0]:
+        return hit[0]
+    rec = _ODOR_TABLE.get(skel)  # odor-corpus common name (PubChem Title)
+    return rec.get("name") if rec else None
+
+
+def _nice(name):
+    """A recognizable common name — not a systematic/registry string — so browse lists read well."""
+    if not name or len(name) > 38 or name[0] in "[(":
+        return False
+    return sum(c.isdigit() for c in name) / len(name) <= 0.22
+
+
+def _rank(smiles_iter, prob_fn):
+    """Top-_CAND (smiles, prob) by a per-molecule probability, structure-parsed once."""
+    import numpy as np
+    rows = [(s, Chem.MolFromSmiles(str(s))) for s in smiles_iter]
+    rows = [(s, m) for s, m in rows if m is not None]
+    if not rows:
+        return []
+    probs = prob_fn(np.vstack([P._fp(m) for _, m in rows]))
+    order = probs.argsort()[::-1][:_CAND]
+    return [(rows[i][0], round(float(probs[i]), 3)) for i in order]
+
+
+def _named_top(ranked):
+    """Keep the recognizable, named molecules from a ranked list, up to _TOP_N."""
+    items, seen = [], set()
+    for s, p in ranked:
+        nm = _table_name(s)
+        if _nice(nm) and nm.lower() not in seen:
+            seen.add(nm.lower())
+            items.append({"name": nm, "smiles": s, "score": p})
+        if len(items) >= _TOP_N:
+            break
+    return items
+
+
+def _precompute_top_lists():
+    """Rank molecules for the landing-page browse lists — taste heads over the labeled set,
+    aroma heads over the odor corpus. Model-derived: honest 'what the tool predicts'."""
+    import pandas as pd
+    try:
+        tm = pd.read_parquet("taste_master.parquet")
+        for taste, clf in P._CLASSIFIERS.items():
+            ranked = _rank(tm["smiles"], lambda X, c=clf: c.predict_proba(X)[:, 1])
+            _TOP_LISTS[f"taste:{taste}"] = {"label": f"Top {taste}", "items": _named_top(ranked)}
+    except Exception:  # noqa: BLE001 — no taste data; skip taste lists
+        pass
+    try:
+        # aroma lists use DOCUMENTED odor (ground truth), not model ranking: the public corpus
+        # skews industrial, so ranking by a head surfaces confident-but-odd picks (cyanide under
+        # "almond"). Documented examples are real, recognizable, and honest ("documented citrus").
+        from build_aroma_dataset import tag as _odor_tag
+        od = pd.read_parquet("odor_notes.parquet")
+        by_desc = {}
+        for _, r in od.iterrows():
+            nm, odor = r.get("name"), r.get("odor")
+            if not isinstance(odor, str) or not _nice(nm):
+                continue
+            for d in _odor_tag(odor):
+                by_desc.setdefault(d, []).append({"name": nm, "smiles": r["smiles"]})
+        for d, items in by_desc.items():
+            if len(items) >= 8:  # only offer descriptors with enough documented examples
+                _TOP_LISTS[f"aroma:{d}"] = {"label": f"Documented {d}", "items": items[:_TOP_N]}
+    except Exception:  # noqa: BLE001 — no odor corpus / vocab; skip aroma lists
+        pass
+# NB: the thread is started at the very end of the module, after _ODOR_TABLE is defined.
+
+
+@app.get("/api/categories")
+def api_categories():
+    """The browse categories available on the landing page, once precompute has finished."""
+    return {"categories": [{"key": k, "label": v["label"], "n": len(v["items"])}
+                           for k, v in _TOP_LISTS.items()]}
+
+
+@app.get("/api/top")
+def api_top(category: str = "", limit: int = 24):
+    """A browse list: model-ranked top molecules for a taste/aroma category (each clickable)."""
+    lst = _TOP_LISTS.get(category)
+    if not lst:
+        return {"label": None, "items": []}
+    items = [dict(it) for it in lst["items"][:limit]]
+    for it in items:
+        it["svg"] = _svg(it["smiles"], 96, 68)
+    return {"label": lst["label"], "items": items}
+
+
 # --- Aroma: REAL documented odor only (public-domain HSDB/CAMEO) ---------------
 # Hand-set illustrative descriptor "scores" were removed on purpose: made-up numbers
 # have no place in the read. The aroma card now shows only real, cited documented odor
@@ -272,12 +396,14 @@ def _load_odor_table():
             return df[name] if name in df.columns else [None] * len(df)
 
         out = {}
-        for ik, odor, osrc, thr, tsrc in zip(df["inchikey"], col("odor"), col("odor_source"),
-                                             col("odor_threshold_ppm"),
-                                             col("odor_threshold_source")):
+        for ik, name, odor, osrc, thr, tsrc in zip(
+                df["inchikey"], col("name"), col("odor"), col("odor_source"),
+                col("odor_threshold_ppm"), col("odor_threshold_source")):
             if not isinstance(ik, str):
                 continue
             rec = {}
+            if isinstance(name, str):
+                rec["name"] = name
             if isinstance(odor, str):
                 rec["odor"] = odor
                 rec["odor_source"] = osrc if isinstance(osrc, str) else None
@@ -292,6 +418,10 @@ def _load_odor_table():
 
 
 _ODOR_TABLE = _load_odor_table()
+
+# start the landing-page precompute now that every table it reads (_NAME_TABLE, _ODOR_TABLE,
+# the models) is defined — starting it earlier would race those globals into NameErrors
+threading.Thread(target=_precompute_top_lists, daemon=True).start()
 
 
 @app.post("/api/aroma")
@@ -317,7 +447,8 @@ def api_aroma(q: Query):
             out["available"] = True
     pa = P.predict_aroma(smi)
     if pa.get("available") and pa.get("descriptors"):
-        out["predicted"] = {"descriptors": pa["descriptors"], "note": pa.get("note")}
+        out["predicted"] = {"descriptors": pa["descriptors"], "note": pa.get("note"),
+                            "any_confident": pa.get("any_confident", True)}
         out["available"] = True
     return out
 

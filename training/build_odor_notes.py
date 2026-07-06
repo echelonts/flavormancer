@@ -170,16 +170,18 @@ def annotation_records(heading):
 
 
 def cids_to_structs(cids, chunk=100):
-    """{cid: (InChIKey, CanonicalSMILES)} via batched PubChem property calls (~1 per 100 CIDs).
-    SMILES is needed downstream to fingerprint these molecules for the aroma descriptor model."""
+    """{cid: (InChIKey, SMILES, Title)} via batched PubChem property calls (~1 per 100 CIDs).
+    SMILES feeds the aroma model's fingerprints; Title gives the corpus common names so the
+    landing-page browse lists (Top citrus/floral/…) read as real molecules."""
     out = {}
     for i in range(0, len(cids), chunk):
         ch = cids[i:i + chunk]
         d = _get(f"{_BASE}/pug/compound/cid/{','.join(map(str, ch))}"
-                 f"/property/InChIKey,SMILES/JSON")
+                 f"/property/InChIKey,SMILES,Title/JSON")
         for p in (d or {}).get("PropertyTable", {}).get("Properties", []):
             if p.get("InChIKey"):  # PubChem renamed the SMILES fields; accept either
-                out[p["CID"]] = (p["InChIKey"], p.get("SMILES") or p.get("ConnectivitySMILES"))
+                out[p["CID"]] = (p["InChIKey"], p.get("SMILES") or p.get("ConnectivitySMILES"),
+                                 p.get("Title"))
     return out
 
 
@@ -202,10 +204,10 @@ def build_from_pubchem_annotations():
         st = cid2s.get(cid)
         if not st:
             continue
-        ik, smi = st
+        ik, smi, title = st
         ostrs, osrcs = odor_by_cid.get(cid, ([], set()))
         thr_pairs = thr_by_cid.get(cid, [])
-        rows.append({"inchikey": ik, "smiles": smi,
+        rows.append({"inchikey": ik, "smiles": smi, "name": title,
                      "odor": "\n".join(sorted(set(ostrs), key=len)) or None,
                      "odor_source": "; ".join(sorted(osrcs)) or None,
                      "odor_threshold_ppm": _parse_threshold_ppm(thr_pairs),
@@ -214,7 +216,7 @@ def build_from_pubchem_annotations():
     return rows
 
 
-COLS = ["inchikey", "smiles", "odor", "odor_source", "odor_threshold_ppm",
+COLS = ["inchikey", "smiles", "name", "odor", "odor_source", "odor_threshold_ppm",
         "odor_threshold_note", "odor_threshold_source"]
 
 if __name__ == "__main__":
