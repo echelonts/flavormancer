@@ -42,6 +42,7 @@
   .meter .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
   .meter .name{font-weight:600;font-size:14px;text-transform:capitalize}
   .meter .val{font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .meter .au{font-size:11px;color:var(--muted);opacity:.85}
   .meter .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;
     margin-left:8px;vertical-align:middle;letter-spacing:.04em}
   .tag.measured{background:var(--accent-soft);color:var(--accent)}
@@ -232,12 +233,14 @@ async function post(path, body){
   return r.json();
 }
 
-function meter(name, value, measured){
+function meter(name, value, measured, auroc){
   const pct = Math.round(value*100);
   const tag = measured ? '<span class="tag measured">measured</span>'
                        : '<span class="tag predicted">predicted</span>';
+  // show the head's held-out AUROC on model predictions (not on measured ground truth)
+  const au = (auroc && !measured) ? ` <span class="au">· AUROC ${auroc}</span>` : '';
   return `<div class="meter">
-    <div class="row"><span class="name">${name}${tag}</span><span class="val">${pct}%</span></div>
+    <div class="row"><span class="name">${name}${tag}</span><span class="val">${pct}%${au}</span></div>
     <div class="track"><div class="fill" style="background:${TASTE_COLORS[name]}"
       data-w="${pct}"></div></div></div>`;
 }
@@ -289,7 +292,7 @@ function render(p, neighbors, svg, names){
   if(inDomain){
     let m = '';
     for(const t of MODEL_TASTES){
-      if(typeof p[t] === 'number') m += meter(t, p[t], known.has(t));
+      if(typeof p[t] === 'number') m += meter(t, p[t], known.has(t), (p.taste_meta&&p.taste_meta[t]||{}).auroc);
     }
     if(m) m += '<div class="meters-note">Each is an independent confidence that the molecule carries that taste — they don\'t sum to 100%. A molecule can be both (sweet <i>and</i> bitter) or weakly any.</div>';
     $('meters').innerHTML = m || '<div class="empty">No taste heads trained yet.</div>';

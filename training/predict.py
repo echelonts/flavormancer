@@ -177,6 +177,7 @@ for _nm, _smi in {
 # load whatever classifier heads exist (sweet/bitter/umami...) + intensity
 _CLASSIFIERS = {}
 _INTENSITY = None
+_TASTE_META = {}  # taste -> {auroc, ...} from taste_models/manifest.json (held-out score)
 if TASTE.exists():
     for p in TASTE.glob("*_rf.joblib"):
         name = p.stem.replace("_rf", "")
@@ -184,6 +185,10 @@ if TASTE.exists():
             _INTENSITY = joblib.load(p)
         else:
             _CLASSIFIERS[name] = joblib.load(p)
+    _tm = TASTE / "manifest.json"
+    if _tm.exists():
+        import json as _json
+        _TASTE_META = _json.loads(_tm.read_text())
 
 # Caution-only toxicity-assay heads (Tox21, public domain). Loaded if trained.
 # INDICATIVE in-vitro signals — never a toxicity determination.
@@ -777,6 +782,10 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
     }
     for name, clf in sorted(_CLASSIFIERS.items()):
         out[name] = round(float(clf.predict_proba(x)[0, 1]), 3)
+    # per-head held-out CV-AUROC (from taste_models/manifest.json) so the UI can show how
+    # trustworthy each trained taste head is, the same way the aroma descriptors carry theirs
+    out["taste_meta"] = {t: {"auroc": _TASTE_META[t]["auroc"]}
+                         for t in _CLASSIFIERS if t in _TASTE_META and "auroc" in _TASTE_META[t]}
     # Sour trains as a small-data INDICATIVE head, but its boolean stays the rule's
     # call below — keep the model probability separately as sour_predicted.
     if "sour" in out:

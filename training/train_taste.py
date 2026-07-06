@@ -15,6 +15,7 @@ Run order:
   python train_taste.py
 """
 
+import json
 from pathlib import Path
 
 import joblib
@@ -79,6 +80,7 @@ def featurize(smiles_series):
 def train_classifiers(master):
     X_all, keep = featurize(master["smiles"])
     df = master.iloc[keep].reset_index(drop=True)
+    manifest = {}
     for taste in BASIC:
         y = df[taste]
         mask = y.notna().values
@@ -98,6 +100,8 @@ def train_classifiers(master):
         auc = roc_auc_score(yte, clf.predict_proba(Xte)[:, 1])
         print(f"  {taste:7s} AUROC={auc:.3f}  (pos={pos}, neg={neg})")
         joblib.dump(clf, OUT / f"{taste}_rf.joblib")
+        manifest[taste] = {"auroc": round(float(auc), 3), "n_pos": pos, "n_neg": neg}
+    return manifest
 
 
 def train_intensity(path=Path("sweet_intensity.parquet")):
@@ -113,6 +117,7 @@ def train_intensity(path=Path("sweet_intensity.parquet")):
     r2 = r2_score(yte, reg.predict(Xte))
     print(f"  sweet_intensity R2={r2:.3f}  (n={len(y)})  [small data; treat as indicative]")
     joblib.dump(reg, OUT / "sweet_intensity_rf.joblib")
+    return round(float(r2), 3)
 
 
 def validate_sour_rule(master):
@@ -140,9 +145,12 @@ def validate_sour_rule(master):
 if __name__ == "__main__":
     master = pd.read_parquet("taste_master.parquet")
     print("training taste classifiers:")
-    train_classifiers(master)
+    manifest = train_classifiers(master)
     print("validating the sour rule against labeled data:")
     validate_sour_rule(master)
     print("training sweetness-intensity regressor:")
-    train_intensity()
-    print(f"\nsaved models -> {OUT}/")
+    r2 = train_intensity()
+    if r2 is not None:
+        manifest["sweet_intensity"] = {"r2": r2}
+    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    print(f"\nsaved models + manifest.json -> {OUT}/")
