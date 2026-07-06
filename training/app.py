@@ -336,6 +336,12 @@ def _precompute_top_lists():
         for taste, clf in P._CLASSIFIERS.items():
             ranked = _rank(tm["smiles"], lambda X, c=clf: c.predict_proba(X)[:, 1])
             _TOP_LISTS[f"taste:{taste}"] = {"label": f"Top {taste}", "items": _named_top(ranked)}
+        # salty is a rule/known-label taste (not a model head) — list the LABELED salty molecules
+        if "salty" in tm.columns:
+            salty = [(s, 1.0) for s in tm.loc[tm["salty"] == 1, "smiles"]]
+            items = _named_top(salty)
+            if items:
+                _TOP_LISTS["taste:salty"] = {"label": "Known salty", "items": items}
     except Exception:  # noqa: BLE001 — no taste data; skip taste lists
         pass
     try:
