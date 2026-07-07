@@ -68,11 +68,17 @@ already exists in `predict.py`; supply the data and the feature reports real num
 
 ---
 
-## 3. Aroma — odor-descriptor prediction (the marquee "comes with your data")
+## 3. Aroma — odor-descriptor prediction (intensity is the "comes with your data")
 
-Aroma is **not** in the commercial edition (the rich public odor data is NonCommercial —
-the GS-LF set; see [`AROMA.md`](AROMA.md)). It is trained **for a customer on their own
-data**, on-prem, or on a **commercially-licensed** set (Leffingwell **PMP 2001**).
+Aroma **ships in the commercial edition as presence/absence** — 13 RandomForest descriptor
+heads (citrus, floral, minty, almond, …) trained on **public-domain** PubChem/HSDB odor text
+(CV-AUROC 0.80–0.96; see [`AROMA.md`](AROMA.md)). What it does **not** have is **scored
+intensity** — *how strong* each note is — because **no public-domain intensity-scored odor
+data exists** (the one clean scored set, keller_2016, is naive-subject noise; every expert
+intensity set — GS-LF, Dravnieks — is NonCommercial/proprietary). So the marquee upgrade is
+**intensity**, trained **for a customer on their own panel data**, on-prem, or on a
+**commercially-licensed** set (Leffingwell **PMP 2001**). Richer/rarer descriptors come with
+that data too.
 
 **What we need to train an aroma model:**
 - **Molecules:** `smiles` — or **GC-MS** output identifying the volatile compounds in your
