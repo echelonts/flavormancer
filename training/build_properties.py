@@ -130,6 +130,22 @@ def parse_bp(strings):
     return t, round(p, 1)
 
 
+def parse_mp(strings):
+    """Melting point in °C — median of parsed temperatures (a single-value property, no pressure)."""
+    temps = []
+    for s in strings:
+        for m in _TEMP_RE.finditer(s):
+            lo = float(m.group(1))
+            hi = float(m.group(2)) if m.group(2) else lo
+            t = (lo + hi) / 2
+            if m.group(3).upper() == "F":
+                t = (t - 32) * 5 / 9
+            if -150 <= t <= 400:
+                temps.append(round(t, 1))
+    temps.sort()
+    return temps[len(temps) // 2] if temps else None
+
+
 def parse_vp_pa(strings):
     vals = []
     for s in strings:
@@ -153,11 +169,12 @@ def _names_for_cid(cid):
 def fetch_props(inchikey):
     cid = _cid(inchikey)
     if not cid:
-        return None, None, None, None, None
+        return None, None, None, None, None, None
     bp, bp_press = parse_bp(_heading_strings(cid, "Boiling Point"))
     vp = parse_vp_pa(_heading_strings(cid, "Vapor Pressure"))
+    mp = parse_mp(_heading_strings(cid, "Melting Point"))
     common, iupac = _names_for_cid(cid)
-    return bp, bp_press, vp, common, iupac
+    return bp, bp_press, vp, mp, common, iupac
 
 
 def load_keys(path):
@@ -192,10 +209,10 @@ if __name__ == "__main__":
                 print(f"{smi}: unparseable")
                 continue
             ik = Chem.MolToInchiKey(mol)
-            bp, bp_press, vp, common, iupac = fetch_props(ik)
+            bp, bp_press, vp, mp, common, iupac = fetch_props(ik)
             cond = f" @{bp_press}mmHg" if bp_press else ""
             print(f"{smi:32s} ik={ik}  name={common!r}  iupac={iupac!r}  "
-                  f"bp_c={bp}{cond}  vp_pa={vp}")
+                  f"bp_c={bp}{cond}  mp_c={mp}  vp_pa={vp}")
             time.sleep(0.3)
         sys.exit(0)
 
@@ -205,7 +222,7 @@ if __name__ == "__main__":
         sys.exit(1)
     keys = load_keys(src)
     cols = ["inchikey", "common_name", "iupac_name", "boiling_point_c",
-            "boiling_point_pressure_mmhg", "vapor_pressure_pa"]
+            "boiling_point_pressure_mmhg", "vapor_pressure_pa", "melting_point_c"]
 
     def checkpoint(rows):
         """Merge new rows into the output table and persist — called every CHUNK so a
@@ -216,21 +233,23 @@ if __name__ == "__main__":
             new = pd.concat([old, new], ignore_index=True).drop_duplicates("inchikey", keep="last")
         return new.reindex(columns=cols)  # stable schema as older tables gain name columns
 
-    done = set()  # resume: skip molecules already carrying a name in the existing table
+    # resume: skip molecules already FULLY fetched (have both a name and a melting point tried).
+    # Keyed on melting_point_c so adding that column re-crawls rows fetched before it existed.
+    done = set()
     if Path(a.out).exists():
         ex = pd.read_parquet(a.out)
-        if "common_name" in ex.columns:
-            done = set(ex.loc[ex["common_name"].notna(), "inchikey"])
+        if "common_name" in ex.columns and "melting_point_c" in ex.columns:
+            done = set(ex.loc[ex["common_name"].notna() & ex["melting_point_c"].notna(), "inchikey"])
     todo = [k for k in keys if k not in done]
-    print(f"{len(keys)} molecules in {src}; {len(done)} already named, {len(todo)} to fetch")
+    print(f"{len(keys)} molecules in {src}; {len(done)} already complete, {len(todo)} to fetch")
 
     CHUNK, rows = 100, []
     for i, ik in enumerate(todo):
-        bp, bp_press, vp, common, iupac = fetch_props(ik)
-        if bp is not None or vp is not None or common or iupac:
+        bp, bp_press, vp, mp, common, iupac = fetch_props(ik)
+        if bp is not None or vp is not None or mp is not None or common or iupac:
             rows.append({"inchikey": ik, "common_name": common, "iupac_name": iupac,
                          "boiling_point_c": bp, "boiling_point_pressure_mmhg": bp_press,
-                         "vapor_pressure_pa": vp})
+                         "vapor_pressure_pa": vp, "melting_point_c": mp})
         if (i + 1) % CHUNK == 0 or (i + 1) == len(todo):
             merged = checkpoint(rows)
             merged.to_parquet(a.out)

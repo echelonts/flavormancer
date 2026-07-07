@@ -246,7 +246,7 @@ if _GRAS_FILE.exists():
 # molecules to report as a number — benzaldehyde misses by ~90 C.
 _PROPS = {}
 _PROP_COLS = ("odor_threshold_ppm", "fema_use_max_ppm", "boiling_point_c",
-              "boiling_point_pressure_mmhg", "vapor_pressure_pa")
+              "boiling_point_pressure_mmhg", "vapor_pressure_pa", "melting_point_c")
 for _ext in ("properties.parquet", "properties.csv"):
     _pf = Path(_ext)
     if _pf.exists():
@@ -494,7 +494,40 @@ def physchem(mol):
     meas = _measured(mol)
     if meas:
         result["measured"] = {**{k: meas[k] for k in meas}, "source": "loaded property table"}
+    # Flavorist formulation hints: carrier-solvent need (from estimated water solubility) and
+    # room-temperature phase (from measured melting/boiling point, when the table has them).
+    form = {}
+    if logS <= -3:
+        form["carrier"] = (f"poorly water-soluble (logS {logS:.1f}) — needs a carrier solvent "
+                           "(propylene glycol, ethanol, or triacetin) to disperse in a water-based product")
+    elif logS <= -1.5:
+        form["carrier"] = (f"limited water solubility (logS {logS:.1f}) — a little propylene glycol "
+                           "or ethanol helps it dissolve in water")
+    else:
+        form["carrier"] = f"reasonably water-soluble (logS {logS:.1f}) — usually no carrier needed"
+    bp = (meas or {}).get("boiling_point_c")
+    mp = (meas or {}).get("melting_point_c")
+    if bp is not None and bp < 25:
+        form["phase_at_rt"] = "gas"
+    elif mp is not None:
+        form["phase_at_rt"] = "solid" if mp > 25 else "liquid"
+    result["formulation"] = form
     return result
+
+
+def chirality(mol):
+    """Stereo flag: enantiomers can taste/smell differently (R-carvone spearmint vs S caraway).
+    We detect chiral centers (assigned or potential) and flag it honestly — the current models
+    are achiral, so this is a caveat, not an enantiomer-specific prediction (see docs/AROMA.md)."""
+    centers = Chem.FindMolChiralCenters(mol, includeUnassigned=True, useLegacyImplementation=False)
+    if not centers:
+        return {"is_chiral": False}
+    assigned = [c for c in centers if c[1] not in ("?", "u")]
+    return {"is_chiral": True, "n_centers": len(centers),
+            "specified": len(assigned) == len(centers),
+            "note": ("chiral — enantiomers can differ in taste/aroma; the current read is the same "
+                     "for both mirror images (achiral model). Draw the stereochemistry (isomeric "
+                     "SMILES) for the specific enantiomer's documented odor where PubChem has it.")}
 
 
 def stability(mol):
@@ -815,6 +848,7 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
     out["physchem"] = physchem(mol)
     out["stability"] = stability(mol)
     out["chemesthesis"] = chemesthesis(mol)
+    out["chirality"] = chirality(mol)
     out["analytical"] = {"retention_index": retention_index(mol)}
     out["labeling"] = labeling(mol)
     out["safety"] = _safety(mol)
