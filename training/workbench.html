@@ -258,6 +258,13 @@
   .design-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}
   .design-pager .pg{font:inherit;font-size:12px;padding:4px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer}
   .design-pager .pg:disabled{opacity:.4;cursor:default}.design-pager .pg:not(:disabled):hover{border-color:var(--brand-2)}
+  /* --- flavor studio --- */
+  .studio-modes{display:flex;gap:8px;margin:14px 0 4px}
+  .studio-mode{font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--muted);cursor:pointer;transition:all .12s}
+  .studio-mode:hover{border-color:var(--brand-2);color:var(--ink)}
+  .studio-mode.on{background:var(--brand-grad);color:#08121A;border-color:transparent}
+  .studio-panel{margin-top:6px}
+  .studio-hint{font-size:12px;color:var(--muted);margin:8px 2px 4px}
   /* --- flavor library --- */
   .lib-cats{display:flex;flex-direction:column;gap:9px;margin:12px 0 2px}
   .lib-cat{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
@@ -308,25 +315,27 @@
     <b>SMILES</b> string (e.g. <code>O=Cc1ccc(O)c(OC)c1</code>). SMILES omit implicit
     hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
 
-  <div class="design-section">
-    <div class="design-head" id="libToggle"><span id="libCaret">▾</span> Flavor library
-      <span class="mapsub">— start from a flavor you know (banana, saffron, smoke, pawpaw…) → the molecule that makes it, food-safe status + drop-in swaps</span></div>
-    <div id="libWrap">
-      <div id="libCats" class="lib-cats"></div>
-      <div id="libResults" class="design-grid"></div>
-    </div>
-  </div>
-
-  <div class="design-section">
-    <div class="design-head" id="designToggle"><span id="designCaret">▾</span> Flavor designer
-      <span class="mapsub">— pick the notes you want, get the best molecules to build it (food-safe) + drop-in swaps to cut cost</span></div>
-    <div id="designWrap">
-      <div id="designChips" class="design-chips"></div>
-      <div class="design-controls">
-        <label class="design-gras"><input type="checkbox" id="designGras" checked> food-safe (GRAS) only</label>
-        <button class="mix-btn" id="designGo">Find molecules</button>
+  <div class="design-section" id="studio">
+    <div class="design-head" id="studioToggle"><span id="studioCaret">▾</span> Flavor Studio
+      <span class="mapsub">— one hub. A flavor <i>is</i> a set of notes: start from a <b>flavor you know</b> or from the <b>notes you want</b>, and land on the same food-safe molecules — 2D/3D structures, GRAS status, drop-in swaps.</span></div>
+    <div id="studioWrap">
+      <div class="studio-modes">
+        <button type="button" id="modeFlavor" class="studio-mode on">🍓 Start from a flavor</button>
+        <button type="button" id="modeNotes" class="studio-mode">🎛 Start from notes</button>
       </div>
-      <div id="designResults" class="design-grid"></div>
+      <div id="flavorMode" class="studio-panel">
+        <div class="studio-hint">Pick a flavor — Studio shows the molecule(s) that <i>make</i> it.</div>
+        <div id="libCats" class="lib-cats"></div>
+      </div>
+      <div id="notesMode" class="studio-panel" style="display:none">
+        <div class="studio-hint">Pick the notes you want — Studio ranks the best molecules to build them.</div>
+        <div id="designChips" class="design-chips"></div>
+        <div class="design-controls">
+          <label class="design-gras"><input type="checkbox" id="designGras" checked> food-safe (GRAS) only</label>
+          <button class="mix-btn" id="designGo">Find molecules</button>
+        </div>
+      </div>
+      <div id="studioResults" class="design-grid"></div>
     </div>
   </div>
 
@@ -1022,8 +1031,16 @@ function attachMapEvents(cv){
 let _mapLastHover=null;
 loadMap();  // map is open by default
 
-// --- flavor library: pick a known flavor -> its character-impact molecule(s) ---
-$('libToggle').addEventListener('click', ()=>{ const w=$('libWrap'); const o=w.style.display==='none'; w.style.display=o?'block':'none'; $('libCaret').textContent=o?'▾':'▸'; });
+// --- Flavor Studio: one hub, two entry modes (flavor / notes) -> shared rich result grid ---
+$('studioToggle').addEventListener('click', ()=>{ const w=$('studioWrap'); const o=w.style.display==='none'; w.style.display=o?'block':'none'; $('studioCaret').textContent=o?'▾':'▸'; });
+function setStudioMode(m){
+  const flav = m==='flavor';
+  $('modeFlavor').classList.toggle('on',flav); $('modeNotes').classList.toggle('on',!flav);
+  $('flavorMode').style.display=flav?'block':'none'; $('notesMode').style.display=flav?'none':'block';
+  $('studioResults').innerHTML='<div class="empty">'+(flav?'Pick a flavor above to see the molecule that makes it.':'Pick one or more notes above, then “Find molecules”.')+'</div>';
+}
+$('modeFlavor').addEventListener('click', ()=>setStudioMode('flavor'));
+$('modeNotes').addEventListener('click', ()=>setStudioMode('notes'));
 async function initLibrary(){
   try{
     const d = await getJSON('/api/flavors'); const cats = d.categories||[];
@@ -1037,7 +1054,7 @@ async function initLibrary(){
 }
 initLibrary();
 async function showFlavor(name){
-  const res=$('libResults'); res.innerHTML='<div class="empty">Looking up the chemistry…</div>';
+  const res=$('studioResults'); res.innerHTML='<div class="empty">Looking up the chemistry…</div>';
   const d=await getJSON('/api/flavor?name='+encodeURIComponent(name)); const mols=d.molecules||[];
   if(!mols.length){ res.innerHTML='<div class="empty">No character molecule on file for that one.</div>'; return; }
   const lead=`<div class="empty" style="grid-column:1/-1"><b style="text-transform:capitalize;color:var(--ink)">${name}</b> — character-impact ${mols.length>1?'molecules':'molecule'}${d.category?' · '+d.category:''}. Click a name to run the full read.</div>`;
@@ -1055,9 +1072,8 @@ async function showFlavor(name){
   res.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
 }
 
-// --- flavor designer: pick notes -> best food-safe molecules + drop-in swaps ---
+// --- Studio "notes" mode: pick notes -> best food-safe molecules + drop-in swaps ---
 const _designSel = new Set();
-$('designToggle').addEventListener('click', ()=>{ const w=$('designWrap'); const o=w.style.display==='none'; w.style.display=o?'block':'none'; $('designCaret').textContent=o?'▾':'▸'; });
 async function initDesign(){
   try{
     const d = await getJSON('/api/design_options'); const descs = d.descriptors||[];
@@ -1069,9 +1085,10 @@ async function initDesign(){
   }catch(_){ setTimeout(initDesign, 4000); }
 }
 initDesign();
+setStudioMode('flavor');  // Studio opens on the flavor entry
 const DESIGN_PAGE=20; let _designOffset=0;
 async function runDesign(offset){
-  const res=$('designResults');
+  const res=$('studioResults');
   if(!_designSel.size){ res.innerHTML='<div class="empty">Pick one or more notes above.</div>'; return; }
   _designOffset=offset;
   const gras=$('designGras').checked?1:0;
@@ -1097,7 +1114,7 @@ async function runDesign(offset){
   res.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
   const pv=$('dPrev'), nx=$('dNext');
   if(pv) pv.addEventListener('click', ()=>runDesign(Math.max(0,offset-DESIGN_PAGE)));
-  if(nx) nx.addEventListener('click', ()=>{ runDesign(offset+DESIGN_PAGE); $('designResults').scrollIntoView({behavior:'smooth',block:'start'}); });
+  if(nx) nx.addEventListener('click', ()=>{ runDesign(offset+DESIGN_PAGE); $('studioResults').scrollIntoView({behavior:'smooth',block:'start'}); });
 }
 $('designGo').addEventListener('click', ()=>runDesign(0));
 
