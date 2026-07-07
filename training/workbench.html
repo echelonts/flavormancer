@@ -15,6 +15,9 @@
 <meta name="twitter:description" content="Predict taste &amp; aroma from chemical structure. On-prem, before you pour.">
 <meta name="twitter:image" content="https://flavormancer.echelonts.net/static/social.png">
 <meta name="theme-color" content="#2BC4C4">
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <style>
   @font-face{font-family:'Cinzel Decorative';src:url('/static/wordmark.ttf') format('truetype');font-weight:700;font-display:swap}
   @font-face{font-family:'Grenze Gotisch';src:url('/static/headerfont.ttf') format('truetype');font-weight:700;font-display:swap}
@@ -233,6 +236,9 @@
   .dmatch .mt{font-size:10px;padding:1px 7px;border-radius:20px;text-transform:capitalize}
   .dsubs{font-size:11px;color:var(--muted);margin-top:7px;border-top:1px solid var(--line);padding-top:6px;line-height:1.5}
   .dsubs a{color:var(--brand-2);cursor:pointer}.dsubs a:hover{text-decoration:underline}
+  .design-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}
+  .design-pager .pg{font:inherit;font-size:12px;padding:4px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer}
+  .design-pager .pg:disabled{opacity:.4;cursor:default}.design-pager .pg:not(:disabled):hover{border-color:var(--brand-2)}
   .sg-info{min-width:0}
   .sg-name{font-weight:600;font-size:13px}
   .sg-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all}
@@ -307,6 +313,7 @@
     <div id="mapWrap">
       <div class="map-controls">
         <span class="map-toggle3d"><button type="button" id="map2d" class="st-tab on">2D</button><button type="button" id="map3d" class="st-tab">3D</button></span>
+        <span class="map-toggle3d"><button type="button" id="mapCT" class="st-tab on">taste</button><button type="button" id="mapCA" class="st-tab">aroma</button></span>
         <span id="mapLegend" class="map-legend"></span>
         <button type="button" id="mapReset" class="map-reset">Reset view</button>
       </div>
@@ -465,12 +472,16 @@ function render(p, neighbors, svg, names){
     for(const t of MODEL_TASTES){
       if(typeof p[t] === 'number') m += meter(t, p[t], known.has(t), (p.taste_meta&&p.taste_meta[t]||{}).auroc);
     }
-    // sour: a trained head (sour_predicted) shown as a bar, with the acidity RULE as a cross-check
+    // sour & salty: trained heads (…_predicted) shown as bars, each with its RULE as a cross-check
     if(typeof p.sour_predicted === 'number'){
       const rule = p.sour ? 'rule ✓ acid group' : 'rule: no acid group';
       m += meter('sour', p.sour_predicted, known.has('sour'), (p.taste_meta&&p.taste_meta.sour||{}).auroc, rule);
     }
-    if(m) m += '<div class="meters-note">Each is an independent confidence that the molecule carries that taste — they don\'t sum to 100%. A molecule can be both (sweet <i>and</i> bitter) or weakly any. Sour pairs the trained head with an acidity rule as a cross-check.</div>';
+    if(typeof p.salty_predicted === 'number'){
+      const rule = p.salty===true ? 'rule ✓ alkali salt' : 'rule: not a simple salt';
+      m += meter('salty', p.salty_predicted, known.has('salty'), (p.taste_meta&&p.taste_meta.salty||{}).auroc, rule);
+    }
+    if(m) m += '<div class="meters-note">Each is an independent confidence that the molecule carries that taste — they don\'t sum to 100%. A molecule can be both (sweet <i>and</i> bitter) or weakly any. Sour and salty pair a trained head with a chemistry rule as a cross-check.</div>';
     $('meters').innerHTML = m || '<div class="empty">No taste heads trained yet.</div>';
   } else {
     $('meters').innerHTML = '<div class="empty">Trained taste prediction not applicable to this molecule.</div>';
@@ -481,8 +492,8 @@ function render(p, neighbors, svg, names){
   // out of domain there's no meter, so keep the sour RULE flag as a chip there
   if(!inDomain) c.push(chip('sour', p.sour, p.sour?'var(--sour)':null,
     p.sour && p.sour_reason && p.sour_reason.length ? `sour · ${p.sour_reason[0]}` : 'not sour'));
-  c.push(chip('salty', p.salty===true, p.salty===true?'var(--salty)':null,
-    p.salty===true ? 'salty (known)' : 'salty — not in data'));
+  if(!inDomain) c.push(chip('salty', p.salty===true, p.salty===true?'var(--salty)':null,
+    p.salty===true ? 'salty (rule)' : 'salty — not a simple salt'));
   const logP = ((p.physchem||{}).computed||{}).logP;
   if(inDomain && p.sweet >= 0.5 && typeof p.sweet_intensity === 'number' && typeof logP==='number' && logP < 2){
     const x = Math.pow(10, p.sweet_intensity);
@@ -734,8 +745,10 @@ initBrowse();
 
 // --- flavor-space map: 2D (zoom/pan) + rotatable 3D point cloud, colored by taste ---
 const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD24E',salty:'#63A6E0',other:'#8A96A0'};
-let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null;
+let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste';
 let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6}, _drag=null, _dragged=false;
+function mapColor(p){ return _mapColorBy==='aroma' ? (p.aroma && p.aroma!=='other' ? aromaColor(p.aroma) : '#5A6068') : (MAP_COLORS[p.label]||MAP_COLORS.other); }
+function mapLabel(p){ return _mapColorBy==='aroma' ? (p.aroma||'other') : p.label; }
 
 $('mapToggle').addEventListener('click', async ()=>{
   const w=$('mapWrap'); const open=w.style.display==='none';
@@ -744,17 +757,23 @@ $('mapToggle').addEventListener('click', async ()=>{
 });
 $('map2d').addEventListener('click', ()=>setMapMode('2d'));
 $('map3d').addEventListener('click', ()=>setMapMode('3d'));
+$('mapCT').addEventListener('click', ()=>setMapColor('taste'));
+$('mapCA').addEventListener('click', ()=>setMapColor('aroma'));
 $('mapReset').addEventListener('click', ()=>{ _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6}; drawMap(); });
 function setMapMode(m){ _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap(); }
+function setMapColor(c){ _mapColorBy=c; $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma'); mapLegendRender(); drawMap(); }
+function mapLegendRender(){
+  const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
+  const labs=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,10);
+  $('mapLegend').innerHTML=labs.map(l=>`<span><i style="background:${_mapColorBy==='aroma'?(l==='other'?'#5A6068':aromaColor(l)):(MAP_COLORS[l]||MAP_COLORS.other)}"></i>${l} (${counts[l]})</span>`).join('');
+}
 
 async function loadMap(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d');
   ctx.fillStyle='#8a938c'; ctx.font='13px sans-serif'; ctx.fillText('Loading…',12,22);
   const d=await getJSON('/api/map'); _mapPts=d.points||[];
   if(!_mapPts.length){ ctx.clearRect(0,0,cv.width,cv.height); ctx.fillText('Map not built yet (build_flavor_map.py).',12,22); return; }
-  const counts={}; _mapPts.forEach(p=>counts[p.label]=(counts[p.label]||0)+1);
-  $('mapLegend').innerHTML=Object.keys(MAP_COLORS).filter(l=>counts[l]).map(l=>
-    `<span><i style="background:${MAP_COLORS[l]}"></i>${l} (${counts[l]})</span>`).join('');
+  mapLegendRender();
   _mapReady=true; attachMapEvents(cv); drawMap();
 }
 function drawMap(){ _mapMode==='3d'?draw3D():draw2D(); }
@@ -763,7 +782,7 @@ function draw2D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=18;
   ctx.clearRect(0,0,W,H);
   const px=p=>(pad+p.x*(W-2*pad))*_v2.s+_v2.ox, py=p=>(H-pad-p.y*(H-2*pad))*_v2.s+_v2.oy;
-  for(const p of _mapPts){ ctx.beginPath(); ctx.arc(px(p),py(p),2.6,0,7); ctx.fillStyle=MAP_COLORS[p.label]||MAP_COLORS.other; ctx.globalAlpha=.8; ctx.fill(); }
+  for(const p of _mapPts){ ctx.beginPath(); ctx.arc(px(p),py(p),2.6,0,7); ctx.fillStyle=mapColor(p); ctx.globalAlpha=.8; ctx.fill(); }
   ctx.globalAlpha=1; _mapProj={px,py};
 }
 function draw3D(){
@@ -774,7 +793,7 @@ function draw3D(){
     const x1=X*cY-Z*sY, z1=X*sY+Z*cY, y1=Y*cX-z1*sX, z2=Y*sX+z1*cX;
     return {sx:cx+x1*R, sy:cy-y1*R, d:z2}; };
   const all=_mapPts.map(p=>({p,pr:proj(p)})).sort((a,b)=>a.pr.d-b.pr.d);  // far first
-  for(const {p,pr} of all){ const t=pr.d+0.5; ctx.beginPath(); ctx.arc(pr.sx,pr.sy,1.7+2.1*t,0,7); ctx.fillStyle=MAP_COLORS[p.label]||MAP_COLORS.other; ctx.globalAlpha=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fill(); }
+  for(const {p,pr} of all){ const t=pr.d+0.5; ctx.beginPath(); ctx.arc(pr.sx,pr.sy,1.7+2.1*t,0,7); ctx.fillStyle=mapColor(p); ctx.globalAlpha=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fill(); }
   ctx.globalAlpha=1; _mapProj={px:p=>proj(p).sx, py:p=>proj(p).sy};
 }
 function nearestMapPt(ev){
@@ -796,7 +815,7 @@ function attachMapEvents(cv){
       drawMap(); tip.style.display='none'; return; }
     const p=nearestMapPt(ev); _mapLastHover=p;
     if(p){ const r=cv.getBoundingClientRect(); tip.style.display='block'; tip.style.left=(ev.clientX-r.left)+'px'; tip.style.top=(ev.clientY-r.top)+'px';
-      tip.innerHTML=`<b>${p.name||p.smiles}</b><br><span style="color:${MAP_COLORS[p.label]}">●</span> ${p.label} · <span style="opacity:.8">${p.smiles}</span>`; }
+      tip.innerHTML=`<b>${p.name||p.smiles}</b><br><span style="color:${mapColor(p)}">●</span> ${mapLabel(p)} · <span style="opacity:.8">${p.smiles}</span>`; }
     else tip.style.display='none';
   });
   cv.addEventListener('mouseleave', ()=>{ tip.style.display='none'; });
@@ -820,24 +839,34 @@ async function initDesign(){
   }catch(_){ setTimeout(initDesign, 4000); }
 }
 initDesign();
-$('designGo').addEventListener('click', async ()=>{
+const DESIGN_PAGE=20; let _designOffset=0;
+async function runDesign(offset){
   const res=$('designResults');
   if(!_designSel.size){ res.innerHTML='<div class="empty">Pick one or more notes above.</div>'; return; }
+  _designOffset=offset;
   const gras=$('designGras').checked?1:0;
   res.innerHTML='<div class="empty">Searching…</div>';
-  const d=await getJSON('/api/design?descriptors='+encodeURIComponent([..._designSel].join(','))+'&gras='+gras+'&limit=18');
-  const items=d.items||[];
+  const d=await getJSON('/api/design?descriptors='+encodeURIComponent([..._designSel].join(','))+'&gras='+gras+'&offset='+offset+'&limit='+DESIGN_PAGE);
+  const items=d.items||[], tot=d.total_matches||0;
   if(!items.length){ res.innerHTML='<div class="empty">No molecule carries all those notes'+(gras?' and is food-safe':'')+'. Try fewer notes.</div>'; return; }
-  res.innerHTML=`<div class="empty" style="grid-column:1/-1">${d.total_matches} molecules match — showing top ${items.length}:</div>`+items.map(it=>{
+  const from=offset+1, to=offset+items.length;
+  const pager=`<div class="design-pager"><button class="pg" id="dPrev" ${offset<=0?'disabled':''}>‹ prev</button>
+    <span>${from}–${to} of ${tot}</span>
+    <button class="pg" id="dNext" ${to>=tot?'disabled':''}>next ›</button></div>`;
+  res.innerHTML=`<div class="empty" style="grid-column:1/-1">${tot} molecules match those notes${gras?' (food-safe)':''}:</div>`+items.map(it=>{
     const badge=it.gras?'<span class="dbadge">GRAS</span>':'';
     const match=it.matched.map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('');
     const subs=(it.subs&&it.subs.length)?`<div class="dsubs">food-safe drop-ins: ${it.subs.map(s=>`<a data-smi="${s.smiles.replace(/"/g,'&quot;')}">${s.name||s.smiles.slice(0,14)}</a>`).join(', ')}</div>`:'';
     return `<div class="dcell"><div class="dstruct">${it.svg||''}</div>
       <div class="dname" data-smi="${it.smiles.replace(/"/g,'&quot;')}">${it.name||it.smiles}${badge}</div>
       <div class="dmatch">${match}</div>${subs}</div>`;
-  }).join('');
+  }).join('')+`<div style="grid-column:1/-1">${pager}</div>`;
   res.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
-});
+  const pv=$('dPrev'), nx=$('dNext');
+  if(pv) pv.addEventListener('click', ()=>runDesign(Math.max(0,offset-DESIGN_PAGE)));
+  if(nx) nx.addEventListener('click', ()=>{ runDesign(offset+DESIGN_PAGE); $('designResults').scrollIntoView({behavior:'smooth',block:'start'}); });
+}
+$('designGo').addEventListener('click', ()=>runDesign(0));
 
 // --- mixture mode ---
 function mixAddRow(val){

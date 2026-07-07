@@ -59,6 +59,20 @@ if __name__ == "__main__":
                         "x": xy[:, 0].astype(float), "y": xy[:, 1].astype(float),
                         "x3": xyz[:, 0].astype(float), "y3": xyz[:, 1].astype(float),
                         "z3": xyz[:, 2].astype(float)})
+    # dominant aroma descriptor per molecule (for the map's "color by aroma" mode) — guarded so
+    # the map still builds without the aroma heads
+    try:
+        import predict as P
+        if P._AROMA_MODELS:
+            best, bp = ["other"] * len(out), [0.0] * len(out)
+            for name, clf in P._AROMA_MODELS.items():
+                probs = clf.predict_proba(X)[:, 1]
+                for i in range(len(out)):
+                    if probs[i] >= 0.5 and probs[i] > bp[i]:
+                        bp[i], best[i] = probs[i], name
+            out["aroma_label"] = best
+    except Exception:  # noqa: BLE001 — no aroma models; taste-only map
+        pass
     out.to_parquet("flavor_map.parquet")
     print(f"flavor_map.parquet: {len(out)} points  "
           f"({', '.join(f'{t}={int((out.label == t).sum())}' for t in TASTES)}, "

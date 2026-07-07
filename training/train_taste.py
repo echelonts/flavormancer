@@ -28,10 +28,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, r2_score
 
 BASIC = ["sweet", "bitter", "umami", "sour", "salty"]
-# Salty stays a validated RULE only (cation property, too few labels to model).
-# Sour trains as a small-data INDICATIVE head but ALSO keeps its acidity rule in
-# predict.py as a deterministic second check (surfaced as sour_predicted + sour).
-RULE_TASTES = {"salty"}
+# Salty now ALSO trains as an INDICATIVE head (CV-AUROC ~0.96 once the PubChem documented-
+# taste labels are merged in — see augment_from_taste_notes) while KEEPING its alkali-salt
+# rule in predict.py as a deterministic second check (surfaced as salty_predicted + salty),
+# exactly like sour. Both use the rule to forecast, the model to add a probability.
+RULE_TASTES = set()
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
 # Below this, a taste is too thin for an HONEST head, so it's skipped and
@@ -142,8 +143,57 @@ def validate_sour_rule(master):
           f"(rule fires on {fp_hits}/{len(df)} of the validation set)")
 
 
+def augment_from_taste_notes(master, path="taste_notes.parquet"):
+    """Fold PubChem documented-taste labels in SELECTIVELY: only salty & sour (small classes
+    that benefit) and the 'tasteless' molecules (rare confirmed negatives). Sweet/bitter are
+    left to ChemTastesDB — a blanket merge adds keyword-text noise there (measured, ~-0.02 AUROC)."""
+    import re
+    p = Path(path)
+    if not p.exists():
+        print("  (no taste_notes.parquet — skipping documented-taste augmentation)")
+        return master
+    tn = pd.read_parquet(p)
+    neg = re.compile(r"\b(tasteless|no taste)")
+    pats = {"salty": re.compile(r"\b(salty|saline)"), "sour": re.compile(r"\b(sour|tart)")}
+    existing = set(master["smiles"])
+    added_pos = {"salty": 0, "sour": 0}
+    new_rows = []
+    for smi, txt in zip(tn["smiles"], tn["taste"].astype(str).str.lower()):
+        mol = Chem.MolFromSmiles(str(smi)) if isinstance(smi, str) else None
+        if mol is None:
+            continue
+        tasteless = bool(neg.search(txt))
+        labels = {t: (1 if pat.search(txt) else (0 if tasteless else None)) for t, pat in pats.items()}
+        if all(v is None for v in labels.values()):
+            continue
+        if smi in existing:
+            for t, v in labels.items():
+                if v is None:
+                    continue
+                cur = master.loc[master["smiles"] == smi, t]
+                if v == 1 or (len(cur) and pd.isna(cur.iloc[0])):  # positive wins; neg fills blanks
+                    master.loc[master["smiles"] == smi, t] = v
+                    if v == 1:
+                        added_pos[t] += 1
+        else:
+            row = {c: None for c in master.columns}
+            row.update({"smiles": smi, "inchikey": Chem.MolToInchiKey(mol)})
+            for t, v in labels.items():
+                row[t] = v
+                if v == 1:
+                    added_pos[t] += 1
+            new_rows.append(row)
+    if new_rows:
+        master = pd.concat([master, pd.DataFrame(new_rows)], ignore_index=True)
+    print(f"  documented-taste augmentation: +{added_pos['salty']} salty, +{added_pos['sour']} sour "
+          f"positives (+{len(new_rows)} new molecules)")
+    return master
+
+
 if __name__ == "__main__":
     master = pd.read_parquet("taste_master.parquet")
+    print("folding in PubChem documented taste (salty/sour + tasteless negatives):")
+    master = augment_from_taste_notes(master)
     print("training taste classifiers:")
     manifest = train_classifiers(master)
     print("validating the sour rule against labeled data:")

@@ -402,9 +402,11 @@ def _load_flavor_map():
 
         cols = {c: norm(c).tolist() for c in ("x", "y", "x3", "y3", "z3") if c in df.columns}
         smis, labs = df["smiles"].tolist(), df["label"].tolist()
+        aromas = df["aroma_label"].tolist() if "aroma_label" in df.columns else [None] * len(smis)
         pts = []
         for i in range(len(smis)):
-            p = {"label": labs[i], "smiles": smis[i], "name": _table_name(smis[i]) or ""}
+            p = {"label": labs[i], "aroma": aromas[i], "smiles": smis[i],
+                 "name": _table_name(smis[i]) or ""}
             for c, v in cols.items():
                 p[c] = v[i]
             pts.append(p)
@@ -487,12 +489,12 @@ def api_design_options():
 
 
 @app.get("/api/design")
-def api_design(descriptors: str = "", gras: int = 0, limit: int = 24):
+def api_design(descriptors: str = "", gras: int = 0, offset: int = 0, limit: int = 20):
     """Reverse search: given desired descriptors (+ optional food-safe filter), rank the
-    best-matching molecules — with GRAS status and drop-in substitutes for the top hits."""
+    best-matching molecules — with GRAS status and drop-in substitutes. Paginated via offset."""
     want = [d.strip().lower() for d in descriptors.split(",") if d.strip()]
     if not want or not _DESIGN:
-        return {"items": [], "requested": want}
+        return {"items": [], "requested": want, "total_matches": 0, "offset": offset, "limit": limit}
     scored = []
     for m in _DESIGN:
         if gras and not m["gras"]:
@@ -502,22 +504,20 @@ def api_design(descriptors: str = "", gras: int = 0, limit: int = 24):
             scored.append((len(matched), m, matched))
     scored.sort(key=lambda x: (-x[0], not x[1]["gras"], x[1]["name"] == ""))
     items = []
-    for i, (n, m, matched) in enumerate(scored[:limit]):
-        it = {"smiles": m["smiles"], "name": m["name"], "gras": m["gras"],
-              "matched": matched, "n_matched": n, "svg": _svg(m["smiles"], 108, 78),
-              "other": sorted(t for t in m["tags"] if t not in matched)[:5]}
-        if i < 8:  # drop-in food-safe swaps for the top hits (cost-saving substitutes)
-            subs = []
-            for s in P.substitute(m["smiles"], k=6).get("neighbors", []):
-                sm = Chem.MolFromSmiles(s["smiles"])
-                if sm is not None and Chem.MolToInchiKey(sm).split("-")[0] in P._GRAS:
-                    subs.append({"smiles": s["smiles"], "name": _table_name(s["smiles"]) or "",
-                                 "similarity": s["similarity"]})
-                if len(subs) >= 3:
-                    break
-            it["subs"] = subs
-        items.append(it)
-    return {"items": items, "requested": want, "total_matches": len(scored)}
+    for n, m, matched in scored[offset:offset + limit]:  # substitutes for the visible page only
+        subs = []
+        for s in P.substitute(m["smiles"], k=6).get("neighbors", []):
+            sm = Chem.MolFromSmiles(s["smiles"])
+            if sm is not None and Chem.MolToInchiKey(sm).split("-")[0] in P._GRAS:
+                subs.append({"smiles": s["smiles"], "name": _table_name(s["smiles"]) or "",
+                             "similarity": s["similarity"]})
+            if len(subs) >= 3:
+                break
+        items.append({"smiles": m["smiles"], "name": m["name"], "gras": m["gras"],
+                      "matched": matched, "n_matched": n, "svg": _svg(m["smiles"], 108, 78),
+                      "other": sorted(t for t in m["tags"] if t not in matched)[:5], "subs": subs})
+    return {"items": items, "requested": want, "total_matches": len(scored),
+            "offset": offset, "limit": limit}
 
 
 # --- Aroma: REAL documented odor only (public-domain HSDB/CAMEO) ---------------
