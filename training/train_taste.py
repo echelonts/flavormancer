@@ -2,10 +2,12 @@
 train_taste.py — taste heads (multi-taste) + sweetness-intensity regressor.
 
 Reads the merged dataset from build_taste_dataset.py and trains one binary
-RandomForest per trainable taste (sweet/bitter/umami, plus sour as a small-data
-*indicative* head). Salty stays a validated RULE in predict.py (a cation
-property, too few labels to model); sour ALSO keeps its acidity rule there as a
-deterministic cross-check. Add more data and the heads sharpen on the next run.
+RandomForest per trainable taste: sweet / bitter / umami, plus sour, salty, and
+tasteless as smaller *indicative* heads (folded up from PubChem documented taste).
+Sour AND salty ALSO keep their deterministic chemistry rules in predict.py as a
+cross-check (surfaced as sour_predicted / salty_predicted beside the rule's
+boolean); tasteless is a documented tasted-vs-tasteless head. Add more data and
+the heads sharpen on the next run.
 
 Even with everything merged this trains in minutes on the R620 CPU. The
 multi-day budget is the aroma model (deferred — see docs/AROMA.md), not this.
@@ -27,7 +29,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, r2_score
 
-BASIC = ["sweet", "bitter", "umami", "sour", "salty"]
+BASIC = ["sweet", "bitter", "umami", "sour", "salty", "tasteless"]
 # Salty now ALSO trains as an INDICATIVE head (CV-AUROC ~0.96 once the PubChem documented-
 # taste labels are merged in — see augment_from_taste_notes) while KEEPING its alkali-salt
 # rule in predict.py as a deterministic second check (surfaced as salty_predicted + salty),
@@ -153,10 +155,15 @@ def augment_from_taste_notes(master, path="taste_notes.parquet"):
         print("  (no taste_notes.parquet — skipping documented-taste augmentation)")
         return master
     tn = pd.read_parquet(p)
-    neg = re.compile(r"\b(tasteless|no taste)")
-    pats = {"salty": re.compile(r"\b(salty|saline)"), "sour": re.compile(r"\b(sour|tart)")}
+    neg = re.compile(r"\b(tasteless|no taste|without taste)")
+    # 'tasteless' is now its OWN trained head (a documented, confirmed negative-of-all-tastes
+    # class), not just a source of negatives for salty/sour. It reads from the same neg pattern.
+    pats = {"salty": re.compile(r"\b(salty|saline)"), "sour": re.compile(r"\b(sour|tart)"),
+            "tasteless": neg}
+    if "tasteless" not in master.columns:
+        master["tasteless"] = np.nan
     existing = set(master["smiles"])
-    added_pos = {"salty": 0, "sour": 0}
+    added_pos = {"salty": 0, "sour": 0, "tasteless": 0}
     new_rows = []
     for smi, txt in zip(tn["smiles"], tn["taste"].astype(str).str.lower()):
         mol = Chem.MolFromSmiles(str(smi)) if isinstance(smi, str) else None
@@ -185,8 +192,21 @@ def augment_from_taste_notes(master, path="taste_notes.parquet"):
             new_rows.append(row)
     if new_rows:
         master = pd.concat([master, pd.DataFrame(new_rows)], ignore_index=True)
-    print(f"  documented-taste augmentation: +{added_pos['salty']} salty, +{added_pos['sour']} sour "
-          f"positives (+{len(new_rows)} new molecules)")
+    print(f"  documented-taste augmentation: +{added_pos['salty']} salty, +{added_pos['sour']} sour, "
+          f"+{added_pos['tasteless']} tasteless positives (+{len(new_rows)} new molecules)")
+    return master
+
+
+def seed_tasteless_negatives(master):
+    """A molecule with any documented basic taste is, by definition, NOT tasteless — so it's a
+    clean tasteless NEGATIVE. This turns the (few) documented tasteless positives into a real
+    tasted-vs-tasteless head instead of a positives-only class."""
+    if "tasteless" not in master.columns:
+        master["tasteless"] = np.nan
+    tasted = master[["sweet", "bitter", "umami", "sour", "salty"]].eq(1).any(axis=1)
+    fill = tasted & master["tasteless"].isna()
+    master.loc[fill, "tasteless"] = 0
+    print(f"  tasteless negatives seeded from tasted molecules: +{int(fill.sum())}")
     return master
 
 
@@ -194,6 +214,7 @@ if __name__ == "__main__":
     master = pd.read_parquet("taste_master.parquet")
     print("folding in PubChem documented taste (salty/sour + tasteless negatives):")
     master = augment_from_taste_notes(master)
+    master = seed_tasteless_negatives(master)
     print("training taste classifiers:")
     manifest = train_classifiers(master)
     print("validating the sour rule against labeled data:")
