@@ -5,14 +5,16 @@ behavior, formulation notes, and safety flags** for any molecule, plus substitut
 Enter a **common or IUPAC name** (or a SMILES) and get a single, honest flavor read,
 running entirely on hardware you own.
 
-> **8,322 unique molecules** across the open datasets · **taste + aroma** prediction from
-> structure · a **flavor designer** (pick your notes → best food-safe molecules + drop-in
-> swaps) · an interactive 2D/3D **flavor-space map** · **2D & 3D** structure views. All on
+> **8,393 unique molecules** across the open datasets · **taste + aroma** prediction from
+> structure · a **flavor library** (start from a flavor → its character-impact molecule) and
+> **flavor designer** (pick your notes → best food-safe molecules + drop-in swaps) · an
+> interactive 2D/3D **flavor-space map** · **2D & 3D** structure views. All on
 > commercial-clean public data.
 >
-> Per set (unique molecules): taste training **3,845** · aroma training **825** · odor
+> Per set (unique molecules): taste training **3,845** · aroma training **981** · odor
 > corpus **2,255** · documented taste **676** · GRAS reference **2,781** · sweetness
-> intensity **316**.
+> intensity **316** · curated character-impact flavors **95 flavors / 77 molecules**.
+> Every one of the 8,393 is enriched with names + measured properties from public-domain PubChem.
 
 > **This is the commercial edition** — Apache-2.0 and **commercial-clean**: every
 > model trains only on permissively-licensed open data, so it's free to use, sell,

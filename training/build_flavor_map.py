@@ -21,8 +21,28 @@ import umap
 from rdkit import Chem
 from rdkit.Chem import DataStructs, rdFingerprintGenerator
 
-TASTES = ["sweet", "bitter", "umami", "sour", "salty"]
+TASTES = ["sweet", "bitter", "umami", "sour", "salty", "tasteless"]
+_BASIC = ["sweet", "bitter", "umami", "sour", "salty"]
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+
+
+def _tasteless_structs():
+    """{InChIKey-skeleton -> canonical SMILES} for molecules documented as tasteless
+    (PubChem/HSDB Taste). Used to LABEL and to ADD tasteless points — most documented-tasteless
+    molecules aren't in ChemTastesDB (taste_master), so without adding them the class is empty."""
+    import re
+    try:
+        tn = pd.read_parquet("taste_notes.parquet")
+    except Exception:  # noqa: BLE001 — no documented-taste table
+        return {}
+    neg = re.compile(r"\b(tasteless|no taste|without taste)", re.I)
+    out = {}
+    for smi, txt in zip(tn["smiles"], tn["taste"].astype(str)):
+        if neg.search(txt):
+            m = Chem.MolFromSmiles(str(smi))
+            if m is not None:
+                out[Chem.MolToInchiKey(m).split("-")[0]] = Chem.MolToSmiles(m)
+    return out
 
 
 def _fp(m):
@@ -43,13 +63,30 @@ if __name__ == "__main__":
         print(f"{src} not found")
         sys.exit(1)
     df = pd.read_parquet(src)
-    smiles, labels, feats = [], [], []
+    tasteless = _tasteless_structs()
+    smiles, labels, feats, seen = [], [], [], set()
     for _, r in df.iterrows():
         m = Chem.MolFromSmiles(str(r["smiles"]))
         if m is None:
             continue
+        skel = Chem.MolToInchiKey(m).split("-")[0]
+        seen.add(skel)
         smiles.append(r["smiles"])
-        labels.append(next((t for t in TASTES if r.get(t) == 1), "other"))
+        lbl = next((t for t in _BASIC if r.get(t) == 1), None)
+        if lbl is None and skel in tasteless:
+            lbl = "tasteless"
+        labels.append(lbl or "other")
+        feats.append(_fp(m))
+    # add documented-tasteless molecules that ChemTastesDB doesn't carry, so the class is real
+    for skel, smi in tasteless.items():
+        if skel in seen:
+            continue
+        m = Chem.MolFromSmiles(smi)
+        if m is None:
+            continue
+        seen.add(skel)
+        smiles.append(smi)
+        labels.append("tasteless")
         feats.append(_fp(m))
     X = np.array(feats)
     print(f"embedding {len(X)} molecules with UMAP (Jaccard) — 2D then 3D...", flush=True)

@@ -22,30 +22,80 @@ from pathlib import Path
 import pandas as pd
 from rdkit import Chem
 
-# controlled odor-descriptor vocabulary: descriptor -> keyword cues matched with word boundaries
+# controlled odor-descriptor vocabulary: descriptor -> keyword cues matched with word boundaries.
+# Broadened over the first pass to recover more of the ~2,258 HSDB odor texts (many phrased with
+# a synonym the narrow list missed), plus a handful of new descriptors common in the corpus.
 VOCAB = {
-    "fruity": ["fruity", "fruit"], "sweet": ["sweet"], "floral": ["floral", "flower", "flowery"],
-    "citrus": ["citrus", "lemon", "orange", "lime", "grapefruit"], "green": ["green"],
-    "minty": ["mint", "minty", "menthol", "peppermint", "spearmint"], "herbal": ["herb", "herbal"],
-    "woody": ["wood", "woody"], "spicy": ["spicy", "spice"], "rose": ["rose", "rosy"],
-    "almond": ["almond"], "vanilla": ["vanilla"], "caramel": ["caramel", "caramellic"],
-    "nutty": ["nut", "nutty"], "buttery": ["butter", "buttery"], "fatty": ["fatty"],
-    "rancid": ["rancid"], "sulfurous": ["sulfur", "sulphur", "sulfurous", "sulfury"],
-    "garlic": ["garlic"], "onion": ["onion"], "fishy": ["fish", "fishy"],
-    "earthy": ["earth", "earthy", "musty", "moldy"], "camphor": ["camphor", "camphoraceous"],
-    "pine": ["pine", "piney"], "balsamic": ["balsam", "balsamic"],
-    "medicinal": ["medicinal", "phenol", "phenolic"], "smoky": ["smoke", "smoky", "smoked"],
-    "pungent": ["pungent", "sharp", "acrid"], "ethereal": ["ether", "ethereal", "solvent"],
-    "winey": ["wine", "winey", "vinous"], "honey": ["honey"], "coconut": ["coconut"],
-    "banana": ["banana"], "apple": ["apple"], "cherry": ["cherry"], "clove": ["clove"],
-    "cinnamon": ["cinnamon", "cinnamic"], "anise": ["anise", "licorice", "aniseed"],
-    "coffee": ["coffee"], "cocoa": ["cocoa", "chocolate"], "meaty": ["meat", "meaty"],
-    "cheesy": ["cheese", "cheesy"], "creamy": ["cream", "creamy"], "waxy": ["wax", "waxy"],
-    "fresh": ["fresh"], "grassy": ["grass", "grassy", "hay"],
-    "burnt": ["burnt", "roasted", "toasted"], "tarry": ["tar", "tarry", "creosote"],
-    "ammoniacal": ["ammonia", "ammoniacal"], "fecal": ["fecal", "feces", "faecal", "manure"],
+    "fruity": ["fruity", "fruit", "berry", "estery", "ester", "jammy"], "sweet": ["sweet", "sweetish"],
+    "floral": ["floral", "flower", "flowery", "blossom"],
+    "citrus": ["citrus", "citrusy", "lemon", "orange", "lime", "grapefruit", "bergamot"],
+    "green": ["green", "leafy"],
+    "minty": ["mint", "minty", "menthol", "peppermint", "spearmint", "cooling"],
+    "herbal": ["herb", "herbal", "herbaceous"], "woody": ["wood", "woody", "cedar", "sandalwood"],
+    "spicy": ["spicy", "spice", "peppery", "pepper"], "rose": ["rose", "rosy"],
+    "almond": ["almond", "marzipan", "benzaldehyde"], "vanilla": ["vanilla", "vanillin"],
+    "caramel": ["caramel", "caramellic"], "nutty": ["nut", "nutty"],
+    "buttery": ["butter", "buttery", "diacetyl"], "fatty": ["fatty", "oily", "tallow"],
+    "rancid": ["rancid"],
+    "sulfurous": ["sulfur", "sulphur", "sulfurous", "sulfury", "rotten egg", "hydrogen sulfide", "eggy", "skunk"],
+    "garlic": ["garlic", "alliaceous"], "onion": ["onion"], "fishy": ["fish", "fishy", "aminy"],
+    "earthy": ["earth", "earthy", "musty", "moldy", "mushroom", "humus"],
+    "camphor": ["camphor", "camphoraceous"], "pine": ["pine", "piney", "turpentine", "resinous"],
+    "balsamic": ["balsam", "balsamic"],
+    "medicinal": ["medicinal", "phenol", "phenolic", "carbolic", "antiseptic", "iodine"],
+    "smoky": ["smoke", "smoky", "smoked", "smokey"],
+    "pungent": ["pungent", "sharp", "acrid", "irritating", "choking"],
+    "ethereal": ["ether", "ethereal", "solvent", "solventy", "chloroform"],
+    "winey": ["wine", "winey", "vinous", "brandy", "cognac"], "honey": ["honey"],
+    "coconut": ["coconut"], "banana": ["banana"], "apple": ["apple"], "cherry": ["cherry"],
+    "clove": ["clove", "eugenol"], "cinnamon": ["cinnamon", "cinnamic"],
+    "anise": ["anise", "licorice", "aniseed"], "coffee": ["coffee"],
+    "cocoa": ["cocoa", "chocolate"], "meaty": ["meat", "meaty", "brothy", "savory"],
+    "cheesy": ["cheese", "cheesy"], "creamy": ["cream", "creamy", "milky", "dairy"],
+    "waxy": ["wax", "waxy"], "fresh": ["fresh"],
+    "grassy": ["grass", "grassy", "hay", "coumarin"],
+    "burnt": ["burnt", "roasted", "toasted", "scorched", "charred"],
+    "tarry": ["tar", "tarry", "creosote"], "ammoniacal": ["ammonia", "ammoniacal", "amine"],
+    "fecal": ["fecal", "feces", "faecal", "manure"],
+    # new descriptors (each clears the training MIN_POS on this corpus)
+    "musky": ["musk", "musky"], "alcoholic": ["alcohol", "alcoholic", "ethanol"],
+    "putrid": ["putrid", "rotten", "rotting", "foul", "decayed", "decaying", "stench"],
+    "soapy": ["soap", "soapy"], "vegetable": ["vegetable", "cabbage", "celery", "potato"],
+    "bready": ["bread", "bready", "yeasty", "yeast", "doughy"],
+    "petroleum": ["petroleum", "kerosene", "gasoline", "petrol", "naphtha"],
 }
 PATS = {d: re.compile(r"\b(" + "|".join(k) + r")\b", re.I) for d, k in VOCAB.items()}
+
+
+def fold_flavors(rows, path="flavors.csv"):
+    """Fold the curated flavor->character-molecule list in as extra AROMA labels: a molecule that
+    IS the banana / cherry / clove note is a documented positive for that descriptor. Extends the
+    weak-labeled HSDB set with hand-verified character-impact facts (only for flavors that are
+    already descriptors in VOCAB). Returns (rows, n_labels_added, n_new_molecules)."""
+    p = Path(path)
+    if not p.exists():
+        return rows, 0, 0
+    fl = pd.read_csv(p)
+    by_key = {r["inchikey_skel"]: r for r in rows}  # rows are dicts; index by skeleton
+    added, new = 0, 0
+    for flavor, smi in zip(fl["flavor"].astype(str).str.lower(), fl["smiles"]):
+        if flavor not in VOCAB:
+            continue
+        mol = Chem.MolFromSmiles(str(smi))
+        if mol is None:
+            continue
+        skel = Chem.MolToInchiKey(mol).split("-")[0]
+        row = by_key.get(skel)
+        if row is None:
+            row = {"inchikey": Chem.MolToInchiKey(mol), "smiles": Chem.MolToSmiles(mol),
+                   "inchikey_skel": skel, **{d: 0 for d in VOCAB}}
+            by_key[skel] = row
+            rows.append(row)
+            new += 1
+        if not row.get(flavor):
+            row[flavor] = 1
+            added += 1
+    return rows, added, new
 
 
 def tag(text):
@@ -63,20 +113,25 @@ if __name__ == "__main__":
     df = df[df["odor"].notna() & df["smiles"].notna()].copy()
     rows = []
     for _, r in df.iterrows():
-        if Chem.MolFromSmiles(str(r["smiles"])) is None:
+        mol = Chem.MolFromSmiles(str(r["smiles"]))
+        if mol is None:
             continue
         tags = tag(r["odor"])
         if not tags:  # no descriptor keyword -> uninformative ("characteristic odor"); skip to
             continue  # limit false-negative noise (absence-as-negative only among tagged mols)
-        row = {"inchikey": r["inchikey"], "smiles": r["smiles"]}
+        row = {"inchikey": r["inchikey"], "smiles": r["smiles"],
+               "inchikey_skel": Chem.MolToInchiKey(mol).split("-")[0]}
         for d in VOCAB:
             row[d] = int(d in tags)
         rows.append(row)
-    out = pd.DataFrame(rows)
+    n_odor = len(rows)
+    rows, n_lbl, n_new = fold_flavors(rows)  # curated character-impact molecules as extra positives
+    out = pd.DataFrame(rows).drop(columns=["inchikey_skel"])
     out.to_parquet("aroma_train.parquet")
     counts = {d: int(out[d].sum()) for d in VOCAB}
     print(f"aroma_train.parquet: {len(out)} molecules with >=1 descriptor "
-          f"(of {len(df)} with odor text), {len(VOCAB)} descriptors")
+          f"({n_odor} from HSDB odor text of {len(df)}; +{n_lbl} curated flavor labels "
+          f"across +{n_new} molecules), {len(VOCAB)} descriptors")
     print("descriptor positives (sorted):")
     for d, n in sorted(counts.items(), key=lambda x: -x[1]):
         print(f"  {n:5d}  {d}")

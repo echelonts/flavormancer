@@ -473,7 +473,7 @@
 <script src="/static/3Dmol-min.js"></script>
 <script>
 const TASTE_COLORS = {sweet:'var(--sweet)',bitter:'var(--bitter)',umami:'var(--umami)',
-  sour:'var(--sour)',salty:'var(--salty)'};
+  sour:'var(--sour)',salty:'var(--salty)',tasteless:'#B8C0C6'};
 const MODEL_TASTES = ['sweet','bitter','umami'];
 // a distinct color per aroma descriptor, so each note reads at a glance
 const AROMA_COLORS = {fruity:'#E8913C',citrus:'#EFC01F',floral:'#E86AA6',minty:'#2FB37E',
@@ -568,7 +568,11 @@ function render(p, neighbors, svg, names){
       const rule = p.salty===true ? 'rule ✓ alkali salt' : 'rule: not a simple salt';
       m += meter('salty', p.salty_predicted, known.has('salty'), (p.taste_meta&&p.taste_meta.salty||{}).auroc, rule);
     }
-    if(m) m += '<div class="meters-note">Each is an independent confidence that the molecule carries that taste — they don\'t sum to 100%. A molecule can be both (sweet <i>and</i> bitter) or weakly any. Sour and salty pair a trained head with a chemistry rule as a cross-check.</div>';
+    // tasteless: a documented tasted-vs-tasteless head — high = likely little/no basic taste
+    if(typeof p.tasteless === 'number'){
+      m += meter('tasteless', p.tasteless, known.has('tasteless'), (p.taste_meta&&p.taste_meta.tasteless||{}).auroc, 'high = likely little taste');
+    }
+    if(m) m += '<div class="meters-note">Each is an independent confidence that the molecule carries that taste — they don\'t sum to 100%. A molecule can be both (sweet <i>and</i> bitter) or weakly any. Sour and salty pair a trained head with a chemistry rule as a cross-check; tasteless is its own head (tasted vs. not).</div>';
     $('meters').innerHTML = m || '<div class="empty">No taste heads trained yet.</div>';
   } else {
     $('meters').innerHTML = '<div class="empty">Trained taste prediction not applicable to this molecule.</div>';
@@ -831,7 +835,7 @@ async function showCategory(btn){
 initBrowse();
 
 // --- flavor-space map: 2D (zoom/pan) + rotatable 3D point cloud, colored by taste ---
-const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD24E',salty:'#63A6E0',other:'#8A96A0'};
+const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD24E',salty:'#63A6E0',tasteless:'#B8C0C6',other:'#8A96A0'};
 let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste';
 let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6,z:1}, _drag=null, _dragged=false;
 function mapColor(p){ return _mapColorBy==='aroma' ? (p.aroma && p.aroma!=='other' ? aromaColor(p.aroma) : '#5A6068') : (MAP_COLORS[p.label]||MAP_COLORS.other); }
