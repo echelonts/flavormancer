@@ -160,6 +160,9 @@
   .kv .k{font-weight:600;font-size:13px}
   .kv .v{font-family:var(--mono);font-size:13px;color:var(--muted)}
   .bsub{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px}
+  .fnote{font-size:13px;color:var(--ink);line-height:1.5}
+  .chiral-note{font-size:12px;color:var(--cream);background:rgba(217,171,116,.09);border:1px solid rgba(217,171,116,.32);border-radius:8px;padding:9px 12px;margin-top:13px;line-height:1.5}
+  .chiral-note b{color:var(--cream)}
   .structure{text-align:center;margin:0 0 14px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px}
   .structure svg{max-width:100%;height:auto}
   .structure:empty{display:none}
@@ -501,11 +504,18 @@ function renderBehavior(p){
     const atP=(typeof meas.boiling_point_pressure_mmhg==='number')?` (at ${meas.boiling_point_pressure_mmhg} mmHg)`:'';
     rows.push(['Boiling point', meas.boiling_point_c+' °C'+atP+MEAS]);
   }
+  if(typeof meas.melting_point_c==='number') rows.push(['Melting point', meas.melting_point_c+' °C'+MEAS]);
+  const form=pc.formulation||{};
+  if(form.phase_at_rt) rows.push(['Phase at ~25 °C', form.phase_at_rt]);
   if(qual.aroma_volatility) rows.push(['Volatility', qual.aroma_volatility]);
   if(typeof meas.vapor_pressure_pa==='number') rows.push(['Vapor pressure', meas.vapor_pressure_pa+' Pa'+MEAS]);
   const ions=(qual.ionizable_groups||[]).map(g=>`${g.group} (pKa≈${g.typical_pKa})`).join(', ');
   if(ions) rows.push(['Ionizable groups', ions]);
   let html = kv(rows);
+
+  if(form.carrier) html += '<div class="bsub">Formulation</div><div class="fnote">'+form.carrier+'</div>';
+  const chir=p.chirality||{};
+  if(chir.is_chiral) html += `<div class="chiral-note">⚗ <b>Chiral molecule</b> — ${chir.n_centers} stereocenter${chir.n_centers>1?'s':''}. ${chir.note}</div>`;
 
   const cc=ch.classes||[];
   if(cc.length) html += '<div class="bsub">Chemesthesis (trigeminal)</div>'+chips(cc,'style="background:var(--aroma);color:#fff;border-color:transparent"');
