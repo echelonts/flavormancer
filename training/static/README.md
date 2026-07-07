@@ -15,3 +15,5 @@ self-contained (no CDN dependency, works on an air-gapped/LAN box).
 - **`social.png`** — 1280×640 Open-Graph / social-preview banner (logo + gradient wordmark).
   Referenced by the demo's OG meta tags; also upload it as the GitHub repo's Social preview
   (Settings → General → Social preview) so the repo link renders richly when shared.
+- **`headerfont.ttf`** — [Grenze Gotisch](https://fonts.google.com/specimen/Grenze+Gotisch)
+  (gothic wordmark). **License: SIL Open Font License 1.1** (commercial-OK). Served locally.

@@ -1,9 +1,14 @@
 # Flavormancer
 
-On-prem flavor prediction from chemical structure — **taste, physicochemical
-behavior, dosing, and safety flags** for any molecule, plus substitution search.
+On-prem flavor prediction from chemical structure — **taste _and_ aroma, physicochemical
+behavior, formulation notes, and safety flags** for any molecule, plus substitution search.
 Enter a **common or IUPAC name** (or a SMILES) and get a single, honest flavor read,
 running entirely on hardware you own.
+
+> **~8,000 molecules** across the open datasets · **taste + aroma** prediction from
+> structure · a **flavor designer** (pick your notes → best food-safe molecules + drop-in
+> swaps) · an interactive 2D/3D **flavor-space map** · **2D & 3D** structure views. All on
+> commercial-clean public data.
 
 > **This is the commercial edition** — Apache-2.0 and **commercial-clean**: every
 > model trains only on permissively-licensed open data, so it's free to use, sell,
