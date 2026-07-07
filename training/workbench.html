@@ -239,6 +239,13 @@
   .design-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}
   .design-pager .pg{font:inherit;font-size:12px;padding:4px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer}
   .design-pager .pg:disabled{opacity:.4;cursor:default}.design-pager .pg:not(:disabled):hover{border-color:var(--brand-2)}
+  /* --- flavor library --- */
+  .lib-cats{display:flex;flex-direction:column;gap:9px;margin:12px 0 2px}
+  .lib-cat{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+  .lib-cat > .lc-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);width:74px;flex:none;text-align:right;padding-right:4px}
+  .fchip{font:inherit;font-size:12px;padding:3px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);cursor:pointer;text-transform:capitalize}
+  .fchip:hover{border-color:var(--brand-2);color:var(--brand-2)}
+  .fchip.on{background:var(--brand-grad);color:#08121A;border-color:transparent;font-weight:650}
   .sg-info{min-width:0}
   .sg-name{font-weight:600;font-size:13px}
   .sg-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all}
@@ -262,6 +269,15 @@
   <div class="hint">Type a <b>common or IUPAC name</b> (e.g. <code>vanillin</code>) or a
     <b>SMILES</b> string (e.g. <code>O=Cc1ccc(O)c(OC)c1</code>). SMILES omit implicit
     hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
+
+  <div class="design-section">
+    <div class="design-head" id="libToggle"><span id="libCaret">▾</span> Flavor library
+      <span class="mapsub">— start from a flavor you know (banana, saffron, smoke, pawpaw…) → the molecule that makes it, food-safe status + drop-in swaps</span></div>
+    <div id="libWrap">
+      <div id="libCats" class="lib-cats"></div>
+      <div id="libResults" class="design-grid"></div>
+    </div>
+  </div>
 
   <div class="design-section">
     <div class="design-head" id="designToggle"><span id="designCaret">▾</span> Flavor designer
@@ -824,6 +840,36 @@ function attachMapEvents(cv){
 }
 let _mapLastHover=null;
 loadMap();  // map is open by default
+
+// --- flavor library: pick a known flavor -> its character-impact molecule(s) ---
+$('libToggle').addEventListener('click', ()=>{ const w=$('libWrap'); const o=w.style.display==='none'; w.style.display=o?'block':'none'; $('libCaret').textContent=o?'▾':'▸'; });
+async function initLibrary(){
+  try{
+    const d = await getJSON('/api/flavors'); const cats = d.categories||[];
+    if(!cats.length){ setTimeout(initLibrary, 4000); return; }
+    $('libCats').innerHTML = cats.map(c=>`<div class="lib-cat"><span class="lc-label">${c.category}</span>`+
+      c.flavors.map(f=>`<button type="button" class="fchip" data-f="${f.replace(/"/g,'&quot;')}">${f}</button>`).join('')+`</div>`).join('');
+    $('libCats').querySelectorAll('.fchip').forEach(b=> b.addEventListener('click', ()=>{
+      $('libCats').querySelectorAll('.fchip.on').forEach(x=>x.classList.remove('on')); b.classList.add('on'); showFlavor(b.dataset.f);
+    }));
+  }catch(_){ setTimeout(initLibrary, 4000); }
+}
+initLibrary();
+async function showFlavor(name){
+  const res=$('libResults'); res.innerHTML='<div class="empty">Looking up the chemistry…</div>';
+  const d=await getJSON('/api/flavor?name='+encodeURIComponent(name)); const mols=d.molecules||[];
+  if(!mols.length){ res.innerHTML='<div class="empty">No character molecule on file for that one.</div>'; return; }
+  const lead=`<div class="empty" style="grid-column:1/-1"><b style="text-transform:capitalize;color:var(--ink)">${name}</b> — character-impact ${mols.length>1?'molecules':'molecule'}${d.category?' · '+d.category:''}. Click a name to run the full read.</div>`;
+  res.innerHTML=lead+mols.map(m=>{
+    const badge=m.gras?'<span class="dbadge">GRAS</span>':'';
+    const tags=(m.tags&&m.tags.length)?`<div class="dmatch">${m.tags.map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('')}</div>`:'';
+    const subs=(m.subs&&m.subs.length)?`<div class="dsubs">food-safe drop-ins: ${m.subs.map(s=>`<a data-smi="${s.smiles.replace(/"/g,'&quot;')}">${s.name||s.smiles.slice(0,14)}</a>`).join(', ')}</div>`:'';
+    return `<div class="dcell"><div class="dstruct">${m.svg||''}</div>
+      <div class="dname" data-smi="${m.smiles.replace(/"/g,'&quot;')}">${m.name||m.molecule}${badge}</div>
+      ${tags}${subs}</div>`;
+  }).join('');
+  res.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
+}
 
 // --- flavor designer: pick notes -> best food-safe molecules + drop-in swaps ---
 const _designSel = new Set();

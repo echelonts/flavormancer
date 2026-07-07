@@ -1,0 +1,102 @@
+flavor,molecule,smiles,category
+banana,isoamyl acetate,CC(=O)OCCC(C)C,fruit
+apple,ethyl 2-methylbutyrate,CCOC(=O)C(C)CC,fruit
+green apple,hexyl acetate,CCCCCCOC(C)=O,fruit
+pineapple,ethyl hexanoate,CCCCCC(=O)OCC,fruit
+pineapple,allyl hexanoate,C=CCOC(=O)CCCCC,fruit
+grape,methyl anthranilate,COC(=O)c1ccccc1N,fruit
+cherry,benzaldehyde,O=Cc1ccccc1,fruit
+peach,gamma-decalactone,CCCCCCC1CCC(=O)O1,fruit
+apricot,gamma-undecalactone,CCCCCCCC1CCC(=O)O1,fruit
+coconut,gamma-nonalactone,CCCCCC1CCC(=O)O1,fruit
+strawberry,furaneol,CC1=C(O)C(=O)C(C)O1,fruit
+strawberry,ethyl butyrate,CCCC(=O)OCC,fruit
+raspberry,raspberry ketone,CC(=O)CCc1ccc(O)cc1,fruit
+watermelon,"(E,Z)-2,6-nonadienal",CC/C=C\CC/C=C/C=O,fruit
+melon,"(E,Z)-2,6-nonadienal",CC/C=C\CC/C=C/C=O,fruit
+cucumber,"(E,Z)-2,6-nonadienal",CC/C=C\CC/C=C/C=O,vegetal
+lemon,citral,CC(C)=CCCC(C)=CC=O,citrus
+orange,limonene,C=C(C)C1CC=C(C)CC1,citrus
+lime,citral,CC(C)=CCCC(C)=CC=O,citrus
+grapefruit,nootkatone,C=C1CC(C)CCC12CCC(=O)C=C2C,citrus
+mango,3-carene,CC1=CCC2CC1C2(C)C,fruit
+pear,"ethyl (E,Z)-2,4-decadienoate",CCC/C=C\C=C\C(=O)OCC,fruit
+plum,gamma-decalactone,CCCCCCC1CCC(=O)O1,fruit
+passionfruit,3-(methylthio)hexyl acetate,CCCC(CCSC)OC(C)=O,fruit
+kiwi,ethyl butyrate,CCCC(=O)OCC,fruit
+guava,ethyl butyrate,CCCC(=O)OCC,fruit
+pawpaw,methyl octanoate,CCCCCCCC(=O)OC,fruit
+pawpaw,methyl hexanoate,CCCCCC(=O)OC,fruit
+durian,diethyl disulfide,CCSSCC,fruit
+lychee,geraniol,CC(C)=CCC/C(C)=C/CO,fruit
+blackcurrant,4-methoxy-2-methylbutane-2-thiol,CCC(C)(S)OC,fruit
+quince,ethyl butyrate,CCCC(=O)OCC,fruit
+tomato,(Z)-3-hexenal,CC/C=C\CC=O,vegetal
+vanilla,vanillin,COc1cc(C=O)ccc1O,sweet
+caramel,maltol,Cc1occc(=O)c1O,sweet
+burnt sugar,furaneol,CC1=C(O)C(=O)C(C)O1,sweet
+cotton candy,ethyl maltol,CCc1occc(=O)c1O,sweet
+butter,diacetyl,CC(=O)C(C)=O,dairy
+cream,delta-decalactone,CCCCCC1CCCC(=O)O1,dairy
+cheese,butyric acid,CCCC(=O)O,dairy
+chocolate,isovaleraldehyde,CC(C)CC=O,sweet
+cocoa,tetramethylpyrazine,Cc1nc(C)c(C)nc1C,sweet
+coffee,furfuryl mercaptan,SCc1ccco1,roast
+honey,phenylacetaldehyde,O=CCc1ccccc1,sweet
+maple,sotolon,CC1=C(O)C(=O)OC1C,sweet
+almond,benzaldehyde,O=Cc1ccccc1,nut
+hazelnut,filbertone,CCC(C)/C=C/C(C)=O,nut
+malt,3-methylbutanal,CC(C)CC=O,roast
+bread,2-acetylpyridine,CC(=O)c1ccccn1,roast
+popcorn,2-acetylpyridine,CC(=O)c1ccccn1,roast
+toasted,2-acetylpyrazine,CC(=O)c1cnccn1,roast
+cinnamon,cinnamaldehyde,O=C/C=C/c1ccccc1,spice
+clove,eugenol,C=CCc1ccc(O)c(OC)c1,spice
+peppermint,menthol,CC1CCC(C(C)C)C(O)C1,herb
+spearmint,carvone,C=C(C)C1CC=C(C)C(=O)C1,herb
+anise,anethole,C/C=C/c1ccc(OC)cc1,spice
+licorice,anethole,C/C=C/c1ccc(OC)cc1,spice
+fennel,anethole,C/C=C/c1ccc(OC)cc1,spice
+ginger,zingerone,COc1cc(CCC(C)=O)ccc1O,spice
+thyme,thymol,Cc1ccc(C(C)C)cc1O,herb
+oregano,carvacrol,Cc1ccc(C(C)C)c(O)c1,herb
+caraway,carvone,C=C(C)C1CC=C(C)C(=O)C1,spice
+dill,carvone,C=C(C)C1CC=C(C)C(=O)C1,herb
+cumin,cuminaldehyde,CC(C)c1ccc(C=O)cc1,spice
+nutmeg,myristicin,C=CCc1cc2c(c(OC)c1OC)OCO2,spice
+wintergreen,methyl salicylate,COC(=O)c1ccccc1O,other
+black pepper,piperine,O=C(/C=C/C=C/c1ccc2c(c1)OCO2)N1CCCCC1,spice
+garlic,diallyl disulfide,C=CCSSCC=C,allium
+onion,dipropyl disulfide,CCCSSCCC,allium
+mustard,allyl isothiocyanate,C=CCN=C=S,spice
+horseradish,allyl isothiocyanate,C=CCN=C=S,spice
+saffron,safranal,CC1=CC=CC(C)(C)C1C=O,spice
+eucalyptus,"1,8-cineole",CC12CCC(CC1)C(C)(C)O2,herb
+camphor,camphor,CC12CCC(CC1=O)C2(C)C,other
+pine,alpha-pinene,CC1=CCC2CC1C2(C)C,other
+rose,geraniol,CC(C)=CCC/C(C)=C/CO,floral
+rose,phenylethyl alcohol,OCCc1ccccc1,floral
+jasmine,benzyl acetate,CC(=O)OCc1ccccc1,floral
+jasmine,cis-jasmone,CC/C=C\CC1=C(C)CCC1=O,floral
+lavender,linalool,C=CC(C)(O)CCC=C(C)C,floral
+violet,beta-ionone,CC(=O)/C=C/C1C(C)=CCCC1(C)C,floral
+lilac,terpineol,CC1=CCC(C(C)(C)O)CC1,floral
+orange blossom,linalool,C=CC(C)(O)CCC=C(C)C,floral
+elderflower,rose oxide,CC(C)=CC1CCC(C)CO1,floral
+magnolia,linalool,C=CC(C)(O)CCC=C(C)C,floral
+bacon,guaiacol,COc1ccccc1O,savory
+smoke,guaiacol,COc1ccccc1O,savory
+smoke,syringol,COc1cccc(OC)c1O,savory
+beef,2-methyl-3-furanthiol,Cc1occc1S,savory
+meaty,2-methyl-3-furanthiol,Cc1occc1S,savory
+mushroom,1-octen-3-ol,C=CC(O)CCCCC,vegetal
+earthy,geosmin,CC1CCCC2(C)C(O)CCCC12,vegetal
+bell pepper,2-isobutyl-3-methoxypyrazine,COc1nccnc1CC(C)C,vegetal
+potato,methional,CSCCC=O,vegetal
+celery,3-butylphthalide,CCCCC1OC(=O)c2ccccc21,vegetal
+fishy,trimethylamine,CN(C)C,other
+root beer,methyl salicylate,COC(=O)c1ccccc1O,other
+cola,ethyl acetate,CCOC(C)=O,other
+rum,ethyl formate,CCOC=O,other
+green,cis-3-hexen-1-ol,CC/C=C\CCO,vegetal
+grassy,cis-3-hexen-1-ol,CC/C=C\CCO,vegetal

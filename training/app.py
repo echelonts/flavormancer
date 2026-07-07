@@ -520,6 +520,105 @@ def api_design(descriptors: str = "", gras: int = 0, offset: int = 0, limit: int
             "offset": offset, "limit": limit}
 
 
+# --- Flavor library: curated flavor -> character-impact molecule(s) ------------
+# A small, hand-curated map from a familiar flavor (banana, saffron, smoke, pawpaw…) to the
+# molecule(s) most responsible for it — "character-impact compounds" — drawn from public,
+# common flavor-chemistry knowledge (no proprietary GC-MS profiles). It's the front door to the
+# designer: pick a flavor you know, see the molecule that makes it, whether it's food-safe, and
+# food-safe drop-ins. flavors.csv is a committed curated input (not a crawl artifact).
+_FLAVORS = {}         # flavor -> [{molecule, smiles, category}]
+_FLAVOR_CATS = []     # [{category, flavors:[...]}] for the picker UI
+
+
+def _load_flavors(path="flavors.csv"):
+    try:
+        import csv
+        from collections import OrderedDict
+        p = Path(path)
+        if not p.exists():
+            return
+        by_flavor, by_cat = OrderedDict(), OrderedDict()
+        with p.open() as f:
+            for row in csv.DictReader(f):
+                fl, cat = row["flavor"], row.get("category", "other")
+                by_flavor.setdefault(fl, []).append(
+                    {"molecule": row["molecule"], "smiles": row["smiles"], "category": cat})
+                by_cat.setdefault(cat, [])
+                if fl not in by_cat[cat]:
+                    by_cat[cat].append(fl)
+        _FLAVORS.clear()
+        _FLAVORS.update(by_flavor)
+        _FLAVOR_CATS[:] = [{"category": c, "flavors": fs} for c, fs in by_cat.items()]
+    except Exception:  # noqa: BLE001 — no csv; library just stays empty
+        pass
+
+
+_load_flavors()
+
+
+def _flavor_card(smi, molname):
+    """One character molecule as a display card: structure, name, GRAS status, its documented/
+    predicted taste+aroma tags, and food-safe drop-in substitutes (same logic as the designer)."""
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        return None
+    skel = Chem.MolToInchiKey(mol).split("-")[0]
+    tags = sorted(_design_tags(smi))
+    subs = []
+    for s in P.substitute(smi, k=8).get("neighbors", []):
+        sm = Chem.MolFromSmiles(s["smiles"])
+        if sm is not None and Chem.MolToInchiKey(sm).split("-")[0] in P._GRAS:
+            subs.append({"smiles": s["smiles"], "name": _table_name(s["smiles"]) or "",
+                         "similarity": s["similarity"]})
+        if len(subs) >= 3:
+            break
+    return {"smiles": smi, "molecule": molname, "name": _table_name(smi) or molname,
+            "gras": skel in P._GRAS, "tags": tags[:6], "svg": _svg(smi, 108, 78), "subs": subs}
+
+
+def _design_tags(smi):
+    """The tag set the designer index holds for this molecule (documented odor + model-confident
+    aroma + taste), computed on the fly for molecules that aren't in the odor corpus."""
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        return set()
+    skel = Chem.MolToInchiKey(mol).split("-")[0]
+    for m in _DESIGN:                                  # reuse the precomputed index when present
+        dm = Chem.MolFromSmiles(m["smiles"])
+        if dm is not None and Chem.MolToInchiKey(dm).split("-")[0] == skel:
+            return set(m["tags"])
+    tags = set()                                        # else predict directly
+    try:
+        X = _fpvec(mol).reshape(1, -1)
+        for name, clf in P._AROMA_MODELS.items():
+            if clf.predict_proba(X)[0, 1] >= 0.5:
+                tags.add(name)
+        for t in ("sweet", "bitter", "umami"):
+            clf = P._CLASSIFIERS.get(t)
+            if clf is not None and clf.predict_proba(X)[0, 1] >= 0.5:
+                tags.add(t)
+    except Exception:  # noqa: BLE001
+        pass
+    return tags
+
+
+@app.get("/api/flavors")
+def api_flavors():
+    """The curated flavor picker: flavors grouped by category (fruit, spice, floral, savory…)."""
+    return {"categories": _FLAVOR_CATS, "count": len(_FLAVORS)}
+
+
+@app.get("/api/flavor")
+def api_flavor(name: str = ""):
+    """One flavor -> its character-impact molecule(s), each with GRAS status, taste/aroma tags,
+    and food-safe drop-in substitutes. The bridge from 'I want banana' to the actual chemistry."""
+    entries = _FLAVORS.get(name.strip().lower()) or _FLAVORS.get(name.strip())
+    if not entries:
+        return {"flavor": name, "molecules": []}
+    cards = [c for c in (_flavor_card(e["smiles"], e["molecule"]) for e in entries) if c]
+    return {"flavor": name, "category": entries[0]["category"], "molecules": cards}
+
+
 # --- Aroma: REAL documented odor only (public-domain HSDB/CAMEO) ---------------
 # Hand-set illustrative descriptor "scores" were removed on purpose: made-up numbers
 # have no place in the read. The aroma card now shows only real, cited documented odor
