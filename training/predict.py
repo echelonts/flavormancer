@@ -823,10 +823,12 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
     # trustworthy each trained taste head is, the same way the aroma descriptors carry theirs
     out["taste_meta"] = {t: {"auroc": _TASTE_META[t]["auroc"]}
                          for t in _CLASSIFIERS if t in _TASTE_META and "auroc" in _TASTE_META[t]}
-    # Sour trains as a small-data INDICATIVE head, but its boolean stays the rule's
-    # call below — keep the model probability separately as sour_predicted.
+    # Sour AND salty train as INDICATIVE heads, but their boolean stays the RULE's call
+    # below — keep the model probabilities separately as sour_predicted / salty_predicted.
     if "sour" in out:
         out["sour_predicted"] = out.pop("sour")
+    if "salty" in out:
+        out["salty_predicted"] = out.pop("salty")
     if _INTENSITY is not None:
         out["sweet_intensity"] = round(float(_INTENSITY.predict(x)[0]), 2)
     out.update(_sour(mol))
