@@ -222,7 +222,7 @@ if __name__ == "__main__":
         sys.exit(1)
     keys = load_keys(src)
     cols = ["inchikey", "common_name", "iupac_name", "boiling_point_c",
-            "boiling_point_pressure_mmhg", "vapor_pressure_pa", "melting_point_c"]
+            "boiling_point_pressure_mmhg", "vapor_pressure_pa", "melting_point_c", "fetched"]
 
     def checkpoint(rows):
         """Merge new rows into the output table and persist — called every CHUNK so a
@@ -233,23 +233,36 @@ if __name__ == "__main__":
             new = pd.concat([old, new], ignore_index=True).drop_duplicates("inchikey", keep="last")
         return new.reindex(columns=cols)  # stable schema as older tables gain name columns
 
-    # resume: skip molecules already FULLY fetched (have both a name and a melting point tried).
-    # Keyed on melting_point_c so adding that column re-crawls rows fetched before it existed.
+    # resume: skip molecules already ATTEMPTED. Keyed on the `fetched` flag — set for EVERY
+    # molecule we've queried, whether or not it yielded a value — so the crawl CONVERGES.
+    # (Keying on melting_point_c was wrong: MP is genuinely sparse in PubChem — most molecules
+    # simply have none — so every restart re-crawled the ~90% that were already tried but MP-less,
+    # and the pass never finished.) Migration fallback: an older table with no `fetched` column
+    # treats a present common_name as "attempted" (a name means we reached PubChem for it), so
+    # upgrading doesn't force a full re-crawl of the already-named majority.
     done = set()
     if Path(a.out).exists():
         ex = pd.read_parquet(a.out)
-        if "common_name" in ex.columns and "melting_point_c" in ex.columns:
-            done = set(ex.loc[ex["common_name"].notna() & ex["melting_point_c"].notna(), "inchikey"])
+        # Attempted := fetched flag set OR (fallback) a name is present. The OR handles a MIXED
+        # table — old rows written before the flag existed carry fetched=NaN but a real name, and
+        # must count as done or they'd re-crawl forever alongside the newly-flagged rows.
+        attempted = pd.Series(False, index=ex.index)
+        if "fetched" in ex.columns:
+            attempted |= (ex["fetched"] == True)  # noqa: E712 — pandas mask
+        if "common_name" in ex.columns:
+            attempted |= ex["common_name"].notna()
+        done = set(ex.loc[attempted, "inchikey"])
     todo = [k for k in keys if k not in done]
-    print(f"{len(keys)} molecules in {src}; {len(done)} already complete, {len(todo)} to fetch")
+    print(f"{len(keys)} molecules in {src}; {len(done)} already attempted, {len(todo)} to fetch")
 
     CHUNK, rows = 100, []
     for i, ik in enumerate(todo):
         bp, bp_press, vp, mp, common, iupac = fetch_props(ik)
-        if bp is not None or vp is not None or mp is not None or common or iupac:
-            rows.append({"inchikey": ik, "common_name": common, "iupac_name": iupac,
-                         "boiling_point_c": bp, "boiling_point_pressure_mmhg": bp_press,
-                         "vapor_pressure_pa": vp, "melting_point_c": mp})
+        # Record the attempt for EVERY molecule (fetched=True), even an all-empty one, so it's
+        # never re-crawled — that's what makes the resume converge instead of thrashing MP-less rows.
+        rows.append({"inchikey": ik, "common_name": common, "iupac_name": iupac,
+                     "boiling_point_c": bp, "boiling_point_pressure_mmhg": bp_press,
+                     "vapor_pressure_pa": vp, "melting_point_c": mp, "fetched": True})
         if (i + 1) % CHUNK == 0 or (i + 1) == len(todo):
             merged = checkpoint(rows)
             merged.to_parquet(a.out)
