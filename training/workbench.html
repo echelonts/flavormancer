@@ -5,15 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flavormancer — taste &amp; aroma from chemical structure</title>
 <meta name="description" content="Flavormancer predicts taste &amp; aroma from a molecule's chemical structure — on-prem flavor prediction for food, beverage, and fragrance R&amp;D.">
+<meta name="author" content="Flavormancer">
+<meta name="application-name" content="Flavormancer">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Flavormancer">
+<meta property="og:url" content="https://flavormancer.echelonts.net/">
+<meta property="og:locale" content="en_US">
 <meta property="og:title" content="Flavormancer — taste &amp; aroma from chemical structure">
 <meta property="og:description" content="Predict taste &amp; aroma from chemical structure. On-prem, before you pour.">
 <meta property="og:image" content="https://flavormancer.echelonts.net/static/social.png">
+<meta property="og:image:secure_url" content="https://flavormancer.echelonts.net/static/social.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Flavormancer — taste and aroma prediction from chemical structure">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Flavormancer — taste &amp; aroma from chemical structure">
 <meta name="twitter:description" content="Predict taste &amp; aroma from chemical structure. On-prem, before you pour.">
 <meta name="twitter:image" content="https://flavormancer.echelonts.net/static/social.png">
+<meta name="twitter:image:alt" content="Flavormancer — taste and aroma prediction from chemical structure">
 <meta name="theme-color" content="#2BC4C4">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon.png">
@@ -37,8 +47,8 @@
   header{padding:34px 28px 26px;border-bottom:1px solid var(--line);display:flex;
     flex-direction:column;align-items:center;gap:6px;text-align:center;
     background:radial-gradient(130% 150% at 50% -30%, #1D2A38 0%, var(--surface) 62%)}
-  header .logo{width:172px;height:172px;margin-bottom:16px;
-    filter:drop-shadow(0 6px 30px rgba(120,150,230,.32))}
+  header .logo{width:min(344px,72vw);height:auto;margin-bottom:18px;
+    filter:drop-shadow(0 8px 38px rgba(120,150,230,.34))}
   header .brand{display:flex;flex-direction:column;align-items:center;gap:8px}
   header h1{margin:0;font-family:'Grenze Gotisch',"Unifrakturmaguntia",Georgia,fantasy;
     font-size:54px;font-weight:700;letter-spacing:.015em;line-height:1;
@@ -250,6 +260,25 @@
   .sg-name{font-weight:600;font-size:13px}
   .sg-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all}
   .sg-smi{font-family:var(--mono);font-size:11px;color:var(--accent);word-break:break-all}
+  /* --- sources footer --- */
+  footer.sources{border-top:1px solid var(--line);margin-top:40px;padding:30px 28px 46px;
+    background:radial-gradient(120% 140% at 50% 130%, #1C2836 0%, var(--surface) 60%)}
+  .src-inner{max-width:980px;margin:0 auto;display:grid;grid-template-columns:1.15fr 1fr;gap:34px}
+  @media(max-width:720px){.src-inner{grid-template-columns:1fr;gap:20px}}
+  footer.sources h4{margin:0 0 10px;font-family:'Cinzel Decorative',Georgia,serif;font-size:12px;
+    text-transform:uppercase;letter-spacing:.12em;color:var(--cream)}
+  footer.sources ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+  footer.sources li{font-size:11.5px;line-height:1.5;color:var(--muted)}
+  footer.sources li b{color:var(--ink);font-weight:600}
+  footer.sources .pd,.src-col .ac,.src-col .lic{font-size:9px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.04em;padding:1px 6px;border-radius:9px;margin-left:3px;white-space:nowrap}
+  footer.sources .pd{background:rgba(43,196,196,.14);color:var(--brand-2)}
+  footer.sources .ac{background:rgba(217,171,116,.16);color:var(--cream)}
+  footer.sources .lic{background:rgba(255,255,255,.06);color:var(--muted)}
+  .src-note{font-size:11px;color:var(--muted);line-height:1.55;margin:14px 0 0;
+    border-top:1px solid var(--line);padding-top:12px}
+  .src-foot{max-width:980px;margin:26px auto 0;text-align:center;font-size:10.5px;
+    letter-spacing:.06em;color:var(--muted);opacity:.8}
 </style>
 </head>
 <body>
@@ -338,7 +367,8 @@
       <div class="map-key">Each dot is a molecule; <b>nearby dots are structurally similar</b>
         (UMAP over Morgan fingerprints, Jaccard/Tanimoto). Color = <b>dominant taste</b>; tight
         groups are structural families. Axes have no units — only <i>relative</i> position matters.
-        <b>2D:</b> scroll to zoom, drag to pan. <b>3D:</b> drag to rotate. Hover for the molecule,
+        <b>2D:</b> scroll to zoom (into the cursor), drag to pan. <b>3D:</b> drag to rotate,
+        scroll to zoom. Hover for the molecule,
         click to open its read.</div>
     </div>
   </div>
@@ -398,6 +428,47 @@
     demo — it trains on your data, on-prem. Results are leads for the bench, not verdicts.
   </p>
 </main>
+
+<footer class="sources">
+  <div class="src-inner">
+    <div class="src-col">
+      <h4>Data sources</h4>
+      <ul>
+        <li><b>PubChem</b> (NIH / NLM) — compound identity, common &amp; IUPAC names, measured
+          boiling / melting / vapor-pressure data, and documented <i>Odor</i> &amp; <i>Taste</i>
+          annotations. <span class="pd">public domain</span></li>
+        <li><b>HSDB</b> — Hazardous Substances Data Bank (served via PubChem) — odor descriptions
+          and odor-detection thresholds. <span class="pd">public domain</span></li>
+        <li><b>CAMEO Chemicals</b> (NOAA) &amp; <b>Haz-Map</b> — physical descriptions and
+          odor notes. <span class="pd">public domain</span></li>
+        <li><b>ChemTastesDB</b> — curated molecular taste labels (sweet / bitter / umami /
+          sour / tasteless). <span class="ac">academic, cited</span></li>
+        <li><b>FEMA GRAS</b> — food-safe (Generally Recognized As Safe) flavor-substance
+          reference. <span class="pd">public listing</span></li>
+        <li><b>Tox21</b> (NIH / EPA / NCATS / FDA) — in-vitro assay data for the caution-only
+          structural tox cross-check. <span class="pd">public domain</span></li>
+        <li>Curated <b>character-impact compounds</b> — well-documented public flavor-chemistry
+          facts (which molecule gives a flavor its signature note).</li>
+      </ul>
+    </div>
+    <div class="src-col">
+      <h4>Software &amp; type</h4>
+      <ul>
+        <li><b>RDKit</b> — cheminformatics (fingerprints, descriptors, 2D/3D depiction). <span class="lic">BSD-3</span></li>
+        <li><b>scikit-learn</b> — the taste &amp; aroma models. <span class="lic">BSD-3</span></li>
+        <li><b>UMAP</b> — the flavor-space embedding. <span class="lic">BSD-3</span></li>
+        <li><b>3Dmol.js</b> — interactive 3D structure viewer. <span class="lic">BSD-3</span></li>
+        <li><b>FastAPI</b> — this demo server. <span class="lic">MIT</span></li>
+        <li>Typefaces <b>Grenze Gotisch</b> &amp; <b>Cinzel Decorative</b>. <span class="lic">OFL</span></li>
+      </ul>
+      <p class="src-note">Every value in a result is tagged by how it was derived
+        (<i>computed / trained / rule / estimate / lookup / qualitative</i>). Predictions are
+        leads for the bench, never a safety, regulatory, or clearance determination.</p>
+    </div>
+  </div>
+  <div class="src-foot">Flavormancer · on-prem taste &amp; aroma prediction from chemical
+    structure · built on commercial-clean public data</div>
+</footer>
 
 <script src="/static/3Dmol-min.js"></script>
 <script>
@@ -762,7 +833,7 @@ initBrowse();
 // --- flavor-space map: 2D (zoom/pan) + rotatable 3D point cloud, colored by taste ---
 const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD24E',salty:'#63A6E0',other:'#8A96A0'};
 let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste';
-let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6}, _drag=null, _dragged=false;
+let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6,z:1}, _drag=null, _dragged=false;
 function mapColor(p){ return _mapColorBy==='aroma' ? (p.aroma && p.aroma!=='other' ? aromaColor(p.aroma) : '#5A6068') : (MAP_COLORS[p.label]||MAP_COLORS.other); }
 function mapLabel(p){ return _mapColorBy==='aroma' ? (p.aroma||'other') : p.label; }
 
@@ -775,7 +846,7 @@ $('map2d').addEventListener('click', ()=>setMapMode('2d'));
 $('map3d').addEventListener('click', ()=>setMapMode('3d'));
 $('mapCT').addEventListener('click', ()=>setMapColor('taste'));
 $('mapCA').addEventListener('click', ()=>setMapColor('aroma'));
-$('mapReset').addEventListener('click', ()=>{ _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6}; drawMap(); });
+$('mapReset').addEventListener('click', ()=>{ _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1}; drawMap(); });
 function setMapMode(m){ _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap(); }
 function setMapColor(c){ _mapColorBy=c; $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma'); mapLegendRender(); drawMap(); }
 function mapLegendRender(){
@@ -804,7 +875,7 @@ function draw2D(){
 function draw3D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
   ctx.clearRect(0,0,W,H);
-  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.66, cY=Math.cos(_v3.ry),sY=Math.sin(_v3.ry),cX=Math.cos(_v3.rx),sX=Math.sin(_v3.rx);
+  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.66*(_v3.z||1), cY=Math.cos(_v3.ry),sY=Math.sin(_v3.ry),cX=Math.cos(_v3.rx),sX=Math.sin(_v3.rx);
   const proj=p=>{ const X=(p.x3||0)-.5,Y=(p.y3||0)-.5,Z=(p.z3||0)-.5;
     const x1=X*cY-Z*sY, z1=X*sY+Z*cY, y1=Y*cX-z1*sX, z2=Y*sX+z1*cX;
     return {sx:cx+x1*R, sy:cy-y1*R, d:z2}; };
@@ -835,7 +906,21 @@ function attachMapEvents(cv){
     else tip.style.display='none';
   });
   cv.addEventListener('mouseleave', ()=>{ tip.style.display='none'; });
-  cv.addEventListener('wheel', ev=>{ if(_mapMode!=='2d')return; ev.preventDefault(); _v2.s*=(ev.deltaY<0?1.12:0.89); drawMap(); }, {passive:false});
+  cv.addEventListener('wheel', ev=>{
+    ev.preventDefault();
+    const k = ev.deltaY<0 ? 1.12 : 0.89;
+    if(_mapMode==='2d'){
+      // cursor-anchored zoom: keep the point under the pointer fixed while scaling
+      const r=cv.getBoundingClientRect(), sx=cv.width/r.width, sy=cv.height/r.height;
+      const mx=(ev.clientX-r.left)*sx, my=(ev.clientY-r.top)*sy;
+      _v2.ox = mx - (mx-_v2.ox)*k;
+      _v2.oy = my - (my-_v2.oy)*k;
+      _v2.s *= k;
+    } else {
+      _v3.z = Math.max(0.35, Math.min(6, (_v3.z||1)*k));  // 3D dolly
+    }
+    drawMap();
+  }, {passive:false});
   cv.addEventListener('click', ()=>{ if(_dragged){ _dragged=false; return; } const p=_mapLastHover; if(p){ q.value=p.smiles; window.scrollTo({top:0,behavior:'smooth'}); run(); } });
 }
 let _mapLastHover=null;
