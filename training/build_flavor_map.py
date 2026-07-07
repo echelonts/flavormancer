@@ -22,6 +22,9 @@ from rdkit import Chem
 from rdkit.Chem import DataStructs, rdFingerprintGenerator
 
 TASTES = ["sweet", "bitter", "umami", "sour", "salty", "tasteless"]
+# _BASIC is only the tastes that ChemTastesDB (taste_master) actually columns. tasteless is a
+# real taste head (it trains — see train_taste.BASIC) but taste_master carries no tasteless
+# column, so on the map it's OVERLAID from documented-tasteless data below, not read from a column.
 _BASIC = ["sweet", "bitter", "umami", "sour", "salty"]
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
