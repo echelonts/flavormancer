@@ -185,6 +185,20 @@
   .fnote{font-size:13px;color:var(--ink);line-height:1.5}
   .chiral-note{font-size:12px;color:var(--cream);background:rgba(217,171,116,.09);border:1px solid rgba(217,171,116,.32);border-radius:8px;padding:9px 12px;margin-top:13px;line-height:1.5}
   .chiral-note b{color:var(--cream)}
+  .stereo-btn{display:inline-block;margin-top:9px;font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border:1px solid rgba(217,171,116,.5);border-radius:7px;background:rgba(217,171,116,.12);color:var(--cream);cursor:pointer}
+  .stereo-btn:hover{background:rgba(217,171,116,.22)}
+  .stereo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px;margin-top:12px}
+  .stereo-cell{position:relative;border:1px solid var(--line);border-radius:9px;padding:9px;background:var(--panel);transition:border-color .12s}
+  .stereo-cell:hover{border-color:var(--cream)}
+  .stereo-struct{position:relative;height:78px;background:var(--struct-bg);border-radius:6px;text-align:center}.stereo-struct svg{height:78px;max-width:100%}
+  .stereo-struct.is3d{height:130px}
+  .stereo-open{margin-top:8px;width:100%;font:inherit;font-size:11px;font-weight:600;padding:4px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--brand-2);cursor:pointer}
+  .stereo-open:hover{border-color:var(--brand-2);background:rgba(43,196,196,.08)}
+  .stereo-label[data-smi],.stereo-name[data-smi]{cursor:pointer}
+  .stereo-label{font-family:var(--mono);font-weight:700;font-size:13px;margin-top:7px;color:var(--ink)}
+  .stereo-badge{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;border-radius:9px;background:var(--aroma);color:#08121A;margin-left:6px;vertical-align:middle}
+  .stereo-name{font-size:11px;color:var(--muted);line-height:1.35;margin-top:2px}
+  .stereo-doc{font-size:11px;color:var(--cream);margin-top:4px;line-height:1.4}
   .structure{text-align:center;margin:0 0 14px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px}
   .structure svg{max-width:100%;height:auto}
   .structure:empty{display:none}
@@ -701,7 +715,13 @@ function renderBehavior(p){
 
   if(form.carrier) html += '<div class="bsub">Formulation</div><div class="fnote">'+form.carrier+'</div>';
   const chir=p.chirality||{};
-  if(chir.is_chiral) html += `<div class="chiral-note">⚗ <b>Chiral molecule</b> — ${chir.n_centers} stereocenter${chir.n_centers>1?'s':''}. ${chir.note}</div>`;
+  if(chir.is_chiral){
+    html += `<div class="chiral-note">⚗ <b>Chiral molecule</b> — ${chir.n_centers} stereocenter${chir.n_centers>1?'s':''}.
+      Enantiomers can taste/smell different (R-carvone spearmint vs S caraway). The models read structure and are
+      <b>achiral</b>, so the read is the same for every mirror image — but the <i>documented</i> odor/taste can differ.
+      <button type="button" class="stereo-btn" id="stereoBtn" data-smi="${(p.smiles||'').replace(/"/g,'&quot;')}">⚗ Explore every stereoisomer →</button></div>
+      <div id="stereoGrid" class="stereo-grid"></div>`;
+  }
 
   const cc=ch.classes||[];
   if(cc.length) html += '<div class="bsub">Chemesthesis (trigeminal)</div>'+chips(cc,'style="background:var(--aroma);color:#fff;border-color:transparent"');
@@ -722,6 +742,30 @@ function renderBehavior(p){
   if((p.applicability||{}).in_domain!==false && tox.available && (tox.flags||[]).length) html += chips(tox.flags.map(f=>'⚠ tox-assay: '+f), WARN);
   html += '<div class="empty" style="font-size:12px">'+(sf.disclaimer||'Defensive screen — flags for review, never a clearance.')+'</div>';
   $('behavior').innerHTML = html;
+  const sb=$('stereoBtn'); if(sb) sb.addEventListener('click', ()=>exploreStereo(sb.dataset.smi));
+}
+
+// chirality explorer: enumerate EVERY stereoisomer (R/S + E/Z) as a card; click one to open its
+// own full read. The models are achiral, so the *documented* odor/taste is where isomers differ.
+async function exploreStereo(smiles){
+  const grid=$('stereoGrid'); if(!grid) return;
+  grid.innerHTML='<div class="empty">Enumerating stereoisomers…</div>';
+  const d=await post('/api/stereoisomers',{smiles}); const iso=d.isomers||[];
+  if(!iso.length){ grid.innerHTML='<div class="empty">No distinct stereoisomers to show.</div>'; return; }
+  grid.innerHTML=`<div class="empty" style="grid-column:1/-1">${d.n} stereoisomer${d.n>1?'s':''}${d.n_documented?` · <b>${d.n_documented}</b> with isomer-specific documented odor/taste`:' · none carry isomer-specific documented data'}. Open any one for its full read (taste, behaviour, substitutions).</div>`+
+    iso.map((it,i)=>{
+      const badge=(it.odor||it.taste)?'<span class="stereo-badge">documented</span>':'';
+      const doc=(it.odor?`<div class="stereo-doc">${it.odor}</div>`:'')+(it.taste?`<div class="stereo-doc">${it.taste}</div>`:'');
+      return `<div class="stereo-cell">
+        <div class="stereo-struct" id="ster${i}">${it.svg||''}</div>
+        ${_has3D?`<button type="button" class="mini-3d" data-i="${i}" data-m="2d">3D</button>`:''}
+        <div class="stereo-label" data-smi="${it.smiles.replace(/"/g,'&quot;')}">${it.label}${badge}</div>
+        <div class="stereo-name" data-smi="${it.smiles.replace(/"/g,'&quot;')}">${it.name||''}</div>${doc}
+        <button type="button" class="stereo-open" data-smi="${it.smiles.replace(/"/g,'&quot;')}">open full read →</button></div>`;
+    }).join('');
+  grid.querySelectorAll('.mini-3d').forEach(b=>{ const i=+b.dataset.i;
+    b.addEventListener('click', ev=>{ ev.stopPropagation(); cardToggle3D(b, $('ster'+i), iso[i].smiles, iso[i].svg||''); }); });
+  grid.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
 }
 
 function renderAroma(ar){
