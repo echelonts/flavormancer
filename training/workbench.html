@@ -3,27 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Flavormancer</title>
+<title>Flavormancer — taste &amp; aroma from chemical structure</title>
+<meta name="description" content="Flavormancer predicts taste &amp; aroma from a molecule's chemical structure — on-prem flavor prediction for food, beverage, and fragrance R&amp;D.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flavormancer">
+<meta property="og:title" content="Flavormancer — taste &amp; aroma from chemical structure">
+<meta property="og:description" content="Predict taste &amp; aroma from chemical structure. On-prem, before you pour.">
+<meta property="og:image" content="/static/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Flavormancer — taste &amp; aroma from chemical structure">
+<meta name="twitter:description" content="Predict taste &amp; aroma from chemical structure. On-prem, before you pour.">
+<meta name="twitter:image" content="/static/social.png">
 <style>
+  @font-face{font-family:'Cinzel Decorative';src:url('/static/wordmark.ttf') format('truetype');font-weight:700;font-display:swap}
   :root{
-    --surface:#F4F6F4; --panel:#FFFFFF; --line:#DCE3DE; --ink:#172019;
-    --muted:#5C6B63; --accent:#2A7C86; --accent-soft:#2A7C8614;
-    --brand-1:#3A2E7C; --brand-2:#1AA0A8; --brand-accent:#E0913C;
-    --brand-grad:linear-gradient(100deg,#3A2E7C 0%,#2A5E9E 45%,#1AA0A8 100%);
-    --sweet:#E0972E; --bitter:#6B4E9E; --umami:#C0563B; --sour:#9FB024; --salty:#4E84B0; --aroma:#2E7D6B;
+    --surface:#0F1319; --panel:#181D24; --line:#2A323C; --ink:#E7EDEA;
+    --muted:#94A2A9; --accent:#2BC4C4; --accent-soft:#2BC4C42A;
+    --brand-1:#8A6BE0; --brand-2:#2BC4C4; --brand-accent:#E0913C; --cream:#D9AB74;
+    --brand-grad:linear-gradient(100deg,#8A6BE0 0%,#4E84C8 45%,#2BC4C4 100%);
+    --sweet:#E8A94A; --bitter:#A88AE0; --umami:#E0805E; --sour:#BFD24E; --salty:#63A6E0; --aroma:#3FC4AA;
+    --struct-bg:#F5F7F5;  /* light 'paper' for molecule drawings (RDKit draws dark structures) */
     --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--ui);
     font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  header{padding:16px 28px;border-bottom:1px solid var(--line);display:flex;
-    align-items:center;gap:15px;background:linear-gradient(180deg,#FBFCFB,#F4F6F4)}
-  header .logo{width:54px;height:54px;flex:0 0 auto}
-  header .brand{display:flex;flex-direction:column;gap:1px;min-width:0}
-  header h1{margin:0;font-size:23px;font-weight:750;letter-spacing:-.01em;line-height:1.1;
-    background:var(--brand-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-  header .sub{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  header{padding:34px 28px 26px;border-bottom:1px solid var(--line);display:flex;
+    flex-direction:column;align-items:center;gap:6px;text-align:center;
+    background:radial-gradient(130% 150% at 50% -30%, #1D2A38 0%, var(--surface) 62%)}
+  header .logo{width:172px;height:172px;margin-bottom:16px;
+    filter:drop-shadow(0 6px 30px rgba(120,150,230,.32))}
+  header .brand{display:flex;flex-direction:column;align-items:center;gap:8px}
+  header h1{margin:0;font-family:'Cinzel Decorative',"Luminari",Georgia,fantasy;
+    font-size:46px;font-weight:700;letter-spacing:.02em;line-height:1;
+    background:var(--brand-grad);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 2px 16px rgba(110,140,220,.32))}
+  header .sub{font-family:'Cinzel Decorative',"Luminari",Georgia,serif;font-size:15px;
+    font-weight:700;text-transform:uppercase;letter-spacing:.16em;color:var(--cream)}
   main{max-width:980px;margin:0 auto;padding:26px 28px 60px}
   .bar{display:flex;gap:10px;align-items:stretch}
   .bar input{flex:1;font-family:var(--mono);font-size:15px;padding:13px 15px;
@@ -69,7 +86,10 @@
   .neighbor .nb-name{font-weight:600;font-size:13px;text-transform:capitalize;color:var(--ink)}
   .neighbor .nb-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all;margin:1px 0}
   .nb-aroma{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
-  .nb-aroma .atag{font-size:10px;padding:1px 7px;border-radius:20px;background:#EAF3F0;color:var(--aroma);border:1px solid #CFE6DF;text-transform:capitalize}
+  .nb-aroma .atag{font-size:10px;padding:1px 7px;border-radius:20px;background:transparent;color:var(--aroma);border:1px solid;text-transform:capitalize}
+  .kt{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+  .kt .tchip{font-size:10px;font-weight:600;padding:1px 8px;border-radius:20px;color:#10140F;text-transform:capitalize}
+  .kt .muted{color:var(--muted);font-size:11px}
   .browse{margin:6px 0 8px}
   .browse-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 9px;display:flex;align-items:center;justify-content:space-between;gap:8px}
   .browse-toggle{display:inline-flex}
@@ -94,8 +114,8 @@
   .bcell .bname{font-size:12px;font-weight:600;margin-top:5px;line-height:1.25;text-transform:capitalize;cursor:pointer}
   .bcell .bname:hover{color:var(--aroma)}
   .map-section{margin:16px 0 8px;border-top:1px solid #EEF0EC;padding-top:12px}
-  .map-head{font-size:13px;font-weight:650;cursor:pointer;color:var(--ink)}
-  .map-head .mapsub{font-weight:400;font-size:12px;color:var(--muted)}
+  .map-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);cursor:pointer}
+  .map-head .mapsub{font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);opacity:.8}
   .map-legend{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 6px;font-size:12px}
   .map-legend span{display:inline-flex;align-items:center;gap:5px}
   .map-legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -152,8 +172,13 @@
   .s3-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
   .domain-banner{background:#FFF6E6;border:1px solid #E8D38A;color:#7A5A12;border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:14px;line-height:1.5}
   .hint code{font-family:var(--mono);background:var(--accent-soft);padding:1px 5px;border-radius:4px;color:var(--accent)}
-  .toggle{font-family:var(--mono);font-size:12px;color:var(--muted);margin:12px 2px 0;display:flex;align-items:center;gap:7px;cursor:pointer}
-  #mixPanel{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .toggle{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:14px 2px 0;display:flex;align-items:center;gap:7px;cursor:pointer}
+  #mixPanel{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .mix-explain{font-size:12.5px;color:var(--muted);line-height:1.55;margin:0 0 12px;max-width:840px}
+  .mix-explain b{color:var(--ink)}
+  .mix-examples{font-size:12px;color:var(--muted);margin:0 0 13px;display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+  .mix-ex{font:inherit;font-size:11.5px;padding:3px 10px;border:1px solid var(--line);border-radius:16px;background:transparent;color:var(--brand-2);cursor:pointer}
+  .mix-ex:hover{border-color:var(--brand-2)}
   .mix-row{display:flex;gap:8px;margin-bottom:8px}
   .mix-row input{flex:1;font-family:var(--mono);font-size:14px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
   .mix-row .rm{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:0 13px;cursor:pointer;color:var(--muted)}
@@ -171,7 +196,17 @@
   .sg-row{display:flex;gap:10px;align-items:center;padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--line)}
   .sg-row:last-child{border-bottom:none}
   .sg-row:hover{background:var(--accent-soft)}
-  .sg-st{flex:0 0 auto;width:56px;height:42px;background:#fff;border:1px solid var(--line);border-radius:5px}
+  .sg-st{flex:0 0 auto;width:56px;height:42px;background:var(--struct-bg);border:1px solid var(--line);border-radius:5px}
+  /* --- dark-mode surface fixes (molecule drawings stay on light 'paper' --struct-bg) --- */
+  .cat,.st-tab,.mini-3d,.map-reset,.suggest-dd{background:var(--panel)}
+  .structure,.structure3d,.neighbor .nb-struct,.bcell .bstruct{background:var(--struct-bg)}
+  .bcell{background:var(--panel)}
+  .track,.atrack,.tag.predicted{background:#242C35}
+  #flavorMap{background:#0C1016}
+  .odor-note{background:#1F2831;border-color:#2E3742}
+  .aroma-card{background:linear-gradient(180deg,#17282A,#181D24)!important;border-color:#2C4A44!important}
+  .err{background:#3A1E18;border-color:#5A2E22;color:#F0C6BA}
+  .cat.on{color:#fff}
   .sg-st svg{width:56px;height:42px}
   .sg-info{min-width:0}
   .sg-name{font-weight:600;font-size:13px}
@@ -197,8 +232,20 @@
     <b>SMILES</b> string (e.g. <code>O=Cc1ccc(O)c(OC)c1</code>). SMILES omit implicit
     hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
 
-  <label class="toggle"><input type="checkbox" id="mixToggle"> Mixture mode — screen 2+ ingredients for documented hazards</label>
-  <div id="mixPanel" style="display:none">
+  <label class="toggle"><input type="checkbox" id="mixToggle" checked> <span id="mixCaret">▾</span> Mixture screen — flag documented hazards when ingredients combine</label>
+  <div id="mixPanel">
+    <p class="mix-explain">Enter two or more ingredients and Flavormancer flags <b>documented
+      precursor→product hazards</b> — combinations known to form a harmful compound (e.g. a
+      preservative + an acid → a carcinogen). It's a <b>curated safety screen, not a general
+      reaction predictor</b>: a hazard fires only when the required roles co-occur, and
+      process-gated ones (heat / refining / fermentation) only when you mark that process.
+      It also gives a per-ingredient taste read and a single-molecule palette match.</p>
+    <div class="mix-examples"><span>Try a known bad combo:</span>
+      <button type="button" class="mix-ex" data-ings="sodium benzoate|ascorbic acid">benzoate + vitamin&nbsp;C → benzene</button>
+      <button type="button" class="mix-ex" data-ings="sodium nitrite|dimethylamine">nitrite + amine → nitrosamine</button>
+      <button type="button" class="mix-ex" data-ings="glucose|asparagine" data-proc="high_heat">sugar + asparagine + heat → acrylamide</button>
+      <button type="button" class="mix-ex" data-ings="ethanol|urea">ethanol + urea → ethyl carbamate</button>
+    </div>
     <div id="mixRows"></div>
     <button class="mix-add" id="mixAdd">+ add ingredient</button>
     <div class="mix-proc">Process applied:
@@ -217,9 +264,9 @@
   </div>
 
   <div class="map-section">
-    <div class="map-head" id="mapToggle"><span id="mapCaret">▸</span> Flavor-space map
+    <div class="map-head" id="mapToggle"><span id="mapCaret">▾</span> Flavor-space map
       <span class="mapsub">— molecules placed by structural similarity; taste classes cluster</span></div>
-    <div id="mapWrap" style="display:none">
+    <div id="mapWrap">
       <div class="map-controls">
         <span class="map-toggle3d"><button type="button" id="map2d" class="st-tab on">2D</button><button type="button" id="map3d" class="st-tab">3D</button></span>
         <span id="mapLegend" class="map-legend"></span>
@@ -421,7 +468,7 @@ function render(p, neighbors, svg, names){
           <div class="nb-name">${x.name||'—'}</div>
           ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
           <div class="s">${x.smiles}</div>
-          <div class="kt">${x.known_tastes.length?x.known_tastes.join(' · '):'—'}</div>
+          <div class="kt">${x.known_tastes.length?x.known_tastes.map(t=>`<span class="tchip" style="background:${TASTE_COLORS[t]||'var(--muted)'}">${t}</span>`).join(''):'<span class="muted">no known taste</span>'}</div>
           ${(x.aroma&&x.aroma.length)?`<div class="nb-aroma" title="aroma (found = documented, else predicted •)">${x.aroma.map(a=>`<span class="atag" style="color:${aromaColor(a.odor)};border-color:${aromaColor(a.odor)}44">${a.odor}${a.source==='predicted'?' •':''}</span>`).join('')}</div>`:''}
         </div>
         <div class="sim">${Math.round(x.similarity*100)}% match</div>
@@ -641,7 +688,7 @@ async function showCategory(btn){
 initBrowse();
 
 // --- flavor-space map: 2D (zoom/pan) + rotatable 3D point cloud, colored by taste ---
-const MAP_COLORS = {sweet:'#E0972E',bitter:'#6B4E9E',umami:'#C0563B',sour:'#9FB024',salty:'#4E84B0',other:'#C3C9C0'};
+const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD24E',salty:'#63A6E0',other:'#8A96A0'};
 let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null;
 let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6}, _drag=null, _dragged=false;
 
@@ -712,6 +759,7 @@ function attachMapEvents(cv){
   cv.addEventListener('click', ()=>{ if(_dragged){ _dragged=false; return; } const p=_mapLastHover; if(p){ q.value=p.smiles; window.scrollTo({top:0,behavior:'smooth'}); run(); } });
 }
 let _mapLastHover=null;
+loadMap();  // map is open by default
 
 // --- mixture mode ---
 function mixAddRow(val){
@@ -723,13 +771,20 @@ function mixAddRow(val){
   div.append(inp, rm); $('mixRows').appendChild(div);
 }
 $('mixAdd').addEventListener('click', ()=>mixAddRow());
+// mixture is its own collapsible section — it no longer hides the search bar/results
 $('mixToggle').addEventListener('change', e=>{
   const on=e.target.checked;
-  $('mixPanel').style.display=on?'block':'none';
-  document.querySelector('.bar').style.display=on?'none':'flex';
-  ['results','behaviorCard','aromaCard','footnote','err'].forEach(id=>$(id).style.display='none');
+  $('mixPanel').style.display=on?'block':'none'; $('mixCaret').textContent=on?'▾':'▸';
   if(on && !$('mixRows').children.length){ mixAddRow(); mixAddRow(); }
 });
+if($('mixToggle').checked && !$('mixRows').children.length){ mixAddRow(); mixAddRow(); }  // open by default
+// click a bad-combo example -> load its ingredients + process and run the screen
+document.querySelectorAll('.mix-ex').forEach(b=> b.addEventListener('click', ()=>{
+  $('mixRows').innerHTML='';
+  b.dataset.ings.split('|').forEach(s=>mixAddRow(s));
+  document.querySelectorAll('.proc').forEach(c=>{ c.checked = (b.dataset.proc||'').split(',').includes(c.value); });
+  $('mixCheck').click();
+}));
 $('mixResults').addEventListener('click', e=>{
   const card=e.target.closest('.mix-ing[data-smi]');
   if(card && card.dataset.smi){ $('mixToggle').checked=false; $('mixToggle').dispatchEvent(new Event('change')); q.value=card.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
