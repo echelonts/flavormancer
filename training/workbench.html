@@ -245,7 +245,9 @@
   .design-gras{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer}
   .design-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:14px}
   .dcell{border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--panel)}
-  .dstruct{height:78px;background:var(--struct-bg);border-radius:6px;text-align:center}.dstruct svg{height:78px;max-width:100%}
+  .dstruct{height:78px;background:var(--struct-bg);border-radius:6px;text-align:center;position:relative}.dstruct svg{height:78px;max-width:100%}
+  .dstruct.is3d{height:130px}
+  .dcell{position:relative}
   .dname{font-weight:600;font-size:13px;margin-top:7px;cursor:pointer;line-height:1.25}
   .dname:hover{color:var(--brand-2)}
   .dbadge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;background:var(--aroma);color:#08121A;margin-left:6px;text-transform:uppercase}
@@ -974,14 +976,17 @@ async function showFlavor(name){
   const d=await getJSON('/api/flavor?name='+encodeURIComponent(name)); const mols=d.molecules||[];
   if(!mols.length){ res.innerHTML='<div class="empty">No character molecule on file for that one.</div>'; return; }
   const lead=`<div class="empty" style="grid-column:1/-1"><b style="text-transform:capitalize;color:var(--ink)">${name}</b> — character-impact ${mols.length>1?'molecules':'molecule'}${d.category?' · '+d.category:''}. Click a name to run the full read.</div>`;
-  res.innerHTML=lead+mols.map(m=>{
+  res.innerHTML=lead+mols.map((m,i)=>{
     const badge=m.gras?'<span class="dbadge">GRAS</span>':'';
     const tags=(m.tags&&m.tags.length)?`<div class="dmatch">${m.tags.map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('')}</div>`:'';
     const subs=(m.subs&&m.subs.length)?`<div class="dsubs">food-safe drop-ins: ${m.subs.map(s=>`<a data-smi="${s.smiles.replace(/"/g,'&quot;')}">${s.name||s.smiles.slice(0,14)}</a>`).join(', ')}</div>`:'';
-    return `<div class="dcell"><div class="dstruct">${m.svg||''}</div>
+    return `<div class="dcell"><div class="dstruct" id="libs${i}">${m.svg||''}</div>
+      ${_has3D?`<button type="button" class="mini-3d" data-i="${i}" data-m="2d">3D</button>`:''}
       <div class="dname" data-smi="${m.smiles.replace(/"/g,'&quot;')}">${m.name||m.molecule}${badge}</div>
       ${tags}${subs}</div>`;
   }).join('');
+  res.querySelectorAll('.mini-3d').forEach(b=>{ const i=+b.dataset.i;
+    b.addEventListener('click', ()=> cardToggle3D(b, $('libs'+i), mols[i].smiles, mols[i].svg||'')); });
   res.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
 }
 
@@ -1013,14 +1018,17 @@ async function runDesign(offset){
   const pager=`<div class="design-pager"><button class="pg" id="dPrev" ${offset<=0?'disabled':''}>‹ prev</button>
     <span>${from}–${to} of ${tot}</span>
     <button class="pg" id="dNext" ${to>=tot?'disabled':''}>next ›</button></div>`;
-  res.innerHTML=`<div class="empty" style="grid-column:1/-1">${tot} molecules match those notes${gras?' (food-safe)':''}:</div>`+items.map(it=>{
+  res.innerHTML=`<div class="empty" style="grid-column:1/-1">${tot} molecules match those notes${gras?' (food-safe)':''}:</div>`+items.map((it,i)=>{
     const badge=it.gras?'<span class="dbadge">GRAS</span>':'';
     const match=it.matched.map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('');
     const subs=(it.subs&&it.subs.length)?`<div class="dsubs">food-safe drop-ins: ${it.subs.map(s=>`<a data-smi="${s.smiles.replace(/"/g,'&quot;')}">${s.name||s.smiles.slice(0,14)}</a>`).join(', ')}</div>`:'';
-    return `<div class="dcell"><div class="dstruct">${it.svg||''}</div>
+    return `<div class="dcell"><div class="dstruct" id="dgs${i}">${it.svg||''}</div>
+      ${_has3D?`<button type="button" class="mini-3d" data-i="${i}" data-m="2d">3D</button>`:''}
       <div class="dname" data-smi="${it.smiles.replace(/"/g,'&quot;')}">${it.name||it.smiles}${badge}</div>
       <div class="dmatch">${match}</div>${subs}</div>`;
   }).join('')+`<div style="grid-column:1/-1">${pager}</div>`;
+  res.querySelectorAll('.mini-3d').forEach(b=>{ const i=+b.dataset.i;
+    b.addEventListener('click', ()=> cardToggle3D(b, $('dgs'+i), items[i].smiles, items[i].svg||'')); });
   res.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
   const pv=$('dPrev'), nx=$('dNext');
   if(pv) pv.addEventListener('click', ()=>runDesign(Math.max(0,offset-DESIGN_PAGE)));
