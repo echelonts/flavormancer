@@ -95,10 +95,19 @@ if __name__ == "__main__":
     print(f"embedding {len(X)} molecules with UMAP (Jaccard) — 2D then 3D...", flush=True)
     xy = _umap(X, 2)
     xyz = _umap(X, 3)
+    # real physicochemical coordinates too, so the map can offer an INTERPRETABLE-AXES view
+    # (molecular weight vs logP) alongside the UMAP similarity layout — actual, labelled units.
+    from rdkit.Chem import Crippen, Descriptors
+    mw, logp = [], []
+    for s in smiles:
+        m = Chem.MolFromSmiles(str(s))
+        mw.append(round(float(Descriptors.MolWt(m)), 1) if m else None)
+        logp.append(round(float(Crippen.MolLogP(m)), 2) if m else None)
     out = pd.DataFrame({"smiles": smiles, "label": labels,
                         "x": xy[:, 0].astype(float), "y": xy[:, 1].astype(float),
                         "x3": xyz[:, 0].astype(float), "y3": xyz[:, 1].astype(float),
-                        "z3": xyz[:, 2].astype(float)})
+                        "z3": xyz[:, 2].astype(float),
+                        "mw": mw, "logp": logp})
     # dominant aroma descriptor per molecule (for the map's "color by aroma" mode) — guarded so
     # the map still builds without the aroma heads
     try:

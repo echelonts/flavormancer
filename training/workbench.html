@@ -366,6 +366,7 @@
       <span class="mapsub">— every labeled molecule embedded by structure; see where structure predicts flavor</span></div>
     <div id="mapWrap">
       <div class="map-controls">
+        <span class="map-toggle3d"><button type="button" id="mapLsim" class="st-tab on">similarity</button><button type="button" id="mapLprop" class="st-tab">property axes</button></span>
         <span class="map-toggle3d"><button type="button" id="map2d" class="st-tab on">2D</button><button type="button" id="map3d" class="st-tab">3D</button></span>
         <span class="map-toggle3d"><button type="button" id="mapCT" class="st-tab on">taste</button><button type="button" id="mapCA" class="st-tab">aroma</button></span>
         <span id="mapLegend" class="map-legend"></span>
@@ -398,9 +399,15 @@
           same structural layout — you're overlaying a different sense. Taste and aroma <i>together</i>
           are the full flavor profile, and comparing the two colorings shows where they align
           (a sweet-tasting molecule that also reads floral) versus diverge.</p>
-          <p><b>Honest caveats.</b> UMAP axes carry <b>no units</b> and only <i>local</i> distances
-          are trustworthy — don't read meaning into global gaps or the orientation. It's a lens for
-          finding neighbors and outliers, not a metric space.</p>
+          <p><b>Honest caveats — and the fix.</b> The <i>similarity</i> (UMAP) layout has axes with
+          <b>no units</b>; only local distances mean anything. When you want <b>real, labelled
+          axes</b>, switch the layout toggle to <b>property axes</b>: the same dots replotted on
+          <b>molecular weight</b> (x, in daltons) vs <b>logP</b> (y — hydrophobicity, oil-vs-water
+          partitioning), with gridlines and a logP = 0 waterline. That view <i>is</i> a metric
+          space — you can read a molecule's size and greasiness straight off the axes, and watch a
+          taste/aroma color track (or not track) those physical properties. Two lenses on the same
+          molecules: <b>similarity</b> for neighbors &amp; outliers, <b>property axes</b> for
+          physical structure.</p>
         </div>
       </details>
     </div>
@@ -869,7 +876,7 @@ initBrowse();
 
 // --- flavor-space map: 2D (zoom/pan) + rotatable 3D point cloud, colored by taste ---
 const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD24E',salty:'#63A6E0',tasteless:'#B8C0C6',other:'#8A96A0'};
-let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste';
+let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste', _mapLayout='similarity';
 let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6,z:1}, _drag=null, _dragged=false;
 function mapColor(p){ return _mapColorBy==='aroma' ? (p.aroma && p.aroma!=='other' ? aromaColor(p.aroma) : '#5A6068') : (MAP_COLORS[p.label]||MAP_COLORS.other); }
 function mapLabel(p){ return _mapColorBy==='aroma' ? (p.aroma||'other') : p.label; }
@@ -881,10 +888,22 @@ $('mapToggle').addEventListener('click', async ()=>{
 });
 $('map2d').addEventListener('click', ()=>setMapMode('2d'));
 $('map3d').addEventListener('click', ()=>setMapMode('3d'));
+$('mapLsim').addEventListener('click', ()=>setMapLayout('similarity'));
+$('mapLprop').addEventListener('click', ()=>setMapLayout('properties'));
 $('mapCT').addEventListener('click', ()=>setMapColor('taste'));
 $('mapCA').addEventListener('click', ()=>setMapColor('aroma'));
 $('mapReset').addEventListener('click', ()=>{ _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1}; drawMap(); });
-function setMapMode(m){ _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap(); }
+function setMapMode(m){
+  // property-axes layout is inherently 2D; picking 3D falls back to the similarity layout
+  if(m==='3d' && _mapLayout==='properties') setMapLayout('similarity');
+  _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap();
+}
+function setMapLayout(l){
+  _mapLayout=l; $('mapLsim').classList.toggle('on',l==='similarity'); $('mapLprop').classList.toggle('on',l==='properties');
+  if(l==='properties'){ setMapMode('2d'); }  // forces 2D; also resets below
+  _v2={s:1,ox:0,oy:0};  // property view is a fixed labelled plot, not zoom/pan
+  drawMap();
+}
 function setMapColor(c){ _mapColorBy=c; $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma'); mapLegendRender(); drawMap(); }
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
@@ -900,7 +919,7 @@ async function loadMap(){
   mapLegendRender();
   _mapReady=true; attachMapEvents(cv); drawMap();
 }
-function drawMap(){ _mapMode==='3d'?draw3D():draw2D(); }
+function drawMap(){ _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D()); }
 
 function draw2D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=18;
@@ -908,6 +927,44 @@ function draw2D(){
   const px=p=>(pad+p.x*(W-2*pad))*_v2.s+_v2.ox, py=p=>(H-pad-p.y*(H-2*pad))*_v2.s+_v2.oy;
   for(const p of _mapPts){ ctx.beginPath(); ctx.arc(px(p),py(p),2.6,0,7); ctx.fillStyle=mapColor(p); ctx.globalAlpha=.8; ctx.fill(); }
   ctx.globalAlpha=1; _mapProj={px,py};
+}
+// interpretable-axes view: real molecular weight (x) vs logP hydrophobicity (y), with labelled
+// ticks + gridlines — the "give the plot actual axes" answer to UMAP's unit-less layout.
+let _propDom=null;
+function drawProps(){
+  const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const ml=58, mb=44, mt=16, mr=18, plotW=W-ml-mr, plotH=H-mt-mb;
+  if(!_propDom){
+    // percentile domain so a few huge/greasy outliers don't squash everyone into a corner;
+    // out-of-range points are clamped to the edge (a handful of polymers/lipids).
+    const pct=(arr,q)=>{ const a=arr.filter(v=>v!=null).sort((x,y)=>x-y); return a[Math.floor(q*(a.length-1))]; };
+    const mws=_mapPts.map(p=>p.mw), lps=_mapPts.map(p=>p.logp);
+    _propDom={mwMax:Math.ceil(pct(mws,0.98)/50)*50, lpMin:Math.floor(pct(lps,0.01)), lpMax:Math.ceil(pct(lps,0.99))};
+  }
+  const {mwMax,lpMin,lpMax}=_propDom;
+  const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const bx=mw=>ml+cl((mw-0)/(mwMax||1),0,1)*plotW, by=lp=>mt+plotH-cl((lp-lpMin)/((lpMax-lpMin)||1),0,1)*plotH;
+  // gridlines + ticks
+  ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top';
+  const mwStep = mwMax>600?100:50;
+  ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.fillStyle='#8A96A0'; ctx.lineWidth=1;
+  for(let v=0; v<=mwMax; v+=mwStep){ const x=bx(v); ctx.beginPath(); ctx.moveTo(x,mt); ctx.lineTo(x,mt+plotH); ctx.stroke(); ctx.fillText(v, x, mt+plotH+6); }
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let v=lpMin; v<=lpMax; v++){ const y=by(v); ctx.beginPath(); ctx.moveTo(ml,y); ctx.lineTo(ml+plotW,y); ctx.stroke(); ctx.fillText(v, ml-7, y); }
+  // logP=0 reference (water/oil boundary)
+  if(lpMin<0&&lpMax>0){ const y0=by(0); ctx.strokeStyle='rgba(63,196,170,.5)'; ctx.beginPath(); ctx.moveTo(ml,y0); ctx.lineTo(ml+plotW,y0); ctx.stroke(); }
+  // axis frame
+  ctx.strokeStyle='var(--line)'; ctx.strokeStyle='#2A323C'; ctx.strokeRect(ml,mt,plotW,plotH);
+  // axis titles
+  ctx.fillStyle='#C7D0CC'; ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('Molecular weight (Da)  →  bigger', ml+plotW/2, mt+plotH+22);
+  ctx.save(); ctx.translate(14, mt+plotH/2); ctx.rotate(-Math.PI/2); ctx.textBaseline='top';
+  ctx.fillText('logP (hydrophobicity)  →  oilier', 0, 0); ctx.restore();
+  // points
+  for(const p of _mapPts){ if(p.mw==null||p.logp==null) continue; ctx.beginPath(); ctx.arc(bx(p.mw),by(p.logp),2.6,0,7); ctx.fillStyle=mapColor(p); ctx.globalAlpha=.78; ctx.fill(); }
+  ctx.globalAlpha=1;
+  _mapProj={px:p=>p.mw==null?-9999:bx(p.mw), py:p=>p.logp==null?-9999:by(p.logp)};
 }
 function draw3D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
@@ -933,7 +990,8 @@ function attachMapEvents(cv){
   cv.addEventListener('mousedown', ev=>{ _drag={x:ev.clientX,y:ev.clientY,v2:{..._v2},v3:{..._v3}}; _dragged=false; });
   window.addEventListener('mouseup', ()=>{ _drag=null; });
   cv.addEventListener('mousemove', ev=>{
-    if(_drag){ _dragged=true; const dx=ev.clientX-_drag.x, dy=ev.clientY-_drag.y;
+    if(_drag && !(_mapMode==='2d' && _mapLayout==='properties')){  // property axes are fixed — no pan
+      _dragged=true; const dx=ev.clientX-_drag.x, dy=ev.clientY-_drag.y;
       if(_mapMode==='2d'){ _v2.ox=_drag.v2.ox+dx; _v2.oy=_drag.v2.oy+dy; }
       else { _v3.ry=_drag.v3.ry+dx*0.008; _v3.rx=_drag.v3.rx+dy*0.008; }
       drawMap(); tip.style.display='none'; return; }
@@ -944,6 +1002,7 @@ function attachMapEvents(cv){
   });
   cv.addEventListener('mouseleave', ()=>{ tip.style.display='none'; });
   cv.addEventListener('wheel', ev=>{
+    if(_mapMode==='2d' && _mapLayout==='properties') return;  // fixed labelled axes — no zoom
     ev.preventDefault();
     const k = ev.deltaY<0 ? 1.12 : 0.89;
     if(_mapMode==='2d'){
