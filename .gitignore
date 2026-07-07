@@ -48,6 +48,7 @@ pnpm-debug.log*
 odor_model/
 # ...but DO track the small, hand-curated input lists:
 !flavor_volatiles.csv
+!training/flavors.csv
 
 # ---- Secrets & local config ----
 .env
