@@ -140,6 +140,13 @@
   .map-reset{font:inherit;font-size:12px;padding:3px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--muted);cursor:pointer;margin-left:auto}
   .map-reset:hover{border-color:var(--aroma)}
   .map-key{font-size:12px;color:var(--muted);line-height:1.55;margin-top:8px;max-width:900px}
+  .map-method{margin-top:10px;max-width:900px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+  .map-method>summary{cursor:pointer;padding:9px 13px;font-size:12px;font-weight:600;color:var(--brand-2);list-style:none}
+  .map-method>summary::-webkit-details-marker{display:none}
+  .map-method>summary::before{content:'▸ ';color:var(--muted)}
+  .map-method[open]>summary::before{content:'▾ '}
+  .map-method-body{padding:2px 15px 12px;font-size:12px;color:var(--muted);line-height:1.6}
+  .map-method-body p{margin:8px 0}.map-method-body b{color:var(--ink)}
   .map-key b{color:var(--ink)}
   .map-canvas-wrap{position:relative;width:100%;overflow-x:auto}
   #flavorMap{max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:crosshair}
@@ -354,7 +361,7 @@
 
   <div class="map-section">
     <div class="map-head" id="mapToggle"><span id="mapCaret">▾</span> Flavor-space map
-      <span class="mapsub">— molecules placed by structural similarity; taste classes cluster</span></div>
+      <span class="mapsub">— every labeled molecule embedded by structure; see where structure predicts flavor</span></div>
     <div id="mapWrap">
       <div class="map-controls">
         <span class="map-toggle3d"><button type="button" id="map2d" class="st-tab on">2D</button><button type="button" id="map3d" class="st-tab">3D</button></span>
@@ -364,12 +371,30 @@
       </div>
       <div class="map-canvas-wrap"><canvas id="flavorMap" width="960" height="560"></canvas>
         <div id="mapTip" class="map-tip" style="display:none"></div></div>
-      <div class="map-key">Each dot is a molecule; <b>nearby dots are structurally similar</b>
-        (UMAP over Morgan fingerprints, Jaccard/Tanimoto). Color = <b>dominant taste</b>; tight
-        groups are structural families. Axes have no units — only <i>relative</i> position matters.
+      <div class="map-key">Each dot is a molecule; <b>nearby dots are structurally similar</b>.
+        Color = <b>dominant taste</b> (toggle to <b>aroma</b>); tight groups are structural families.
         <b>2D:</b> scroll to zoom (into the cursor), drag to pan. <b>3D:</b> drag to rotate,
-        scroll to zoom. Hover for the molecule,
-        click to open its read.</div>
+        scroll to zoom. Hover for the molecule, click to open its read.</div>
+      <details class="map-method">
+        <summary>How it's built &amp; how to read it</summary>
+        <div class="map-method-body">
+          <p><b>Method.</b> Each molecule becomes a 2048-bit <b>Morgan fingerprint</b> (radius 2 —
+          a bit for every local atom environment). Distance between two molecules is
+          <b>Jaccard = Tanimoto</b> on those bits, the standard chemical-similarity measure. That
+          high-dimensional space is projected to 2D/3D with <b>UMAP</b>, which preserves each
+          molecule's <i>local neighborhood</i> — so dots that sit together really are built from
+          the same substructures. The layout is deterministic (fixed seed).</p>
+          <p><b>How to read it.</b> The <i>positions</i> come purely from <b>structure</b>; the
+          <i>colors</i> come from <b>taste/aroma</b> labels laid on top. Where a color forms a clean
+          island, structure alone predicts that flavor (e.g. sugar-like polyols cluster sweet;
+          alkaloid scaffolds cluster bitter). The interesting molecules are the <b>off-color dots
+          inside another cluster</b> — a bitter point sitting among sweeteners is a structure that
+          breaks the trend, exactly the kind of lead worth a closer look.</p>
+          <p><b>Honest caveats.</b> UMAP axes carry <b>no units</b> and only <i>local</i> distances
+          are trustworthy — don't read meaning into global gaps or the orientation. It's a lens for
+          finding neighbors and outliers, not a metric space.</p>
+        </div>
+      </details>
     </div>
   </div>
 
