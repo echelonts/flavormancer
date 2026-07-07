@@ -17,10 +17,11 @@ enumerable via the annotations API. Pipeline:
 - `train_aroma.py` — one RandomForest per descriptor on Morgan fingerprints (the taste
   stack). After broadening the descriptor vocabulary and folding the curated
   `flavors.csv` character-impact molecules in as extra labels (825 → **981** molecules),
-  **15 heads clear CV-AUROC ≥ 0.70**: medicinal 0.96, ammoniacal 0.94, almond 0.94,
-  citrus 0.91, sulfurous 0.88, fatty 0.87, fruity/fishy 0.86, camphor/ethereal/garlic 0.84,
-  minty 0.82, petroleum 0.80, floral 0.80, pungent 0.79 (**fatty** and **petroleum** are
-  new this pass). `predict_aroma()` surfaces them for **any** molecule.
+  **15 heads clear CV-AUROC ≥ 0.70** (each score is that descriptor's own held-out AUROC —
+  unrelated descriptors can happen to score the same): medicinal 0.96, ammoniacal 0.94,
+  almond 0.94, citrus 0.91, sulfurous 0.88, fatty 0.87, fruity 0.86, fishy 0.86, camphor 0.84,
+  ethereal 0.84, garlic 0.84, minty 0.82, petroleum 0.80, floral 0.80, pungent 0.79 (**fatty**
+  and **petroleum** are new this pass). `predict_aroma()` surfaces them for **any** molecule.
 
 **Honest ceiling:** this is **presence/absence** (which notes apply), not **intensity**
 (how strong). HSDB free text carries no scored ratings, and the corpus skews industrial

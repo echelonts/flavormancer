@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flavormancer — taste &amp; aroma from chemical structure</title>
 <meta name="description" content="Flavormancer predicts taste &amp; aroma from a molecule's chemical structure — on-prem flavor prediction for food, beverage, and fragrance R&amp;D.">
-<meta name="author" content="Flavormancer">
+<meta name="author" content="Echelon Technology Solutions">
 <meta name="application-name" content="Flavormancer">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Flavormancer">
 <meta property="og:url" content="https://flavormancer.echelonts.net/">
 <meta property="og:locale" content="en_US">
-<meta property="og:title" content="Flavormancer — taste &amp; aroma from chemical structure">
-<meta property="og:description" content="Predict taste &amp; aroma from chemical structure. On-prem, before you pour.">
+<meta property="og:title" content="Flavormancer — taste &amp; aroma from chemical structure, before you pour">
+<meta property="og:description" content="Taste &amp; aroma prediction from chemical structure — before you pour. On-prem flavor prediction, behind your own firewall.">
 <meta property="og:image" content="https://flavormancer.echelonts.net/static/social.png">
 <meta property="og:image:secure_url" content="https://flavormancer.echelonts.net/static/social.png">
 <meta property="og:image:type" content="image/png">
@@ -20,8 +20,8 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="Flavormancer — taste and aroma prediction from chemical structure">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Flavormancer — taste &amp; aroma from chemical structure">
-<meta name="twitter:description" content="Predict taste &amp; aroma from chemical structure. On-prem, before you pour.">
+<meta name="twitter:title" content="Flavormancer — taste &amp; aroma from chemical structure, before you pour">
+<meta name="twitter:description" content="Taste &amp; aroma prediction from chemical structure — before you pour. On-prem flavor prediction, behind your own firewall.">
 <meta name="twitter:image" content="https://flavormancer.echelonts.net/static/social.png">
 <meta name="twitter:image:alt" content="Flavormancer — taste and aroma prediction from chemical structure">
 <meta name="theme-color" content="#2BC4C4">
@@ -387,11 +387,17 @@
           molecule's <i>local neighborhood</i> — so dots that sit together really are built from
           the same substructures. The layout is deterministic (fixed seed).</p>
           <p><b>How to read it.</b> The <i>positions</i> come purely from <b>structure</b>; the
-          <i>colors</i> come from <b>taste/aroma</b> labels laid on top. Where a color forms a clean
-          island, structure alone predicts that flavor (e.g. sugar-like polyols cluster sweet;
-          alkaloid scaffolds cluster bitter). The interesting molecules are the <b>off-color dots
-          inside another cluster</b> — a bitter point sitting among sweeteners is a structure that
-          breaks the trend, exactly the kind of lead worth a closer look.</p>
+          <i>colors</i> are a flavor label laid on top. Where a color forms a clean island,
+          structure alone predicts that flavor (e.g. sugar-like polyols cluster sweet; alkaloid
+          scaffolds cluster bitter). The interesting molecules are the <b>off-color dots inside
+          another cluster</b> — a bitter point sitting among sweeteners is a structure that breaks
+          the trend, exactly the kind of lead worth a closer look.</p>
+          <p><b>Two flavor dimensions.</b> Flip the color toggle between <b>taste</b> (sweet /
+          bitter / umami / sour / salty / tasteless) and <b>aroma</b> (= odor — the same thing;
+          the 15 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
+          same structural layout — you're overlaying a different sense. Taste and aroma <i>together</i>
+          are the full flavor profile, and comparing the two colorings shows where they align
+          (a sweet-tasting molecule that also reads floral) versus diverge.</p>
           <p><b>Honest caveats.</b> UMAP axes carry <b>no units</b> and only <i>local</i> distances
           are trustworthy — don't read meaning into global gaps or the orientation. It's a lens for
           finding neighbors and outliers, not a metric space.</p>
