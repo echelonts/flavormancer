@@ -425,6 +425,101 @@ def api_map():
     return {"points": _FLAVOR_MAP}
 
 
+# --- Flavor designer: reverse search (desired descriptors -> best food-safe molecules) ---
+_DESIGN = []          # [{smiles, name, tags:set, gras:bool}]
+_DESIGN_DESCS = []    # descriptors with enough molecules to offer as options
+
+
+def _precompute_design():
+    """Index the odor corpus by descriptor (documented tags + model-confident predictions +
+    taste), with GRAS status — so the designer can rank food-safe molecules for a target flavor.
+    Model inference is BATCHED (one vectorized call per head over all molecules) — per-molecule
+    RandomForest calls over ~2.3k molecules would take minutes."""
+    try:
+        from collections import Counter
+
+        import numpy as np
+        import pandas as pd
+
+        from build_aroma_dataset import tag as _odor_tag
+        od = pd.read_parquet("odor_notes.parquet")
+        rows = []  # (smiles, name, mol_skeleton, {documented tags})
+        for smi, nm, odor in zip(od["smiles"], od.get("name", [None] * len(od)), od["odor"]):
+            mol = Chem.MolFromSmiles(str(smi)) if isinstance(smi, str) else None
+            if mol is None:
+                continue
+            dtags = set(_odor_tag(odor)) if isinstance(odor, str) else set()
+            rows.append((smi, nm if isinstance(nm, str) else "",
+                         Chem.MolToInchiKey(mol).split("-")[0], _fpvec(mol), dtags))
+        if not rows:
+            return
+        X = np.vstack([r[3] for r in rows])
+        tagsets = [set(r[4]) for r in rows]
+        for name, clf in P._AROMA_MODELS.items():                 # model-confident aroma
+            for i in np.where(clf.predict_proba(X)[:, 1] >= 0.5)[0]:
+                tagsets[i].add(name)
+        for t in ("sweet", "bitter", "umami"):                    # taste
+            clf = P._CLASSIFIERS.get(t)
+            if clf is not None:
+                for i in np.where(clf.predict_proba(X)[:, 1] >= 0.5)[0]:
+                    tagsets[i].add(t)
+        cnt, pool = Counter(), []
+        for (smi, nm, skel, _, _), tags in zip(rows, tagsets):
+            if not tags:
+                continue
+            pool.append({"smiles": smi, "name": nm, "tags": tags, "gras": skel in P._GRAS})
+            cnt.update(tags)
+        _DESIGN[:] = pool
+        _DESIGN_DESCS[:] = sorted(d for d, n in cnt.items() if n >= 5)
+    except Exception:  # noqa: BLE001 — no corpus/models; designer just stays empty
+        pass
+
+
+def _fpvec(mol):
+    """1-D Morgan fingerprint (predict._fp returns a (1, N) row; we want the flat vector)."""
+    return P._fp(mol)[0]
+
+
+@app.get("/api/design_options")
+def api_design_options():
+    """The descriptors the designer can actually match (enough molecules in the corpus)."""
+    return {"descriptors": _DESIGN_DESCS}
+
+
+@app.get("/api/design")
+def api_design(descriptors: str = "", gras: int = 0, limit: int = 24):
+    """Reverse search: given desired descriptors (+ optional food-safe filter), rank the
+    best-matching molecules — with GRAS status and drop-in substitutes for the top hits."""
+    want = [d.strip().lower() for d in descriptors.split(",") if d.strip()]
+    if not want or not _DESIGN:
+        return {"items": [], "requested": want}
+    scored = []
+    for m in _DESIGN:
+        if gras and not m["gras"]:
+            continue
+        matched = [d for d in want if d in m["tags"]]
+        if matched:
+            scored.append((len(matched), m, matched))
+    scored.sort(key=lambda x: (-x[0], not x[1]["gras"], x[1]["name"] == ""))
+    items = []
+    for i, (n, m, matched) in enumerate(scored[:limit]):
+        it = {"smiles": m["smiles"], "name": m["name"], "gras": m["gras"],
+              "matched": matched, "n_matched": n, "svg": _svg(m["smiles"], 108, 78),
+              "other": sorted(t for t in m["tags"] if t not in matched)[:5]}
+        if i < 8:  # drop-in food-safe swaps for the top hits (cost-saving substitutes)
+            subs = []
+            for s in P.substitute(m["smiles"], k=6).get("neighbors", []):
+                sm = Chem.MolFromSmiles(s["smiles"])
+                if sm is not None and Chem.MolToInchiKey(sm).split("-")[0] in P._GRAS:
+                    subs.append({"smiles": s["smiles"], "name": _table_name(s["smiles"]) or "",
+                                 "similarity": s["similarity"]})
+                if len(subs) >= 3:
+                    break
+            it["subs"] = subs
+        items.append(it)
+    return {"items": items, "requested": want, "total_matches": len(scored)}
+
+
 # --- Aroma: REAL documented odor only (public-domain HSDB/CAMEO) ---------------
 # Hand-set illustrative descriptor "scores" were removed on purpose: made-up numbers
 # have no place in the read. The aroma card now shows only real, cited documented odor
@@ -468,7 +563,12 @@ _ODOR_TABLE = _load_odor_table()
 
 # start the landing-page precompute now that every table it reads (_NAME_TABLE, _ODOR_TABLE,
 # the models) is defined — starting it earlier would race those globals into NameErrors
-threading.Thread(target=_precompute_top_lists, daemon=True).start()
+def _precompute_all():
+    _precompute_top_lists()
+    _precompute_design()
+
+
+threading.Thread(target=_precompute_all, daemon=True).start()
 
 
 @app.post("/api/aroma")

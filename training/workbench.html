@@ -211,6 +211,26 @@
   .err{background:#3A1E18;border-color:#5A2E22;color:#F0C6BA}
   .cat.on{color:#fff}
   .sg-st svg{width:56px;height:42px}
+  /* --- flavor designer --- */
+  .design-section{margin:14px 0 4px;border:1px solid #2C6E74;border-radius:12px;padding:15px 18px;background:linear-gradient(180deg,#15211F,#181D24)}
+  .design-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-2);cursor:pointer}
+  .design-head .mapsub{font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);opacity:.85}
+  .design-chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 10px}
+  .dchip{font:inherit;font-size:12px;padding:4px 11px;border-radius:20px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;text-transform:capitalize}
+  .dchip:hover{border-color:var(--brand-2)}
+  .dchip.on{background:var(--brand-2);color:#08121A;border-color:var(--brand-2);font-weight:650}
+  .design-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:4px}
+  .design-gras{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer}
+  .design-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:14px}
+  .dcell{border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--panel)}
+  .dstruct{height:78px;background:var(--struct-bg);border-radius:6px;text-align:center}.dstruct svg{height:78px;max-width:100%}
+  .dname{font-weight:600;font-size:13px;margin-top:7px;cursor:pointer;line-height:1.25}
+  .dname:hover{color:var(--brand-2)}
+  .dbadge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;background:var(--aroma);color:#08121A;margin-left:6px;text-transform:uppercase}
+  .dmatch{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+  .dmatch .mt{font-size:10px;padding:1px 7px;border-radius:20px;text-transform:capitalize}
+  .dsubs{font-size:11px;color:var(--muted);margin-top:7px;border-top:1px solid var(--line);padding-top:6px;line-height:1.5}
+  .dsubs a{color:var(--brand-2);cursor:pointer}.dsubs a:hover{text-decoration:underline}
   .sg-info{min-width:0}
   .sg-name{font-weight:600;font-size:13px}
   .sg-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all}
@@ -234,6 +254,19 @@
   <div class="hint">Type a <b>common or IUPAC name</b> (e.g. <code>vanillin</code>) or a
     <b>SMILES</b> string (e.g. <code>O=Cc1ccc(O)c(OC)c1</code>). SMILES omit implicit
     hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
+
+  <div class="design-section">
+    <div class="design-head" id="designToggle"><span id="designCaret">▾</span> Flavor designer
+      <span class="mapsub">— pick the notes you want, get the best molecules to build it (food-safe) + drop-in swaps to cut cost</span></div>
+    <div id="designWrap">
+      <div id="designChips" class="design-chips"></div>
+      <div class="design-controls">
+        <label class="design-gras"><input type="checkbox" id="designGras" checked> food-safe (GRAS) only</label>
+        <button class="mix-btn" id="designGo">Find molecules</button>
+      </div>
+      <div id="designResults" class="design-grid"></div>
+    </div>
+  </div>
 
   <label class="toggle"><input type="checkbox" id="mixToggle" checked> <span id="mixCaret">▾</span> Mixture screen — flag documented hazards when ingredients combine</label>
   <div id="mixPanel">
@@ -770,6 +803,39 @@ function attachMapEvents(cv){
 }
 let _mapLastHover=null;
 loadMap();  // map is open by default
+
+// --- flavor designer: pick notes -> best food-safe molecules + drop-in swaps ---
+const _designSel = new Set();
+$('designToggle').addEventListener('click', ()=>{ const w=$('designWrap'); const o=w.style.display==='none'; w.style.display=o?'block':'none'; $('designCaret').textContent=o?'▾':'▸'; });
+async function initDesign(){
+  try{
+    const d = await getJSON('/api/design_options'); const descs = d.descriptors||[];
+    if(!descs.length){ setTimeout(initDesign, 4000); return; }  // precompute still warming
+    $('designChips').innerHTML = descs.map(x=>`<button type="button" class="dchip" data-d="${x}">${x}</button>`).join('');
+    $('designChips').querySelectorAll('.dchip').forEach(b=> b.addEventListener('click', ()=>{
+      const d=b.dataset.d; if(_designSel.has(d)){ _designSel.delete(d); b.classList.remove('on'); } else { _designSel.add(d); b.classList.add('on'); }
+    }));
+  }catch(_){ setTimeout(initDesign, 4000); }
+}
+initDesign();
+$('designGo').addEventListener('click', async ()=>{
+  const res=$('designResults');
+  if(!_designSel.size){ res.innerHTML='<div class="empty">Pick one or more notes above.</div>'; return; }
+  const gras=$('designGras').checked?1:0;
+  res.innerHTML='<div class="empty">Searching…</div>';
+  const d=await getJSON('/api/design?descriptors='+encodeURIComponent([..._designSel].join(','))+'&gras='+gras+'&limit=18');
+  const items=d.items||[];
+  if(!items.length){ res.innerHTML='<div class="empty">No molecule carries all those notes'+(gras?' and is food-safe':'')+'. Try fewer notes.</div>'; return; }
+  res.innerHTML=`<div class="empty" style="grid-column:1/-1">${d.total_matches} molecules match — showing top ${items.length}:</div>`+items.map(it=>{
+    const badge=it.gras?'<span class="dbadge">GRAS</span>':'';
+    const match=it.matched.map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('');
+    const subs=(it.subs&&it.subs.length)?`<div class="dsubs">food-safe drop-ins: ${it.subs.map(s=>`<a data-smi="${s.smiles.replace(/"/g,'&quot;')}">${s.name||s.smiles.slice(0,14)}</a>`).join(', ')}</div>`:'';
+    return `<div class="dcell"><div class="dstruct">${it.svg||''}</div>
+      <div class="dname" data-smi="${it.smiles.replace(/"/g,'&quot;')}">${it.name||it.smiles}${badge}</div>
+      <div class="dmatch">${match}</div>${subs}</div>`;
+  }).join('');
+  res.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
+});
 
 // --- mixture mode ---
 function mixAddRow(val){
