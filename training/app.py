@@ -417,6 +417,9 @@ def _load_flavor_map():
     try:
         import pandas as pd
         df = pd.read_parquet("flavor_map.parquet")
+        # UMAP occasionally emits NaN coords for a few near-duplicate rows — drop them so the
+        # JSON stays valid (NaN isn't JSON-compliant) and the scatter has no phantom points.
+        df = df.dropna(subset=[c for c in ("x", "y", "x3", "y3", "z3") if c in df.columns]).reset_index(drop=True)
 
         def norm(col):
             v = df[col]
@@ -426,15 +429,17 @@ def _load_flavor_map():
         cols = {c: norm(c).tolist() for c in ("x", "y", "x3", "y3", "z3") if c in df.columns}
         smis, labs = df["smiles"].tolist(), df["label"].tolist()
         aromas = df["aroma_label"].tolist() if "aroma_label" in df.columns else [None] * len(smis)
-        # raw physicochemical values (for the interpretable MW×logP axes view — real units, not normalized)
+        # raw physicochemical values (for the interpretable MW×logP×TPSA axes view — real units)
         mw = df["mw"].tolist() if "mw" in df.columns else [None] * len(smis)
         logp = df["logp"].tolist() if "logp" in df.columns else [None] * len(smis)
+        tpsa = df["tpsa"].tolist() if "tpsa" in df.columns else [None] * len(smis)
         pts = []
         for i in range(len(smis)):
             p = {"label": labs[i], "aroma": aromas[i], "smiles": smis[i],
                  "name": _table_name(smis[i]) or "",
                  "mw": None if mw[i] != mw[i] else mw[i],      # NaN -> None
-                 "logp": None if logp[i] != logp[i] else logp[i]}
+                 "logp": None if logp[i] != logp[i] else logp[i],
+                 "tpsa": None if tpsa[i] != tpsa[i] else tpsa[i]}
             for c, v in cols.items():
                 p[c] = v[i]
             pts.append(p)

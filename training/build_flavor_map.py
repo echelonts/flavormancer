@@ -60,54 +60,80 @@ def _umap(X, n):
                      metric="jaccard", random_state=42).fit_transform(X)
 
 
-if __name__ == "__main__":
-    src = "taste_master.parquet"
-    if not Path(src).exists():
-        print(f"{src} not found")
-        sys.exit(1)
-    df = pd.read_parquet(src)
-    tasteless = _tasteless_structs()
-    smiles, labels, feats, seen = [], [], [], set()
+def _taste_labels(path="taste_master.parquet"):
+    """{InChIKey-skeleton -> dominant basic taste} from ChemTastesDB, so any molecule that also
+    appears in other sets still gets its taste color on the map."""
+    out = {}
+    if not Path(path).exists():
+        return out
+    df = pd.read_parquet(path)
     for _, r in df.iterrows():
         m = Chem.MolFromSmiles(str(r["smiles"]))
         if m is None:
             continue
-        skel = Chem.MolToInchiKey(m).split("-")[0]
-        seen.add(skel)
-        smiles.append(r["smiles"])
         lbl = next((t for t in _BASIC if r.get(t) == 1), None)
-        if lbl is None and skel in tasteless:
-            lbl = "tasteless"
-        labels.append(lbl or "other")
-        feats.append(_fp(m))
-    # add documented-tasteless molecules that ChemTastesDB doesn't carry, so the class is real
-    for skel, smi in tasteless.items():
-        if skel in seen:
+        if lbl:
+            out[Chem.MolToInchiKey(m).split("-")[0]] = lbl
+    return out
+
+
+def _all_structures():
+    """{InChIKey-skeleton -> canonical SMILES} for EVERY molecule with a structure across all
+    datasets — so the map is the whole embeddable universe, not just the taste-labeled subset."""
+    import glob
+    out = {}
+    for f in sorted(glob.glob("*.parquet")):
+        if f in ("flavor_map.parquet",):
             continue
+        try:
+            d = pd.read_parquet(f)
+        except Exception:  # noqa: BLE001
+            continue
+        if "smiles" not in d.columns:
+            continue
+        for s in d["smiles"].dropna().unique():
+            m = Chem.MolFromSmiles(str(s))
+            if m is not None:
+                out.setdefault(Chem.MolToInchiKey(m).split("-")[0], Chem.MolToSmiles(m))
+    return out
+
+
+if __name__ == "__main__":
+    if not Path("taste_master.parquet").exists():
+        print("taste_master.parquet not found")
+        sys.exit(1)
+    taste = _taste_labels()
+    tasteless = _tasteless_structs()
+    structs = _all_structures()
+    for skel, smi in tasteless.items():  # fold documented-tasteless in (many aren't elsewhere)
+        structs.setdefault(skel, smi)
+    smiles, labels, feats = [], [], []
+    for skel, smi in structs.items():
         m = Chem.MolFromSmiles(smi)
         if m is None:
             continue
-        seen.add(skel)
+        lbl = taste.get(skel) or ("tasteless" if skel in tasteless else "other")
         smiles.append(smi)
-        labels.append("tasteless")
+        labels.append(lbl)
         feats.append(_fp(m))
     X = np.array(feats)
     print(f"embedding {len(X)} molecules with UMAP (Jaccard) — 2D then 3D...", flush=True)
     xy = _umap(X, 2)
     xyz = _umap(X, 3)
-    # real physicochemical coordinates too, so the map can offer an INTERPRETABLE-AXES view
-    # (molecular weight vs logP) alongside the UMAP similarity layout — actual, labelled units.
+    # real physicochemical coordinates too, so the map can offer an INTERPRETABLE-AXES view:
+    # MW (x) vs logP (y) in 2D, and MW vs logP vs TPSA (z) in 3D — actual, labelled units.
     from rdkit.Chem import Crippen, Descriptors
-    mw, logp = [], []
+    mw, logp, tpsa = [], [], []
     for s in smiles:
         m = Chem.MolFromSmiles(str(s))
         mw.append(round(float(Descriptors.MolWt(m)), 1) if m else None)
         logp.append(round(float(Crippen.MolLogP(m)), 2) if m else None)
+        tpsa.append(round(float(Descriptors.TPSA(m)), 1) if m else None)
     out = pd.DataFrame({"smiles": smiles, "label": labels,
                         "x": xy[:, 0].astype(float), "y": xy[:, 1].astype(float),
                         "x3": xyz[:, 0].astype(float), "y3": xyz[:, 1].astype(float),
                         "z3": xyz[:, 2].astype(float),
-                        "mw": mw, "logp": logp})
+                        "mw": mw, "logp": logp, "tpsa": tpsa})
     # dominant aroma descriptor per molecule (for the map's "color by aroma" mode) — guarded so
     # the map still builds without the aroma heads
     try:
