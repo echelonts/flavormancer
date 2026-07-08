@@ -272,13 +272,17 @@
   .design-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}
   .design-pager .pg{font:inherit;font-size:12px;padding:4px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer}
   .design-pager .pg:disabled{opacity:.4;cursor:default}.design-pager .pg:not(:disabled):hover{border-color:var(--brand-2)}
-  /* --- flavor studio --- */
-  .studio-modes{display:flex;gap:8px;margin:14px 0 4px}
-  .studio-mode{font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--muted);cursor:pointer;transition:all .12s}
-  .studio-mode:hover{border-color:var(--brand-2);color:var(--ink)}
-  .studio-mode.on{background:var(--brand-grad);color:#08121A;border-color:transparent}
-  .studio-panel{margin-top:6px}
-  .studio-hint{font-size:12px;color:var(--muted);margin:8px 2px 4px}
+  /* --- flavor studio (unified flavors + notes picker) --- */
+  .studio-hint{font-size:12px;color:var(--muted);margin:12px 2px 8px}
+  .studio-chips{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;padding:2px 2px 6px}
+  .studio-group{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+  .studio-group>.sg-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);width:70px;flex:none;text-align:right;padding-right:4px}
+  .schip{font:inherit;font-size:12px;padding:3px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);cursor:pointer;text-transform:capitalize}
+  .schip:hover{border-color:var(--brand-2)}
+  .schip-note{border-style:dashed}
+  .schip.on{background:var(--brand-grad);color:#08121A;border-color:transparent;font-weight:650}
+  .studio-clear{font:inherit;font-size:12px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+  .studio-clear:hover{border-color:var(--brand-2);color:var(--ink)}
   /* --- flavor library --- */
   .lib-cats{display:flex;flex-direction:column;gap:9px;margin:12px 0 2px}
   .lib-cat{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
@@ -331,23 +335,14 @@
 
   <div class="design-section" id="studio">
     <div class="design-head" id="studioToggle"><span id="studioCaret">▾</span> Flavor Studio
-      <span class="mapsub">— one hub. A flavor <i>is</i> a set of notes: start from a <b>flavor you know</b> or from the <b>notes you want</b>, and land on the same food-safe molecules — 2D/3D structures, GRAS status, drop-in swaps.</span></div>
+      <span class="mapsub">— a flavor <i>is</i> a set of notes, so it's one list. Pick any mix of <b>flavors</b> and <b>notes</b>; Studio ranks the food-safe molecules that carry them (a flavor's character molecule, or a molecule with that note) — 2D/3D structures + drop-in swaps.</span></div>
     <div id="studioWrap">
-      <div class="studio-modes">
-        <button type="button" id="modeFlavor" class="studio-mode on">🍓 Start from a flavor</button>
-        <button type="button" id="modeNotes" class="studio-mode">🎛 Start from notes</button>
-      </div>
-      <div id="flavorMode" class="studio-panel">
-        <div class="studio-hint">Pick a flavor — Studio shows the molecule(s) that <i>make</i> it.</div>
-        <div id="libCats" class="lib-cats"></div>
-      </div>
-      <div id="notesMode" class="studio-panel" style="display:none">
-        <div class="studio-hint">Pick the notes you want — Studio ranks the best molecules to build them.</div>
-        <div id="designChips" class="design-chips"></div>
-        <div class="design-controls">
-          <label class="design-gras"><input type="checkbox" id="designGras" checked> food-safe (GRAS) only</label>
-          <button class="mix-btn" id="designGo">Find molecules</button>
-        </div>
+      <div class="studio-hint">Pick one or more <b>flavors</b> or <b>notes</b> — the more you pick, the higher a molecule that hits several ranks.</div>
+      <div id="studioChips" class="studio-chips"></div>
+      <div class="design-controls">
+        <label class="design-gras"><input type="checkbox" id="designGras" checked> food-safe (GRAS) only</label>
+        <button class="mix-btn" id="studioGo">Find molecules</button>
+        <button type="button" id="studioClear" class="studio-clear">clear</button>
       </div>
       <div id="studioResults" class="design-grid"></div>
     </div>
@@ -1094,92 +1089,57 @@ function attachMapEvents(cv){
 let _mapLastHover=null;
 loadMap();  // map is open by default
 
-// --- Flavor Studio: one hub, two entry modes (flavor / notes) -> shared rich result grid ---
+// --- Flavor Studio: ONE unified picker over flavors AND notes -> ranked molecules ---
 $('studioToggle').addEventListener('click', ()=>{ const w=$('studioWrap'); const o=w.style.display==='none'; w.style.display=o?'block':'none'; $('studioCaret').textContent=o?'▾':'▸'; });
-function setStudioMode(m){
-  const flav = m==='flavor';
-  $('modeFlavor').classList.toggle('on',flav); $('modeNotes').classList.toggle('on',!flav);
-  $('flavorMode').style.display=flav?'block':'none'; $('notesMode').style.display=flav?'none':'block';
-  $('studioResults').innerHTML='<div class="empty">'+(flav?'Pick a flavor above to see the molecule that makes it.':'Pick one or more notes above, then “Find molecules”.')+'</div>';
-}
-$('modeFlavor').addEventListener('click', ()=>setStudioMode('flavor'));
-$('modeNotes').addEventListener('click', ()=>setStudioMode('notes'));
-async function initLibrary(){
+const _studioSel = new Set(); const STUDIO_PAGE = 20;
+const STUDIO_EMPTY='<div class="empty">Pick one or more flavors or notes above, then “Find molecules”.</div>';
+async function initStudio(){
   try{
-    const d = await getJSON('/api/flavors'); const cats = d.categories||[];
-    if(!cats.length){ setTimeout(initLibrary, 4000); return; }
-    $('libCats').innerHTML = cats.map(c=>`<div class="lib-cat"><span class="lc-label">${c.category}</span>`+
-      c.flavors.map(f=>`<button type="button" class="fchip" data-f="${f.replace(/"/g,'&quot;')}">${f}</button>`).join('')+`</div>`).join('');
-    $('libCats').querySelectorAll('.fchip').forEach(b=> b.addEventListener('click', ()=>{
-      $('libCats').querySelectorAll('.fchip.on').forEach(x=>x.classList.remove('on')); b.classList.add('on'); showFlavor(b.dataset.f);
+    const d = await getJSON('/api/studio_terms'); const cats=d.flavors||[], notes=d.notes||[];
+    if(!cats.length && !notes.length){ setTimeout(initStudio, 4000); return; }
+    let html = notes.length ? `<div class="studio-group"><span class="sg-label">notes</span>`+
+      notes.map(n=>`<button type="button" class="schip schip-note" data-term="${n.replace(/"/g,'&quot;')}">${n}</button>`).join('')+`</div>` : '';
+    html += cats.map(c=>`<div class="studio-group"><span class="sg-label">${c.category}</span>`+
+      c.flavors.map(f=>`<button type="button" class="schip schip-flavor" data-term="${f.replace(/"/g,'&quot;')}">${f}</button>`).join('')+`</div>`).join('');
+    $('studioChips').innerHTML = html;
+    $('studioChips').querySelectorAll('.schip').forEach(b=> b.addEventListener('click', ()=>{
+      const t=b.dataset.term; if(_studioSel.has(t)){ _studioSel.delete(t); b.classList.remove('on'); } else { _studioSel.add(t); b.classList.add('on'); }
     }));
-  }catch(_){ setTimeout(initLibrary, 4000); }
+  }catch(_){ setTimeout(initStudio, 4000); }
 }
-initLibrary();
-async function showFlavor(name){
-  const res=$('studioResults'); res.innerHTML='<div class="empty">Looking up the chemistry…</div>';
-  const d=await getJSON('/api/flavor?name='+encodeURIComponent(name)); const mols=d.molecules||[];
-  if(!mols.length){ res.innerHTML='<div class="empty">No character molecule on file for that one.</div>'; return; }
-  const lead=`<div class="empty" style="grid-column:1/-1"><b style="text-transform:capitalize;color:var(--ink)">${name}</b> — character-impact ${mols.length>1?'molecules':'molecule'}${d.category?' · '+d.category:''}. Click a name to run the full read.</div>`;
-  res.innerHTML=lead+mols.map((m,i)=>{
-    const badge=m.gras?'<span class="dbadge">GRAS</span>':'';
-    const tags=(m.tags&&m.tags.length)?`<div class="dmatch">${m.tags.map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('')}</div>`:'';
-    const subs=(m.subs&&m.subs.length)?`<div class="dsubs">food-safe drop-ins: ${m.subs.map(s=>`<a data-smi="${s.smiles.replace(/"/g,'&quot;')}">${s.name||s.smiles.slice(0,14)}</a>`).join(', ')}</div>`:'';
-    return `<div class="dcell"><div class="dstruct" id="libs${i}">${m.svg||''}</div>
-      ${_has3D?`<button type="button" class="mini-3d" data-i="${i}" data-m="2d">3D</button>`:''}
-      <div class="dname" data-smi="${m.smiles.replace(/"/g,'&quot;')}">${m.name||m.molecule}${badge}</div>
-      ${tags}${subs}</div>`;
-  }).join('');
-  res.querySelectorAll('.mini-3d').forEach(b=>{ const i=+b.dataset.i;
-    b.addEventListener('click', ()=> cardToggle3D(b, $('libs'+i), mols[i].smiles, mols[i].svg||'')); });
-  res.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
-}
-
-// --- Studio "notes" mode: pick notes -> best food-safe molecules + drop-in swaps ---
-const _designSel = new Set();
-async function initDesign(){
-  try{
-    const d = await getJSON('/api/design_options'); const descs = d.descriptors||[];
-    if(!descs.length){ setTimeout(initDesign, 4000); return; }  // precompute still warming
-    $('designChips').innerHTML = descs.map(x=>`<button type="button" class="dchip" data-d="${x}">${x}</button>`).join('');
-    $('designChips').querySelectorAll('.dchip').forEach(b=> b.addEventListener('click', ()=>{
-      const d=b.dataset.d; if(_designSel.has(d)){ _designSel.delete(d); b.classList.remove('on'); } else { _designSel.add(d); b.classList.add('on'); }
-    }));
-  }catch(_){ setTimeout(initDesign, 4000); }
-}
-initDesign();
-setStudioMode('flavor');  // Studio opens on the flavor entry
-const DESIGN_PAGE=20; let _designOffset=0;
-async function runDesign(offset){
+initStudio();
+$('studioResults').innerHTML=STUDIO_EMPTY;
+$('studioClear').addEventListener('click', ()=>{ _studioSel.clear(); $('studioChips').querySelectorAll('.schip.on').forEach(x=>x.classList.remove('on')); $('studioResults').innerHTML=STUDIO_EMPTY; });
+async function runStudio(offset){
   const res=$('studioResults');
-  if(!_designSel.size){ res.innerHTML='<div class="empty">Pick one or more notes above.</div>'; return; }
-  _designOffset=offset;
+  if(!_studioSel.size){ res.innerHTML=STUDIO_EMPTY; return; }
   const gras=$('designGras').checked?1:0;
   res.innerHTML='<div class="empty">Searching…</div>';
-  const d=await getJSON('/api/design?descriptors='+encodeURIComponent([..._designSel].join(','))+'&gras='+gras+'&offset='+offset+'&limit='+DESIGN_PAGE);
+  const d=await getJSON('/api/studio?terms='+encodeURIComponent([..._studioSel].join(','))+'&gras='+gras+'&offset='+offset+'&limit='+STUDIO_PAGE);
   const items=d.items||[], tot=d.total_matches||0;
-  if(!items.length){ res.innerHTML='<div class="empty">No molecule carries all those notes'+(gras?' and is food-safe':'')+'. Try fewer notes.</div>'; return; }
+  if(!items.length){ res.innerHTML='<div class="empty">No molecule carries those'+(gras?' and is food-safe':'')+'. Try fewer, or turn off food-safe.</div>'; return; }
   const from=offset+1, to=offset+items.length;
-  const pager=`<div class="design-pager"><button class="pg" id="dPrev" ${offset<=0?'disabled':''}>‹ prev</button>
+  const pager=`<div class="design-pager"><button class="pg" id="sPrev" ${offset<=0?'disabled':''}>‹ prev</button>
     <span>${from}–${to} of ${tot}</span>
-    <button class="pg" id="dNext" ${to>=tot?'disabled':''}>next ›</button></div>`;
-  res.innerHTML=`<div class="empty" style="grid-column:1/-1">${tot} molecules match those notes${gras?' (food-safe)':''}:</div>`+items.map((it,i)=>{
+    <button class="pg" id="sNext" ${to>=tot?'disabled':''}>next ›</button></div>`;
+  res.innerHTML=`<div class="empty" style="grid-column:1/-1">${tot} molecule${tot>1?'s':''} for <b>${[..._studioSel].join(' + ')}</b>${gras?' (food-safe)':''} — the ones hitting the most picks first:</div>`+items.map((it,i)=>{
     const badge=it.gras?'<span class="dbadge">GRAS</span>':'';
-    const match=it.matched.map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('');
+    const match=(it.matched||[]).map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('');
+    const other=(it.other&&it.other.length)?`<div class="dmatch">${it.other.map(t=>`<span class="mt" style="background:#2A323C;color:var(--muted)">${t}</span>`).join('')}</div>`:'';
     const subs=(it.subs&&it.subs.length)?`<div class="dsubs">food-safe drop-ins: ${it.subs.map(s=>`<a data-smi="${s.smiles.replace(/"/g,'&quot;')}">${s.name||s.smiles.slice(0,14)}</a>`).join(', ')}</div>`:'';
-    return `<div class="dcell"><div class="dstruct" id="dgs${i}">${it.svg||''}</div>
+    return `<div class="dcell"><div class="dstruct" id="sts${i}">${it.svg||''}</div>
       ${_has3D?`<button type="button" class="mini-3d" data-i="${i}" data-m="2d">3D</button>`:''}
       <div class="dname" data-smi="${it.smiles.replace(/"/g,'&quot;')}">${it.name||it.smiles}${badge}</div>
-      <div class="dmatch">${match}</div>${subs}</div>`;
+      <div class="dmatch">${match}</div>${other}${subs}</div>`;
   }).join('')+`<div style="grid-column:1/-1">${pager}</div>`;
   res.querySelectorAll('.mini-3d').forEach(b=>{ const i=+b.dataset.i;
-    b.addEventListener('click', ()=> cardToggle3D(b, $('dgs'+i), items[i].smiles, items[i].svg||'')); });
+    b.addEventListener('click', ()=> cardToggle3D(b, $('sts'+i), items[i].smiles, items[i].svg||'')); });
   res.querySelectorAll('[data-smi]').forEach(el=> el.addEventListener('click', ()=>{ q.value=el.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
-  const pv=$('dPrev'), nx=$('dNext');
-  if(pv) pv.addEventListener('click', ()=>runDesign(Math.max(0,offset-DESIGN_PAGE)));
-  if(nx) nx.addEventListener('click', ()=>{ runDesign(offset+DESIGN_PAGE); $('studioResults').scrollIntoView({behavior:'smooth',block:'start'}); });
+  const pv=$('sPrev'), nx=$('sNext');
+  if(pv) pv.addEventListener('click', ()=>runStudio(Math.max(0,offset-STUDIO_PAGE)));
+  if(nx) nx.addEventListener('click', ()=>{ runStudio(offset+STUDIO_PAGE); $('studioResults').scrollIntoView({behavior:'smooth',block:'start'}); });
 }
-$('designGo').addEventListener('click', ()=>runDesign(0));
+$('studioGo').addEventListener('click', ()=>runStudio(0));
 
 // --- mixture mode ---
 function mixAddRow(val){
