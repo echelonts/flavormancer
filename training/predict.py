@@ -271,6 +271,14 @@ def _fp(mol):
     return arr.reshape(1, -1)
 
 
+def _feat(mol):
+    """Model input for the taste & aroma heads: the Morgan fingerprint PLUS the shared
+    physicochemical descriptor block (see chemfeatures.py) — identical to how they were trained.
+    Tox stays on the pure fingerprint; similarity/UMAP also keep the pure bits."""
+    from chemfeatures import descriptors as _desc
+    return np.hstack([_fp(mol).astype(np.float32), _desc(mol).reshape(1, -1)])
+
+
 def _sour(mol):
     hits = [n for n, pat in _ACID.items() if pat is not None and mol.HasSubstructMatch(pat)]
     return {"sour": bool(hits), "sour_reason": hits}
@@ -711,7 +719,7 @@ def predict_aroma(smiles, top_k=8, threshold=0.5):
     if not _AROMA_MODELS:
         return {"available": False,
                 "note": "aroma model not trained here — build with train_aroma.py"}
-    fp = _fp(m)
+    fp = _feat(m)
     preds = []
     for name, clf in _AROMA_MODELS.items():
         p = float(clf.predict_proba(fp)[0][1])
@@ -867,7 +875,7 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return {"error": f"unparseable SMILES: {smiles}"}
-    x = _fp(mol)
+    x = _feat(mol)  # taste heads + intensity regressor use fingerprint + physicochemical block
     out = {"smiles": Chem.MolToSmiles(mol)}
     # Applicability domain: the trained taste/tox heads are fit on ORGANIC tastants.
     # For inorganic / carbon-free molecules (water, O2, N2, NaCl, ...) their output is

@@ -531,8 +531,9 @@ def _precompute_design():
 
 
 def _fpvec(mol):
-    """1-D Morgan fingerprint (predict._fp returns a (1, N) row; we want the flat vector)."""
-    return P._fp(mol)[0]
+    """1-D model feature row for the taste/aroma heads (fingerprint + physicochemical block),
+    matching how they were trained (predict._feat returns a (1, N) row; we want the flat vector)."""
+    return P._feat(mol)[0]
 
 
 @app.get("/api/design_options")
