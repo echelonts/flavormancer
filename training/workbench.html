@@ -112,8 +112,8 @@
   .kt{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
   .kt .tchip{font-size:10px;font-weight:600;padding:1px 8px;border-radius:20px;color:#10140F;text-transform:capitalize}
   .kt .muted{color:var(--muted);font-size:11px}
-  .browse{margin:6px 0 8px}
-  .browse-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 9px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .browse{margin:14px 0 4px;border:1px solid #2C6E74;border-radius:12px;padding:15px 18px;background:linear-gradient(180deg,#15211F,#181D24)}
+  .browse-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-2);margin:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
   .browse-toggle{display:inline-flex}
   .browse-toggle .st-tab{padding:3px 11px}
   .browse-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
@@ -219,7 +219,9 @@
   .s3-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
   .domain-banner{background:#FFF6E6;border:1px solid #E8D38A;color:#7A5A12;border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:14px;line-height:1.5}
   .hint code{font-family:var(--mono);background:var(--accent-soft);padding:1px 5px;border-radius:4px;color:var(--accent)}
-  .toggle{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:14px 2px 0;display:flex;align-items:center;gap:7px;cursor:pointer}
+  .toggle{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-2);margin:18px 0 0;display:flex;align-items:center;gap:7px;cursor:pointer;padding:2px}
+  .toggle:hover{color:var(--ink)}
+  .toggle input[type=checkbox]{display:none}  /* caret is the control, no raw checkbox */
   #mixPanel{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
   .mix-explain{font-size:12.5px;color:var(--muted);line-height:1.55;margin:0 0 12px;max-width:840px}
   .mix-explain b{color:var(--ink)}
