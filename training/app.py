@@ -197,6 +197,29 @@ def api_structure3d(q: Query):
         return {"molblock": None}
 
 
+@app.post("/api/stereoisomers")
+def api_stereoisomers(q: Query):
+    """Every stereoisomer of the queried molecule — all R/S centers AND E/Z double bonds — each
+    as a card: stereo label, structure SVG, name, and any ISOMER-SPECIFIC documented odor/taste
+    (keyed by full InChIKey, so R-carvone spearmint vs S-carvone caraway show through where
+    PubChem records them). The trained models are achiral, so the *difference* is documented, not
+    predicted — this makes that difference explorable instead of hidden."""
+    smi = _resolve(q.smiles)
+    if not smi:
+        return {"isomers": []}
+    isos = P.stereoisomers(smi)
+    for it in isos:
+        it["svg"] = _svg(it["smiles"], 150, 108)
+        it["name"] = (_names(it["smiles"]) or (None, None))[0]
+        doc = _documented_by_full(it["inchikey"])
+        if doc.get("odor"):
+            it["odor"] = doc["odor"]
+        if doc.get("taste"):
+            it["taste"] = doc["taste"]
+    n_doc = sum(1 for it in isos if it.get("odor") or it.get("taste"))
+    return {"isomers": isos, "n": len(isos), "n_documented": n_doc}
+
+
 @app.get("/static/{fname}")
 def _static(fname: str):
     """Serve vendored static assets (3Dmol.js, the logo) locally so the demo is self-contained."""
@@ -664,6 +687,39 @@ def _load_odor_table():
 
 
 _ODOR_TABLE = _load_odor_table()
+
+
+def _load_documented_full():
+    """{full InChIKey -> {odor?, taste?}} from odor_notes / taste_notes — keyed by the FULL key
+    (stereo included) so the stereoisomer explorer can surface enantiomer-specific documented
+    sensory data (e.g. R- vs S-carvone) that the skeleton-keyed tables collapse together."""
+    out = {}
+    try:
+        import pandas as pd
+        od = pd.read_parquet("odor_notes.parquet")
+        for ik, odor in zip(od["inchikey"], od["odor"]):
+            if isinstance(ik, str) and isinstance(odor, str) and odor.strip():
+                out.setdefault(ik, {})["odor"] = odor.strip().split("\n")[0][:160]
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        import pandas as pd
+        tn = pd.read_parquet("taste_notes.parquet")
+        for ik, taste in zip(tn["inchikey"], tn["taste"]):
+            if isinstance(ik, str) and isinstance(taste, str) and taste.strip():
+                out.setdefault(ik, {})["taste"] = taste.strip().split("\n")[0][:160]
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+_DOCUMENTED_FULL = _load_documented_full()
+
+
+def _documented_by_full(inchikey):
+    """Isomer-specific documented odor/taste for an exact InChIKey ({} if none on record)."""
+    return _DOCUMENTED_FULL.get(inchikey, {})
+
 
 # start the landing-page precompute now that every table it reads (_NAME_TABLE, _ODOR_TABLE,
 # the models) is defined — starting it earlier would race those globals into NameErrors

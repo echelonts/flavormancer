@@ -530,6 +530,59 @@ def chirality(mol):
                      "SMILES) for the specific enantiomer's documented odor where PubChem has it.")}
 
 
+def _stereo_label(mol):
+    """A compact stereo-descriptor for one fully-specified isomer: tetrahedral R/S per center
+    (with atom map) and E/Z per double bond — e.g. '(R)', '(2R,3S)', '(E)', '(1Z,2R)'. Covers
+    ALL stereochemistry RDKit tracks, not just a single R/S center."""
+    Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
+    parts = []
+    # read double-bond E/Z FIRST — FindMolChiralCenters re-perceives stereo and clears bond flags
+    for b in mol.GetBonds():
+        s = b.GetStereo()
+        if s == Chem.BondStereo.STEREOE:
+            parts.append((b.GetBeginAtomIdx(), "E"))
+        elif s == Chem.BondStereo.STEREOZ:
+            parts.append((b.GetBeginAtomIdx(), "Z"))
+    for idx, code in Chem.FindMolChiralCenters(mol, includeUnassigned=True,
+                                               useLegacyImplementation=False):
+        parts.append((idx, code))
+    parts.sort()
+    codes = [c for _, c in parts]
+    return "(" + ",".join(codes) + ")" if codes else "(achiral)"
+
+
+def stereoisomers(smiles, max_isomers=24):
+    """Enumerate EVERY stereoisomer of a structure — all tetrahedral (R/S) and double-bond (E/Z)
+    combinations, not just one R/S pair. Returns a list of {smiles (isomeric), inchikey, label,
+    n_stereo}, capped at max_isomers so a molecule with many centers can't blow up. Empty when the
+    molecule has no stereochemistry to vary."""
+    from rdkit.Chem.EnumerateStereoisomers import (EnumerateStereoisomers,
+                                                   StereoEnumerationOptions)
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return []
+    centers = Chem.FindMolChiralCenters(mol, includeUnassigned=True, useLegacyImplementation=False)
+    ez = sum(1 for b in mol.GetBonds() if b.GetStereo() != Chem.BondStereo.STEREONONE
+             or (b.GetBondType() == Chem.BondType.DOUBLE and not b.GetIsAromatic()
+                 and b.GetBeginAtom().GetDegree() > 1 and b.GetEndAtom().GetDegree() > 1))
+    if not centers and ez == 0:
+        return []
+    # onlyUnassigned=False -> flip ALL centers/bonds (every isomer), unique to dedupe meso forms
+    opts = StereoEnumerationOptions(onlyUnassigned=False, unique=True, maxIsomers=max_isomers)
+    out, seen = [], set()
+    for iso in EnumerateStereoisomers(mol, options=opts):
+        Chem.AssignStereochemistry(iso, cleanIt=True, force=True)
+        smi = Chem.MolToSmiles(iso)
+        ik = Chem.MolToInchiKey(iso)
+        if ik in seen:
+            continue
+        seen.add(ik)
+        out.append({"smiles": smi, "inchikey": ik, "label": _stereo_label(iso),
+                    "n_stereo": len(centers) + ez})
+    out.sort(key=lambda r: r["label"])
+    return out
+
+
 def stability(mol):
     def hits(d):
         return [n for n, p in d.items() if p is not None and mol.HasSubstructMatch(p)]
