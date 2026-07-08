@@ -652,6 +652,77 @@ def api_flavor(name: str = ""):
     return {"flavor": name, "category": entries[0]["category"], "molecules": cards}
 
 
+# --- Flavor Studio: ONE unified search over flavors AND notes -------------------
+# A flavor IS a set of notes, so the Studio offers a single pick-list mixing curated flavors
+# (banana, saffron…) with model/documented descriptors (citrus, floral…). Pick any combination;
+# a molecule is ranked by how many of your picks it carries — the character molecule of a flavor,
+# a molecule that has a note, or (best) one that satisfies several at once.
+def _gras_subs(smi, k=3):
+    subs = []
+    for s in P.substitute(smi, k=6).get("neighbors", []):
+        sm = Chem.MolFromSmiles(s["smiles"])
+        if sm is not None and Chem.MolToInchiKey(sm).split("-")[0] in P._GRAS:
+            subs.append({"smiles": s["smiles"], "name": _table_name(s["smiles"]) or "",
+                         "similarity": s["similarity"]})
+        if len(subs) >= k:
+            break
+    return subs
+
+
+@app.get("/api/studio_terms")
+def api_studio_terms():
+    """The unified pick-list: curated flavors (grouped by category) + matchable note descriptors."""
+    return {"flavors": _FLAVOR_CATS, "notes": _DESIGN_DESCS}
+
+
+@app.get("/api/studio")
+def api_studio(terms: str = "", gras: int = 0, offset: int = 0, limit: int = 20):
+    """Unified search: given any mix of flavors and notes, rank the molecules that carry them.
+    Each molecule scores by how many distinct picked terms it matches (a flavor's character
+    molecule matches that flavor; a molecule with a note matches that note)."""
+    want = [t.strip().lower() for t in terms.split(",") if t.strip()]
+    if not want:
+        return {"items": [], "requested": want, "total_matches": 0, "offset": offset, "limit": limit}
+    flavor_terms = [t for t in want if t in _FLAVORS]
+    note_terms = [t for t in want if t not in _FLAVORS]
+    cand = {}  # skeleton -> {smiles, name, gras, matched:set}
+
+    def add(smi, name, is_gras, term):
+        mol = Chem.MolFromSmiles(smi)
+        if mol is None:
+            return
+        skel = Chem.MolToInchiKey(mol).split("-")[0]
+        rec = cand.get(skel)
+        if rec is None:
+            rec = cand[skel] = {"smiles": smi, "name": name or "", "gras": is_gras, "matched": set(),
+                                "tags": set()}
+        rec["matched"].add(term)
+
+    for ft in flavor_terms:                               # flavor -> its character molecule(s)
+        for e in _FLAVORS.get(ft, []):
+            mol = Chem.MolFromSmiles(e["smiles"])
+            g = mol is not None and Chem.MolToInchiKey(mol).split("-")[0] in P._GRAS
+            add(e["smiles"], _table_name(e["smiles"]) or e["molecule"], g, ft)
+    if note_terms:                                        # notes -> molecules carrying them
+        for m in _DESIGN:
+            hit = [nt for nt in note_terms if nt in m["tags"]]
+            for nt in hit:
+                add(m["smiles"], m["name"], m["gras"], nt)
+                cand[Chem.MolToInchiKey(Chem.MolFromSmiles(m["smiles"])).split("-")[0]]["tags"] = m["tags"]
+    scored = [r for r in cand.values() if not (gras and not r["gras"])]
+    scored.sort(key=lambda r: (-len(r["matched"]), not r["gras"], r["name"] == ""))
+    items = []
+    for r in scored[offset:offset + limit]:
+        matched = sorted(r["matched"])
+        items.append({"smiles": r["smiles"], "name": r["name"], "gras": r["gras"],
+                      "matched": matched, "n_matched": len(matched),
+                      "svg": _svg(r["smiles"], 108, 78),
+                      "other": sorted(t for t in r["tags"] if t not in r["matched"])[:5],
+                      "subs": _gras_subs(r["smiles"])})
+    return {"items": items, "requested": want, "flavor_terms": flavor_terms, "note_terms": note_terms,
+            "total_matches": len(scored), "offset": offset, "limit": limit}
+
+
 # --- Aroma: REAL documented odor only (public-domain HSDB/CAMEO) ---------------
 # Hand-set illustrative descriptor "scores" were removed on purpose: made-up numbers
 # have no place in the read. The aroma card now shows only real, cited documented odor
