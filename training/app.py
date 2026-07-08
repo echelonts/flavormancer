@@ -116,7 +116,27 @@ def api_predict(q: Query):
     if not smi:
         return {"error": f"Couldn't resolve '{q.smiles}' to a structure. "
                          f"Enter a valid SMILES or a recognized compound name."}
-    return P.predict(smi, include_aroma=False)
+    out = P.predict(smi, include_aroma=False)
+    out["flavor_tags"] = _read_tags(smi, out)
+    return out
+
+
+def _read_tags(smi, out):
+    """Plain-folk 'what is this?' tags for the read: the tastes it carries, the aroma notes it
+    reads as, and any everyday flavor it's the character molecule of (banana, saffron…). So a
+    non-chemist sees 'banana · fruity · sweet' at a glance instead of only probabilities."""
+    tastes = [t for t in ("sweet", "bitter", "umami")
+              if isinstance(out.get(t), (int, float)) and out[t] >= 0.5]
+    if out.get("sour"):
+        tastes.append("sour")
+    if out.get("salty"):
+        tastes.append("salty")
+    aromas = [d["odor"] for d in _aroma_tags(smi)]  # documented-or-confident aroma notes
+    mol = Chem.MolFromSmiles(smi)
+    flavors = []
+    if mol is not None:
+        flavors = _FLAVOR_BY_SKEL.get(Chem.MolToInchiKey(mol).split("-")[0], [])
+    return {"tastes": tastes, "aromas": aromas[:6], "flavors": flavors}
 
 
 def _aroma_tags(smi, k=3):
@@ -587,6 +607,22 @@ def _load_flavors(path="flavors.csv"):
 
 
 _load_flavors()
+
+
+def _build_flavor_by_skel():
+    """InChIKey-skeleton -> [everyday flavor names it's a character molecule of], for the read tags."""
+    out = {}
+    for flavor, entries in _FLAVORS.items():
+        for e in entries:
+            m = Chem.MolFromSmiles(e["smiles"])
+            if m is not None:
+                out.setdefault(Chem.MolToInchiKey(m).split("-")[0], [])
+                if flavor not in out[Chem.MolToInchiKey(m).split("-")[0]]:
+                    out[Chem.MolToInchiKey(m).split("-")[0]].append(flavor)
+    return out
+
+
+_FLAVOR_BY_SKEL = _build_flavor_by_skel()
 
 
 def _flavor_card(smi, molname):

@@ -77,6 +77,13 @@
   .meter{margin:13px 0}
   .meters-note{font-size:11.5px;color:var(--muted);line-height:1.5;margin:10px 2px 2px;border-top:1px solid #EEF0EC;padding-top:9px}
   .meter .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+  .meter-help{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .flavor-tags{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:12px 0 2px}
+  .flavor-tags .ft-label{font-size:11px;color:var(--muted);margin-right:2px}
+  .ftag{font-size:11px;padding:2px 9px;border-radius:20px;text-transform:capitalize;font-weight:600}
+  .ftag-flavor{background:var(--brand-grad);color:#08121A}
+  .ftag-taste{color:#08121A}
+  .ftag-aroma{background:transparent;border:1px solid;font-weight:600}
   .meter .name{font-weight:600;font-size:14px;text-transform:capitalize}
   .meter .val{font-family:var(--mono);font-size:13px;color:var(--muted)}
   .meter .au{font-size:11px;color:var(--muted);opacity:.85}
@@ -518,6 +525,7 @@
       <p class="smiles" id="smiles"></p>
       <p class="iupac" id="iupac"></p>
       <div id="domainBanner" class="domain-banner" style="display:none"></div>
+      <div id="flavorTags" class="flavor-tags"></div>
       <div id="meters"></div>
       <div class="chips" id="chips"></div>
     </div>
@@ -631,17 +639,27 @@ async function post(path, body){
   return r.json();
 }
 
+const TASTE_HELP = {
+  sweet:'sugars, polyols &amp; some proteins — the reward/energy cue',
+  bitter:'alkaloids &amp; polyphenols — often an aversive/warning cue',
+  umami:'glutamate &amp; 5′-nucleotides — savoury, brothy depth',
+  sour:'free acids / low pH — a solution property, so paired with an acid-group rule',
+  salty:'small mineral (alkali) salts — paired with a cation rule',
+  tasteless:'little or no basic taste expected from structure'
+};
 function meter(name, value, measured, auroc, note){
   const pct = Math.round(value*100);
   const tag = measured ? '<span class="tag measured">measured</span>'
                        : '<span class="tag predicted">predicted</span>';
-  // show the head's held-out AUROC on model predictions (not on measured ground truth)
+  // strength word so each line reads on its own, not just a number
+  const lvl = pct>=65?'likely':pct>=40?'possible':pct>=15?'weak':'unlikely';
   const au = (auroc && !measured) ? ` <span class="au">· AUROC ${auroc}</span>` : '';
   const nt = note ? ` <span class="au">· ${note}</span>` : '';
+  const help = TASTE_HELP[name] ? `<div class="meter-help">${TASTE_HELP[name]}</div>` : '';
   return `<div class="meter">
-    <div class="row"><span class="name">${name}${tag}</span><span class="val">${pct}%${au}${nt}</span></div>
+    <div class="row"><span class="name">${name}${tag}</span><span class="val"><b>${lvl}</b> · ${pct}%${au}${nt}</span></div>
     <div class="track"><div class="fill" style="background:${TASTE_COLORS[name]}"
-      data-w="${pct}"></div></div></div>`;
+      data-w="${pct}"></div></div>${help}</div>`;
 }
 
 function stepDone(name){ const li=document.querySelector('#loaderSteps li[data-step="'+name+'"]'); if(li){ li.classList.remove('active'); li.classList.add('done'); } }
@@ -696,6 +714,12 @@ function render(p, neighbors, svg, names){
   $('smiles').textContent = p.smiles;
   $('iupac').textContent = (iupac && !dupe) ? ('IUPAC: ' + iupac) : '';
   $('iupac').style.display = (iupac && !dupe) ? 'block' : 'none';
+  // plain-folk "reads as" tags: everyday flavors, tastes, aroma notes
+  const ft = p.flavor_tags || {}; const tags = [];
+  (ft.flavors||[]).forEach(f=> tags.push(`<span class="ftag ftag-flavor">${f}</span>`));
+  (ft.tastes||[]).forEach(t=> tags.push(`<span class="ftag ftag-taste" style="background:${TASTE_COLORS[t]||'#8A96A0'}">${t}</span>`));
+  (ft.aromas||[]).forEach(a=>{ const c=aromaColor(a); tags.push(`<span class="ftag ftag-aroma" style="border-color:${c};color:${c}">${a}</span>`); });
+  $('flavorTags').innerHTML = tags.length ? `<span class="ft-label">reads as:</span>`+tags.join('') : '';
   const inDomain = !(p.applicability && p.applicability.in_domain === false);
   const db = $('domainBanner');
   db.style.display = inDomain ? 'none' : 'block';

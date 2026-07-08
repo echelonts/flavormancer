@@ -816,11 +816,19 @@ def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
         return {"neighbors": [], "note": "no reference set loaded (taste_master.parquet absent)"}
     q = _MORGAN.GetFingerprint(mol)
     self_smi = Chem.MolToSmiles(mol)
+    # exclude self by InChIKey SKELETON (connectivity), not the canonical-SMILES string: the query's
+    # canonicalization can differ from the stored form, which let the identical molecule slip back in
+    # at 100%. The Morgan fingerprint is achiral, so a same-skeleton neighbor is structurally the
+    # query (or a stereoisomer it can't distinguish) — either way not a substitute.
+    self_skel = Chem.MolToInchiKey(mol).split("-")[0]
     sims = DataStructs.BulkTanimotoSimilarity(q, fps)
     order = sorted(range(len(sims)), key=lambda i: sims[i], reverse=True)
     neighbors = []
     for i in order:
-        if smis[i] == self_smi or sims[i] < min_similarity:
+        if sims[i] < min_similarity:
+            continue
+        ni = Chem.MolFromSmiles(smis[i])
+        if ni is None or Chem.MolToInchiKey(ni).split("-")[0] == self_skel:
             continue
         neighbors.append({"smiles": smis[i], "similarity": round(float(sims[i]), 3),
                           "known_tastes": tastes[i]})
