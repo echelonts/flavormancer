@@ -718,12 +718,12 @@ def predict_aroma(smiles, top_k=8, threshold=0.5):
         preds.append({"odor": name, "score": round(p, 3), "confident": p >= threshold,
                       "auroc": _AROMA_META.get(name, {}).get("auroc")})
     preds.sort(key=lambda d: -d["score"])
-    # ALWAYS return a ranked read so every molecule gets an aroma prediction: the confident
-    # descriptors (>= threshold) if any, otherwise the top few by probability (flagged).
+    # Return EVERY head (like the taste meters list every taste), ranked, each flagged confident
+    # or not — so the read shows the full aroma profile across all 15 descriptor models, not just
+    # the ones that fired. `top` is the confident shortlist for compact tag uses elsewhere.
     confident = [d for d in preds if d["confident"]]
-    out = confident[:top_k] if confident else preds[:3]
-    return {"available": True, "predicted": True, "descriptors": out,
-            "any_confident": bool(confident),
+    return {"available": True, "predicted": True, "descriptors": preds,
+            "top": (confident or preds[:3]), "any_confident": bool(confident),
             "note": "presence/absence model on public-domain HSDB odor text; not intensity"}
 
 
