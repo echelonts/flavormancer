@@ -29,6 +29,8 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, r2_score
 
+from chemfeatures import descriptors as _desc
+
 BASIC = ["sweet", "bitter", "umami", "sour", "salty", "tasteless"]
 # Salty now ALSO trains as an INDICATIVE head (CV-AUROC ~0.96 once the PubChem documented-
 # taste labels are merged in — see augment_from_taste_notes) while KEEPING its alkali-salt
@@ -65,9 +67,9 @@ def fp(smiles):
     if mol is None:
         return None
     bv = _MORGAN.GetFingerprint(mol)
-    arr = np.zeros((FP_BITS,), dtype=np.int8)
+    arr = np.zeros((FP_BITS,), dtype=np.float32)
     DataStructs.ConvertToNumpyArray(bv, arr)
-    return arr
+    return np.concatenate([arr, _desc(mol)])  # fingerprint + physicochemical block (chemfeatures.py)
 
 
 def featurize(smiles_series):

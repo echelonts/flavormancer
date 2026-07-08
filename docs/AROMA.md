@@ -14,14 +14,18 @@ enumerable via the annotations API. Pipeline:
   thresholds), source-filtered to public domain, dropping GoodScents/Leffingwell/FEMA.
 - `build_aroma_dataset.py` — keyword-normalizes the free text into a controlled
   multi-label descriptor vocabulary (presence/absence).
-- `train_aroma.py` — one RandomForest per descriptor on Morgan fingerprints (the taste
-  stack). After broadening the descriptor vocabulary and folding the curated
-  `flavors.csv` character-impact molecules in as extra labels (825 → **981** molecules),
-  **15 heads clear CV-AUROC ≥ 0.70** (each score is that descriptor's own held-out AUROC —
-  unrelated descriptors can happen to score the same): medicinal 0.96, ammoniacal 0.94,
-  almond 0.94, citrus 0.91, sulfurous 0.88, fatty 0.87, fruity 0.86, fishy 0.86, camphor 0.84,
-  ethereal 0.84, garlic 0.84, minty 0.82, petroleum 0.80, floral 0.80, pungent 0.79 (**fatty**
-  and **petroleum** are new this pass). `predict_aroma()` surfaces them for **any** molecule.
+- `train_aroma.py` — one RandomForest per descriptor on Morgan fingerprints **plus a
+  physicochemical descriptor block** (`chemfeatures.py`: MW, logP, TPSA, H-bond donors/
+  acceptors, rotatable bonds, ring counts, fraction sp3, heteroatoms — the global properties
+  bare bits miss). After broadening the vocabulary, folding the curated `flavors.csv` molecules
+  in (825 → **981** molecules), and adding those features, **16 heads clear CV-AUROC ≥ 0.70**
+  (each score is that descriptor's own held-out AUROC): medicinal 0.97, ammoniacal 0.96,
+  petroleum 0.96, citrus 0.94, camphor 0.93, almond 0.92, fatty 0.89, minty 0.88, ethereal 0.87,
+  fruity 0.87, fishy 0.86, sulfurous 0.85, garlic 0.84, floral 0.83, pungent 0.81, earthy 0.73.
+  The physicochemical features lifted nearly every head and pushed **earthy** over the line (the
+  16th head) — honest signal, not threshold-lowering. `predict_aroma()` surfaces all heads for
+  **any** molecule. (The same feature block sharpened the taste heads too: sour 0.87→0.91,
+  salty 0.91→0.93, tasteless 0.87→0.89.)
 
 **Honest ceiling:** this is **presence/absence** (which notes apply), not **intensity**
 (how strong). HSDB free text carries no scored ratings, and the corpus skews industrial

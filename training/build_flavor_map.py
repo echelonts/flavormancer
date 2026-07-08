@@ -139,9 +139,12 @@ if __name__ == "__main__":
     try:
         import predict as P
         if P._AROMA_MODELS:
+            # the aroma heads take fingerprint + physicochemical features (chemfeatures), not the
+            # bare fp used for the Jaccard UMAP — build that feature matrix here
+            Xf = np.vstack([P._feat(Chem.MolFromSmiles(str(s)))[0] for s in smiles])
             best, bp = ["other"] * len(out), [0.0] * len(out)
             for name, clf in P._AROMA_MODELS.items():
-                probs = clf.predict_proba(X)[:, 1]
+                probs = clf.predict_proba(Xf)[:, 1]
                 for i in range(len(out)):
                     if probs[i] >= 0.5 and probs[i] > bp[i]:
                         bp[i], best[i] = probs[i], name

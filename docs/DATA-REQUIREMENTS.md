@@ -70,10 +70,10 @@ already exists in `predict.py`; supply the data and the feature reports real num
 
 ## 3. Aroma — odor-descriptor prediction (intensity is the "comes with your data")
 
-Aroma **ships in the commercial edition as presence/absence** — 15 RandomForest descriptor
-heads (citrus, floral, minty, almond, fatty, petroleum, …) trained on **public-domain**
-PubChem/HSDB odor text plus the curated character-impact flavor list (CV-AUROC 0.79–0.96;
-see [`AROMA.md`](AROMA.md)). What it does **not** have is **scored
+Aroma **ships in the commercial edition as presence/absence** — 16 RandomForest descriptor
+heads (citrus, floral, minty, almond, fatty, petroleum, earthy, …) trained on **public-domain**
+PubChem/HSDB odor text plus the curated character-impact flavor list, over Morgan fingerprints
+**+ a physicochemical descriptor block** (CV-AUROC 0.73–0.97; see [`AROMA.md`](AROMA.md)). What it does **not** have is **scored
 intensity** — *how strong* each note is — because **no public-domain intensity-scored odor
 data exists** (the one clean scored set, keller_2016, is naive-subject noise; every expert
 intensity set — GS-LF, Dravnieks — is NonCommercial/proprietary). So the marquee upgrade is

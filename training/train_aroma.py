@@ -23,6 +23,8 @@ from rdkit.Chem import DataStructs, rdFingerprintGenerator
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 
+from chemfeatures import descriptors as _desc
+
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
 MIN_POS = 20       # need enough positives for a stable 5-fold estimate
@@ -38,9 +40,9 @@ def fp(smiles):
     if m is None:
         return None
     bv = _MORGAN.GetFingerprint(m)
-    arr = np.zeros((FP_BITS,), dtype=np.int8)
+    arr = np.zeros((FP_BITS,), dtype=np.float32)
     DataStructs.ConvertToNumpyArray(bv, arr)
-    return arr
+    return np.concatenate([arr, _desc(m)])  # fingerprint + physicochemical block (chemfeatures.py)
 
 
 df = pd.read_parquet("aroma_train.parquet")
