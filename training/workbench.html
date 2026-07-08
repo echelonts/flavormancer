@@ -428,9 +428,10 @@
           <b>molecular weight</b> (x, in daltons) vs <b>logP</b> (y — hydrophobicity, oil-vs-water
           partitioning), with gridlines and a logP = 0 waterline. That view <i>is</i> a metric
           space — you can read a molecule's size and greasiness straight off the axes, and watch a
-          taste/aroma color track (or not track) those physical properties. Two lenses on the same
-          molecules: <b>similarity</b> for neighbors &amp; outliers, <b>property axes</b> for
-          physical structure.</p>
+          taste/aroma color track (or not track) those physical properties. In <b>3D</b>, property
+          axes add a real third dimension: <b>TPSA</b> (topological polar surface area — polarity /
+          H-bonding), so it's MW × logP × TPSA. Two lenses on the same molecules:
+          <b>similarity</b> for neighbors &amp; outliers, <b>property axes</b> for physical structure.</p>
         </div>
       </details>
     </div>
@@ -947,14 +948,11 @@ $('mapCT').addEventListener('click', ()=>setMapColor('taste'));
 $('mapCA').addEventListener('click', ()=>setMapColor('aroma'));
 $('mapReset').addEventListener('click', ()=>{ _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1}; drawMap(); });
 function setMapMode(m){
-  // property-axes layout is inherently 2D; picking 3D falls back to the similarity layout
-  if(m==='3d' && _mapLayout==='properties') setMapLayout('similarity');
   _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap();
 }
 function setMapLayout(l){
   _mapLayout=l; $('mapLsim').classList.toggle('on',l==='similarity'); $('mapLprop').classList.toggle('on',l==='properties');
-  if(l==='properties'){ setMapMode('2d'); }  // forces 2D; also resets below
-  _v2={s:1,ox:0,oy:0};  // property view is a fixed labelled plot, not zoom/pan
+  _v2={s:1,ox:0,oy:0};  // 2D property view is a fixed labelled plot, not zoom/pan
   drawMap();
 }
 function setMapColor(c){ _mapColorBy=c; $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma'); mapLegendRender(); drawMap(); }
@@ -1019,13 +1017,34 @@ function drawProps(){
   ctx.globalAlpha=1;
   _mapProj={px:p=>p.mw==null?-9999:bx(p.mw), py:p=>p.logp==null?-9999:by(p.logp)};
 }
+let _prop3=null;
 function draw3D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
   ctx.clearRect(0,0,W,H);
   const cx=W/2, cy=H/2, R=Math.min(W,H)*0.66*(_v3.z||1), cY=Math.cos(_v3.ry),sY=Math.sin(_v3.ry),cX=Math.cos(_v3.rx),sX=Math.sin(_v3.rx);
-  const proj=p=>{ const X=(p.x3||0)-.5,Y=(p.y3||0)-.5,Z=(p.z3||0)-.5;
-    const x1=X*cY-Z*sY, z1=X*sY+Z*cY, y1=Y*cX-z1*sX, z2=Y*sX+z1*cX;
-    return {sx:cx+x1*R, sy:cy-y1*R, d:z2}; };
+  const props = _mapLayout==='properties';
+  if(props && !_prop3){  // real-axis 3D: MW × logP × TPSA, normalized to the unit cube
+    const pc=(a,q)=>{ const s=a.filter(v=>v!=null).sort((x,y)=>x-y); return s[Math.floor(q*(s.length-1))]; };
+    const mw=_mapPts.map(p=>p.mw), lp=_mapPts.map(p=>p.logp), tp=_mapPts.map(p=>p.tpsa);
+    _prop3={mwMax:pc(mw,.98)||1, lpMin:pc(lp,.01), lpMax:pc(lp,.99), tpMax:pc(tp,.98)||1};
+  }
+  const cl=(v)=>Math.max(0,Math.min(1,v));
+  const coord=p=>{
+    if(!props) return [(p.x3||0), (p.y3||0), (p.z3||0)];
+    const d=_prop3;
+    return [ p.mw==null?0:cl(p.mw/d.mwMax),
+             p.logp==null?0:cl((p.logp-d.lpMin)/((d.lpMax-d.lpMin)||1)),
+             p.tpsa==null?0:cl(p.tpsa/d.tpMax) ];
+  };
+  const rot=(X,Y,Z)=>{ const x1=X*cY-Z*sY, z1=X*sY+Z*cY, y1=Y*cX-z1*sX, z2=Y*sX+z1*cX; return {sx:cx+x1*R, sy:cy-y1*R, d:z2}; };
+  const proj=p=>{ const c=coord(p); return rot(c[0]-.5, c[1]-.5, c[2]-.5); };
+  if(props){  // draw labelled 3D axes from the cube origin
+    const O=rot(-.5,-.5,-.5);
+    const axes=[[[.5,-.5,-.5],'MW','#E0805E'],[[-.5,.5,-.5],'logP','#3FC4AA'],[[-.5,-.5,.5],'TPSA','#A88AE0']];
+    ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.lineWidth=1.4;
+    for(const [e,lab,col] of axes){ const E=rot(e[0],e[1],e[2]); ctx.strokeStyle=col; ctx.globalAlpha=.55;
+      ctx.beginPath(); ctx.moveTo(O.sx,O.sy); ctx.lineTo(E.sx,E.sy); ctx.stroke(); ctx.globalAlpha=1; ctx.fillStyle=col; ctx.fillText(lab, E.sx, E.sy-6); }
+  }
   const all=_mapPts.map(p=>({p,pr:proj(p)})).sort((a,b)=>a.pr.d-b.pr.d);  // far first
   for(const {p,pr} of all){ const t=pr.d+0.5; ctx.beginPath(); ctx.arc(pr.sx,pr.sy,1.7+2.1*t,0,7); ctx.fillStyle=mapColor(p); ctx.globalAlpha=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fill(); }
   ctx.globalAlpha=1; _mapProj={px:p=>proj(p).sx, py:p=>proj(p).sy};
