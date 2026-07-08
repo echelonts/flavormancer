@@ -173,6 +173,7 @@
   .odor-thr b{font-family:var(--mono);color:var(--aroma)}
   .odor-thr span{color:var(--muted);font-size:12px}
   .ameter{margin:8px 0}
+  .ameter.dim{opacity:.4}.ameter.dim:hover{opacity:.75}
   .arow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
   .aname{font-weight:600;font-size:13px;text-transform:capitalize}
   .aval{font-family:var(--mono);font-size:12px;color:var(--muted)}
@@ -294,6 +295,37 @@
   .sg-name{font-weight:600;font-size:13px}
   .sg-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all}
   .sg-smi{font-family:var(--mono);font-size:11px;color:var(--accent);word-break:break-all}
+  /* --- molecule modal + logo-matched loader --- */
+  .mol-modal{position:fixed;inset:0;z-index:200;background:rgba(6,10,14,.72);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:34px 16px}
+  .mol-modal-inner{position:relative;width:100%;max-width:1000px;margin:auto;background:var(--surface);
+    border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.55);padding:20px 22px 26px;
+    animation:modalIn .22s cubic-bezier(.2,.9,.3,1)}
+  .mol-modal-inner::before{content:'';position:absolute;inset:0;border-radius:16px;padding:1px;pointer-events:none;
+    background:linear-gradient(135deg,rgba(124,92,191,.5),rgba(43,196,196,.5));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.6}
+  @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+  .mol-close{position:absolute;top:12px;right:12px;z-index:3;width:34px;height:34px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:16px;cursor:pointer;line-height:1}
+  .mol-close:hover{border-color:var(--brand-2);color:var(--ink)}
+  .mol-loader{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 16px 40px}
+  .loader-flask{width:150px;height:150px}
+  .loader-ring{transform-origin:70px 70px;animation:ringspin 1.15s linear infinite}
+  @keyframes ringspin{to{transform:rotate(360deg)}}
+  .loader-flask .bub{opacity:0;animation:bub 1.7s ease-in infinite}
+  .loader-flask .b1{animation-delay:0s}.loader-flask .b2{animation-delay:.5s}
+  .loader-flask .b3{animation-delay:.9s}.loader-flask .b4{animation-delay:1.3s}
+  @keyframes bub{0%{opacity:0;transform:translateY(0) scale(.6)}25%{opacity:.95}100%{opacity:0;transform:translateY(-30px) scale(1)}}
+  .loader-flask .wisp{opacity:.85;stroke-dasharray:6 8;animation:wisp 2s linear infinite}
+  @keyframes wisp{to{stroke-dashoffset:-28}}
+  .loader-title{font-family:'Cinzel Decorative',Georgia,serif;font-size:15px;letter-spacing:.06em;color:var(--cream);margin-top:6px}
+  .loader-steps{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:7px;min-width:250px}
+  .loader-steps li{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--muted);transition:color .2s}
+  .loader-steps li.done{color:var(--ink)}
+  .ls-dot{width:13px;height:13px;border-radius:50%;border:2px solid var(--line);flex:none;position:relative;transition:all .2s}
+  li.active .ls-dot{border-color:var(--brand-2);border-top-color:transparent;animation:ringspin .7s linear infinite}
+  li.done .ls-dot{border-color:var(--aroma);background:var(--aroma)}
+  li.done .ls-dot::after{content:'✓';position:absolute;inset:-3px 0 0 1px;font-size:10px;color:#08121A;font-weight:800}
   /* --- sources footer --- */
   footer.sources{border-top:1px solid var(--line);margin-top:40px;padding:30px 28px 46px;
     background:radial-gradient(120% 140% at 50% 130%, #1C2836 0%, var(--surface) 60%)}
@@ -386,7 +418,7 @@
       <div class="map-controls">
         <span class="map-toggle3d"><button type="button" id="mapLsim" class="st-tab on">similarity</button><button type="button" id="mapLprop" class="st-tab">property axes</button></span>
         <span class="map-toggle3d"><button type="button" id="map2d" class="st-tab on">2D</button><button type="button" id="map3d" class="st-tab">3D</button></span>
-        <span class="map-toggle3d"><button type="button" id="mapCT" class="st-tab on">taste</button><button type="button" id="mapCA" class="st-tab">aroma</button></span>
+        <span class="map-toggle3d"><button type="button" id="mapCT" class="st-tab on">taste</button><button type="button" id="mapCA" class="st-tab">aroma</button><button type="button" id="mapCB" class="st-tab">both</button></span>
         <span id="mapLegend" class="map-legend"></span>
         <button type="button" id="mapReset" class="map-reset">Reset view</button>
       </div>
@@ -414,8 +446,10 @@
           <p><b>Two flavor dimensions.</b> Flip the color toggle between <b>taste</b> (sweet /
           bitter / umami / sour / salty / tasteless) and <b>aroma</b> (= odor — the same thing;
           the 15 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
-          same structural layout — you're overlaying a different sense. Taste and aroma <i>together</i>
-          are the full flavor profile, and comparing the two colorings shows where they align
+          same structural layout — you're overlaying a different sense. The <b>both</b> toggle merges
+          them into one full-flavor view: each dot takes its <b>taste</b> color where a taste is known,
+          otherwise its <b>aroma</b> color — so nearly every molecule is colored by its dominant known
+          flavor property. Comparing taste-only vs aroma-only vs both shows where the two senses align
           (a sweet-tasting molecule that also reads floral) versus diverge.</p>
           <p><b>Honest caveats — and the fix.</b> The <i>similarity</i> (UMAP) layout has axes with
           <b>no units</b>; only local distances mean anything. When you want <b>real, labelled
@@ -432,6 +466,43 @@
     </div>
   </div>
 
+  <div id="molModal" class="mol-modal" style="display:none">
+   <div class="mol-modal-inner">
+    <button type="button" id="molClose" class="mol-close" aria-label="Close">✕</button>
+    <div id="molLoader" class="mol-loader">
+      <svg class="loader-flask" viewBox="0 0 140 140" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg-brand" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#7C5CBF"/><stop offset="1" stop-color="#2BC4C4"/>
+          </linearGradient>
+        </defs>
+        <circle cx="70" cy="70" r="62" fill="none" stroke="url(#lg-brand)" stroke-width="3" opacity=".55"/>
+        <circle class="loader-ring" cx="70" cy="70" r="62" fill="none" stroke="url(#lg-brand)" stroke-width="3" stroke-linecap="round" stroke-dasharray="80 320"/>
+        <!-- aroma wisp -->
+        <path class="wisp" d="M70 34 C58 26 82 20 70 12" fill="none" stroke="#D9AB74" stroke-width="2.4" stroke-linecap="round"/>
+        <!-- flask -->
+        <path d="M58 44 h24 v14 l16 34 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 l16 -34 z"
+              fill="rgba(43,196,196,.10)" stroke="url(#lg-brand)" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M56 44 h28" stroke="url(#lg-brand)" stroke-width="3.4" stroke-linecap="round"/>
+        <!-- liquid -->
+        <path d="M50 82 l7 -15 h26 l7 15 a6 6 0 0 1 -5.5 8.4 h-29 a6 6 0 0 1 -5.5 -8.4 z" fill="url(#lg-brand)" opacity=".7"/>
+        <!-- fizzing bubbles -->
+        <circle class="bub b1" cx="64" cy="80" r="2.4" fill="#EAF6F4"/>
+        <circle class="bub b2" cx="72" cy="84" r="1.8" fill="#EAF6F4"/>
+        <circle class="bub b3" cx="77" cy="78" r="2.1" fill="#EAF6F4"/>
+        <circle class="bub b4" cx="68" cy="86" r="1.5" fill="#EAF6F4"/>
+      </svg>
+      <div class="loader-title" id="loaderTitle">Brewing the flavor read…</div>
+      <ul class="loader-steps" id="loaderSteps">
+        <li data-step="predict"><span class="ls-dot"></span> Taste models + chemistry</li>
+        <li data-step="aroma"><span class="ls-dot"></span> Aroma descriptors</li>
+        <li data-step="names"><span class="ls-dot"></span> Names (common / IUPAC)</li>
+        <li data-step="structure"><span class="ls-dot"></span> 2D structure</li>
+        <li data-step="structure3d"><span class="ls-dot"></span> 3D conformer</li>
+        <li data-step="neighbors"><span class="ls-dot"></span> Substitution candidates</li>
+      </ul>
+    </div>
+    <div id="molBody">
   <div id="err" class="err" style="display:none"></div>
 
   <div class="grid" id="results" style="display:none">
@@ -486,6 +557,9 @@
     Substitutions rank by structural similarity (Tanimoto). Aroma isn't in the public
     demo — it trains on your data, on-prem. Results are leads for the bench, not verdicts.
   </p>
+    </div>
+   </div>
+  </div>
 </main>
 
 <footer class="sources">
@@ -544,7 +618,8 @@ const AROMA_COLORS = {fruity:'#E8913C',citrus:'#EFC01F',floral:'#E86AA6',minty:'
   cinnamon:'#B5561F',clove:'#8A5A2B',coffee:'#6A4632',cocoa:'#6B4226',meaty:'#A0522D',
   cheesy:'#D9B84D',creamy:'#E3CE9A',waxy:'#C4BE96',fresh:'#4FC0B0',grassy:'#7DAF3A',
   rancid:'#9A8B5A',tarry:'#4A4038',winey:'#8E4B6E',honey:'#E0A83C',apple:'#8DBF4A',
-  cherry:'#C0392B',pine:'#3FA06B',banana:'#E6C84D'};
+  cherry:'#C0392B',pine:'#3FA06B',banana:'#E6C84D',fatty:'#C9B27A',petroleum:'#6E7B8B',
+  alcoholic:'#9FB6C4',musky:'#8B7BA5',putrid:'#6E7A4A',soapy:'#B9C6D0',vegetable:'#6FA36B',bready:'#C7A06A'};
 const aromaColor = n => AROMA_COLORS[n] || 'var(--aroma)';
 
 const $ = id => document.getElementById(id);
@@ -569,25 +644,39 @@ function meter(name, value, measured, auroc, note){
       data-w="${pct}"></div></div></div>`;
 }
 
+function stepDone(name){ const li=document.querySelector('#loaderSteps li[data-step="'+name+'"]'); if(li){ li.classList.remove('active'); li.classList.add('done'); } }
+function openModal(){ $('molModal').style.display='flex'; $('molModal').scrollTop=0; document.body.style.overflow='hidden'; }
+function closeModal(){ $('molModal').style.display='none'; document.body.style.overflow=''; }
+$('molClose').addEventListener('click', closeModal);
+$('molModal').addEventListener('click', e=>{ if(e.target===$('molModal')) closeModal(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && $('molModal').style.display==='flex') closeModal(); });
+
 async function run(){
   const text = q.value.trim();
   if(!text) return;
   go.disabled = true; go.textContent = 'Reading…';
   $('err').style.display='none';
+  openModal();
+  $('molLoader').style.display='flex'; $('molBody').style.display='none';
+  document.querySelectorAll('#loaderSteps li').forEach(li=>{ li.classList.remove('done'); li.classList.add('active'); });
+  $('loaderTitle').textContent='Brewing the flavor read…';
   try{
     const [p, n, s, nm, ar, s3] = await Promise.all([
-      post('/api/predict',{smiles:text}),
-      post('/api/neighbors',{smiles:text, k:8}),
-      post('/api/structure',{smiles:text}),
-      post('/api/names',{smiles:text}),
-      post('/api/aroma',{smiles:text}),
-      post('/api/structure3d',{smiles:text})
+      post('/api/predict',{smiles:text}).then(r=>{stepDone('predict');return r;}),
+      post('/api/neighbors',{smiles:text, k:8}).then(r=>{stepDone('neighbors');return r;}),
+      post('/api/structure',{smiles:text}).then(r=>{stepDone('structure');return r;}),
+      post('/api/names',{smiles:text}).then(r=>{stepDone('names');return r;}),
+      post('/api/aroma',{smiles:text}).then(r=>{stepDone('aroma');return r;}),
+      post('/api/structure3d',{smiles:text}).then(r=>{stepDone('structure3d');return r;})
     ]);
     if(p.error){ throw new Error(p.error); }
+    $('molLoader').style.display='none'; $('molBody').style.display='block';
     render(p, n.neighbors||[], (s&&s.svg)||null, nm||{});
     renderAroma(ar||{});
     setStructure3D((s3&&s3.molblock)||null);
+    $('molModal').scrollTop=0;
   }catch(e){
+    $('molLoader').style.display='none'; $('molBody').style.display='block';
     $('results').style.display='none'; $('behaviorCard').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
     $('err').textContent = e.message; $('err').style.display='block';
   }finally{
@@ -771,8 +860,8 @@ function renderAroma(ar){
   const pred = ar.predicted;
   if(pred && (pred.descriptors||[]).length){
     const lowconf = pred.any_confident===false;
-    html += `<div class="aroma-prev-tag">Predicted descriptors · model (presence/absence, public-domain HSDB)${lowconf?' — low confidence (no strong descriptor)':''}</div>`;
-    html += pred.descriptors.map(d=>{ const pct=Math.round(d.score*100); const col=aromaColor(d.odor); const au=d.auroc?` · AUROC ${d.auroc}`:''; return `<div class="ameter"><div class="arow"><span class="aname" style="color:${col}">${d.odor}</span><span class="aval">${pct}%${au}</span></div><div class="atrack"><div class="afill" style="width:${pct}%;background:${col}"></div></div></div>`; }).join('');
+    html += `<div class="aroma-prev-tag">All ${pred.descriptors.length} aroma descriptor models · presence/absence, public-domain HSDB${lowconf?' — none firing strongly for this molecule':''}</div>`;
+    html += pred.descriptors.map(d=>{ const pct=Math.round(d.score*100); const col=aromaColor(d.odor); const au=d.auroc?` · AUROC ${d.auroc}`:''; return `<div class="ameter${d.confident?'':' dim'}"><div class="arow"><span class="aname" style="color:${col}">${d.odor}${d.confident?'':' '}</span><span class="aval">${pct}%${au}</span></div><div class="atrack"><div class="afill" style="width:${pct}%;background:${col}"></div></div></div>`; }).join('');
   }
   const doc = ar.documented;
   if(doc && (doc.notes||[]).length){
@@ -927,8 +1016,26 @@ initBrowse();
 const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD24E',salty:'#63A6E0',tasteless:'#B8C0C6',other:'#8A96A0'};
 let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste', _mapLayout='similarity';
 let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6,z:1}, _drag=null, _dragged=false;
-function mapColor(p){ return _mapColorBy==='aroma' ? (p.aroma && p.aroma!=='other' ? aromaColor(p.aroma) : '#5A6068') : (MAP_COLORS[p.label]||MAP_COLORS.other); }
-function mapLabel(p){ return _mapColorBy==='aroma' ? (p.aroma||'other') : p.label; }
+const GREY='#5A6068';
+// 'both' = the full flavor picture: taste color where a taste is known, else the aroma color,
+// else grey — so every molecule with any known taste OR aroma is colored (taste takes priority).
+function _tasteC(l){ return MAP_COLORS[l]||MAP_COLORS.other; }
+function _aromaC(a){ return a && a!=='other' ? aromaColor(a) : GREY; }
+function mapLabel(p){
+  if(_mapColorBy==='aroma') return p.aroma||'other';
+  if(_mapColorBy==='both')  return (p.label && p.label!=='other') ? p.label : (p.aroma||'other');
+  return p.label;
+}
+function mapColor(p){
+  if(_mapColorBy==='aroma') return _aromaC(p.aroma);
+  if(_mapColorBy==='both'){ return (p.label && p.label!=='other') ? _tasteC(p.label) : _aromaC(p.aroma); }
+  return _tasteC(p.label);
+}
+function legendColor(l){  // color a legend label given the current mode
+  if(_mapColorBy==='taste') return _tasteC(l);
+  if(_mapColorBy==='aroma') return l==='other'?GREY:aromaColor(l);
+  return MAP_COLORS[l] ? _tasteC(l) : (l==='other'?GREY:aromaColor(l));  // both: taste palette if it's a taste
+}
 
 $('mapToggle').addEventListener('click', async ()=>{
   const w=$('mapWrap'); const open=w.style.display==='none';
@@ -941,6 +1048,7 @@ $('mapLsim').addEventListener('click', ()=>setMapLayout('similarity'));
 $('mapLprop').addEventListener('click', ()=>setMapLayout('properties'));
 $('mapCT').addEventListener('click', ()=>setMapColor('taste'));
 $('mapCA').addEventListener('click', ()=>setMapColor('aroma'));
+$('mapCB').addEventListener('click', ()=>setMapColor('both'));
 $('mapReset').addEventListener('click', ()=>{ _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1}; drawMap(); });
 function setMapMode(m){
   _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap();
@@ -950,11 +1058,15 @@ function setMapLayout(l){
   _v2={s:1,ox:0,oy:0};  // 2D property view is a fixed labelled plot, not zoom/pan
   drawMap();
 }
-function setMapColor(c){ _mapColorBy=c; $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma'); mapLegendRender(); drawMap(); }
+function setMapColor(c){ _mapColorBy=c;
+  $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma'); $('mapCB').classList.toggle('on',c==='both');
+  mapLegendRender(); drawMap();
+}
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
-  const labs=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,10);
-  $('mapLegend').innerHTML=labs.map(l=>`<span><i style="background:${_mapColorBy==='aroma'?(l==='other'?'#5A6068':aromaColor(l)):(MAP_COLORS[l]||MAP_COLORS.other)}"></i>${l} (${counts[l]})</span>`).join('');
+  // show every class (all taste heads / all 15 aroma heads / both), 'other' always last
+  const labs=Object.keys(counts).sort((a,b)=> a==='other'?1 : b==='other'?-1 : counts[b]-counts[a]).slice(0,20);
+  $('mapLegend').innerHTML=labs.map(l=>`<span><i style="background:${legendColor(l)}"></i>${l} (${counts[l]})</span>`).join('');
 }
 
 async function loadMap(){
