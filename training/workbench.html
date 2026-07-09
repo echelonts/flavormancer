@@ -322,6 +322,7 @@
   .enrich-table .et-name{font-weight:600}
   .enrich-table .et-mut{color:var(--muted)}
   .et-gras{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;background:var(--aroma);color:#08121A}
+  .et-iso{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;background:rgba(217,171,116,.22);color:var(--cream);margin-left:5px}
   .et-tag{font-size:10px;padding:1px 7px;border-radius:20px;text-transform:capitalize}
   /* --- molecule modal + logo-matched loader --- */
   .mol-modal{position:fixed;inset:0;z-index:200;background:rgba(6,10,14,.72);backdrop-filter:blur(4px);
@@ -1341,7 +1342,7 @@ let _enTimer=null;
 $('enrichSearch').addEventListener('input', e=>{ clearTimeout(_enTimer); _enTimer=setTimeout(()=>{ _enQ=e.target.value; _enOffset=0; loadEnrich(); }, 250); });
 function etCell(c, r){
   const v=r[c.key];
-  if(c.key==='name') return `<td class="et-name">${v||'<span class="et-mut">—</span>'}</td>`;
+  if(c.key==='name'){ const iso=r.is_isomer?' <span class="et-iso" title="A stereoisomer with its own documented odor/taste">isomer</span>':''; return `<td class="et-name">${v||'<span class="et-mut">—</span>'}${iso}</td>`; }
   if(c.key==='gras') return `<td>${v?'<span class="et-gras">GRAS</span>':''}</td>`;
   if(c.key==='taste') return `<td>${(v||'').split(',').filter(Boolean).map(t=>`<span class="et-tag" style="background:${(TASTE_COLORS[t]||'#8A96A0')};color:#08121A">${t}</span>`).join(' ')}</td>`;
   if(c.key==='aroma_top') return `<td>${v?`<span class="et-tag" style="background:${aromaColor(v)};color:#08121A">${v}</span>`:''}</td>`;
