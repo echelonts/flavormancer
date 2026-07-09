@@ -304,6 +304,24 @@
   .sg-name{font-weight:600;font-size:13px}
   .sg-iupac{font-family:var(--mono);font-size:10px;color:var(--muted);word-break:break-all}
   .sg-smi{font-family:var(--mono);font-size:11px;color:var(--accent);word-break:break-all}
+  /* --- enrichment table --- */
+  .enrich-controls{display:flex;align-items:center;gap:12px;margin:12px 0 8px}
+  .enrich-search{flex:1;max-width:420px;font:inherit;font-size:13px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+  .enrich-search:focus{outline:none;border-color:var(--brand-2)}
+  .enrich-count{font-size:12px;color:var(--muted)}
+  .enrich-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+  .enrich-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px}
+  .enrich-table th{position:sticky;top:0;background:var(--panel);text-align:left;padding:9px 11px;font-weight:650;
+    color:var(--brand-2);border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none}
+  .enrich-table th:hover{color:var(--ink)}
+  .enrich-table th .th-ar{opacity:.6;font-size:10px}
+  .enrich-table td{padding:8px 11px;border-bottom:1px solid #20272F;color:var(--ink);white-space:nowrap}
+  .enrich-table tbody tr{cursor:pointer}
+  .enrich-table tbody tr:hover{background:rgba(43,196,196,.06)}
+  .enrich-table .et-name{font-weight:600}
+  .enrich-table .et-mut{color:var(--muted)}
+  .et-gras{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;background:var(--aroma);color:#08121A}
+  .et-tag{font-size:10px;padding:1px 7px;border-radius:20px;text-transform:capitalize}
   /* --- molecule modal + logo-matched loader --- */
   .mol-modal{position:fixed;inset:0;z-index:200;background:rgba(6,10,14,.72);backdrop-filter:blur(4px);
     display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:34px 16px}
@@ -472,6 +490,19 @@
           <b>similarity</b> for neighbors &amp; outliers, <b>property axes</b> for physical structure.</p>
         </div>
       </details>
+    </div>
+  </div>
+
+  <div class="design-section" id="enrich">
+    <div class="design-head" id="enrichToggle"><span id="enrichCaret">▸</span> Molecule enrichment table
+      <span class="mapsub">— the whole universe in one grid: every molecule with its taste, aroma, food-safety, and chemistry. Sort any column; hover a header for what it means.</span></div>
+    <div id="enrichWrap" style="display:none">
+      <div class="enrich-controls">
+        <input id="enrichSearch" class="enrich-search" placeholder="Search name, SMILES, taste, aroma…" autocomplete="off">
+        <span id="enrichCount" class="enrich-count"></span>
+      </div>
+      <div class="enrich-scroll"><table id="enrichTable" class="enrich-table"><thead id="enrichHead"></thead><tbody id="enrichBody"></tbody></table></div>
+      <div id="enrichPager" class="design-pager"></div>
     </div>
   </div>
 
@@ -1278,6 +1309,41 @@ async function runStudio(offset){
   if(nx) nx.addEventListener('click', ()=>{ runStudio(offset+STUDIO_PAGE); $('studioResults').scrollIntoView({behavior:'smooth',block:'start'}); });
 }
 $('studioGo').addEventListener('click', ()=>runStudio(0));
+
+// --- enrichment table: browse the whole universe, sortable + searchable ---
+let _enCols=[], _enSort='name', _enDesc=false, _enOffset=0, _enQ=''; const EN_PAGE=50;
+$('enrichToggle').addEventListener('click', ()=>{ const w=$('enrichWrap'); const o=w.style.display==='none'; w.style.display=o?'block':'none'; $('enrichCaret').textContent=o?'▾':'▸'; if(o && !_enCols.length) initEnrich(); });
+async function initEnrich(){
+  const m = await getJSON('/api/enrichment_meta'); _enCols = m.columns||[];
+  $('enrichHead').innerHTML = '<tr>'+_enCols.map(c=>`<th data-k="${c.key}" title="${c.why.replace(/"/g,'&quot;')}">${c.label} <span class="th-ar" data-k="${c.key}"></span></th>`).join('')+'</tr>';
+  $('enrichHead').querySelectorAll('th').forEach(th=> th.addEventListener('click', ()=>{
+    const k=th.dataset.k; if(_enSort===k){ _enDesc=!_enDesc; } else { _enSort=k; _enDesc=(k!=='name'); } _enOffset=0; loadEnrich();
+  }));
+  loadEnrich();
+}
+let _enTimer=null;
+$('enrichSearch').addEventListener('input', e=>{ clearTimeout(_enTimer); _enTimer=setTimeout(()=>{ _enQ=e.target.value; _enOffset=0; loadEnrich(); }, 250); });
+function etCell(c, r){
+  const v=r[c.key];
+  if(c.key==='name') return `<td class="et-name">${v||'<span class="et-mut">—</span>'}</td>`;
+  if(c.key==='gras') return `<td>${v?'<span class="et-gras">GRAS</span>':''}</td>`;
+  if(c.key==='taste') return `<td>${(v||'').split(',').filter(Boolean).map(t=>`<span class="et-tag" style="background:${(TASTE_COLORS[t]||'#8A96A0')};color:#08121A">${t}</span>`).join(' ')}</td>`;
+  if(c.key==='aroma_top') return `<td>${v?`<span class="et-tag" style="background:${aromaColor(v)};color:#08121A">${v}</span>`:''}</td>`;
+  return `<td>${v==null?'<span class="et-mut">—</span>':v}</td>`;
+}
+async function loadEnrich(){
+  $('enrichHead').querySelectorAll('.th-ar').forEach(s=> s.textContent = s.dataset.k===_enSort ? (_enDesc?'▼':'▲') : '');
+  const d = await getJSON(`/api/enrichment?q=${encodeURIComponent(_enQ)}&sort=${_enSort}&desc=${_enDesc?1:0}&offset=${_enOffset}&limit=${EN_PAGE}`);
+  const tot=d.total||0;
+  $('enrichBody').innerHTML = (d.rows||[]).map(r=>`<tr data-smi="${r.smiles.replace(/"/g,'&quot;')}">`+_enCols.map(c=>etCell(c,r)).join('')+'</tr>').join('') || `<tr><td colspan="${_enCols.length}" class="et-mut" style="padding:16px">No molecules match.</td></tr>`;
+  $('enrichBody').querySelectorAll('tr[data-smi]').forEach(tr=> tr.addEventListener('click', ()=>{ q.value=tr.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
+  const from=tot?_enOffset+1:0, to=Math.min(_enOffset+EN_PAGE,tot);
+  $('enrichCount').textContent = `${tot.toLocaleString()} molecules`;
+  $('enrichPager').innerHTML = `<button class="pg" id="enPrev" ${_enOffset<=0?'disabled':''}>‹ prev</button><span>${from}–${to} of ${tot.toLocaleString()}</span><button class="pg" id="enNext" ${to>=tot?'disabled':''}>next ›</button>`;
+  const pv=$('enPrev'), nx=$('enNext');
+  if(pv) pv.addEventListener('click', ()=>{ _enOffset=Math.max(0,_enOffset-EN_PAGE); loadEnrich(); });
+  if(nx) nx.addEventListener('click', ()=>{ _enOffset+=EN_PAGE; loadEnrich(); $('enrich').scrollIntoView({behavior:'smooth',block:'start'}); });
+}
 
 // --- mixture mode ---
 function mixAddRow(val){
