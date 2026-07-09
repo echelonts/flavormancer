@@ -186,8 +186,9 @@
   .aval{font-family:var(--mono);font-size:12px;color:var(--muted)}
   .atrack{height:8px;background:#EDEFEC;border-radius:5px;overflow:hidden}
   .afill{height:100%;background:var(--aroma);border-radius:5px;transition:width .5s ease}
-  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:10px}
-  .kv .k{font-weight:600;font-size:13px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin-bottom:10px}
+  .kv .k{font-weight:600;font-size:13px;max-width:230px}
+  .kv .k-why{font-weight:400;font-size:10.5px;color:var(--muted);line-height:1.35;margin-top:2px}
   .kv .v{font-family:var(--mono);font-size:13px;color:var(--muted)}
   .bsub{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px}
   .fnote{font-size:13px;color:var(--ink);line-height:1.5}
@@ -494,9 +495,9 @@
   </div>
 
   <div class="design-section" id="enrich">
-    <div class="design-head" id="enrichToggle"><span id="enrichCaret">▸</span> Molecule enrichment table
+    <div class="design-head" id="enrichToggle"><span id="enrichCaret">▾</span> Molecule enrichment table
       <span class="mapsub">— the whole universe in one grid: every molecule with its taste, aroma, food-safety, and chemistry. Sort any column; hover a header for what it means.</span></div>
-    <div id="enrichWrap" style="display:none">
+    <div id="enrichWrap">
       <div class="enrich-controls">
         <input id="enrichSearch" class="enrich-search" placeholder="Search name, SMILES, taste, aroma…" autocomplete="off">
         <span id="enrichCount" class="enrich-count"></span>
@@ -672,6 +673,21 @@ async function post(path, body){
   return r.json();
 }
 
+// significance of each physicochemical fact, shown per molecule under its value
+const PHYS_WHY = {
+  'Molecular weight':'Size. Heavier molecules are generally less volatile, so aroma fades.',
+  'logP (lipophilicity)':'Oil↔water balance — sets solubility, which carrier a flavor needs, and how it partitions.',
+  'Polar surface area':'Polarity / H-bonding. High ⇒ more water-soluble, less volatile.',
+  'H-bond donors / acceptors':'Drive water solubility and lower volatility.',
+  'Rotatable bonds':'Molecular flexibility — rigidity often tracks with a sharper odor.',
+  'Water solubility (logS)':'How much dissolves in water — dosing and delivery.',
+  'Boiling point':'Lower BP ⇒ more volatile ⇒ stronger, faster aroma.',
+  'Melting point':'Sets whether it is solid or liquid at room temperature.',
+  'Phase at ~25 °C':'The physical form you actually handle it as.',
+  'Volatility':'How readily it evaporates into the air to be smelled.',
+  'Vapor pressure':'Higher ⇒ more molecules airborne ⇒ more aroma.',
+  'Ionizable groups':'Charge vs pH — affects taste, solubility, and stability.',
+};
 const TASTE_HELP = {
   sweet:'sugars, polyols &amp; some proteins — the reward/energy cue',
   bitter:'alkaloids &amp; polyphenols — often an aversive/warning cue',
@@ -831,7 +847,7 @@ function renderBehavior(p){
   const pc=p.physchem||{}, sf=p.safety||{}, st=p.stability||{}, ch=p.chemesthesis||{}, lb=p.labeling||{};
   const comp=pc.computed||{}, est=pc.estimate||{}, meas=pc.measured||{}, qual=pc.qualitative||{};
   const MEAS=' <span class="tag measured">measured</span>', EST=' <span class="tag predicted">estimate</span>';
-  const kv = rows => '<div class="kv">'+rows.map(r=>`<div class="k">${r[0]}</div><div class="v">${r[1]}</div>`).join('')+'</div>';
+  const kv = rows => '<div class="kv">'+rows.map(r=>{ const w=r[2]||PHYS_WHY[r[0]]; return `<div class="k">${r[0]}${w?`<div class="k-why">${w}</div>`:''}</div><div class="v">${r[1]}</div>`; }).join('')+'</div>';
   const chips = (arr,style)=> '<div class="chips">'+arr.map(x=>`<span class="chip" ${style||''}>${x}</span>`).join('')+'</div>';
   const WARN='style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8"';
 
@@ -1344,6 +1360,7 @@ async function loadEnrich(){
   if(pv) pv.addEventListener('click', ()=>{ _enOffset=Math.max(0,_enOffset-EN_PAGE); loadEnrich(); });
   if(nx) nx.addEventListener('click', ()=>{ _enOffset+=EN_PAGE; loadEnrich(); $('enrich').scrollIntoView({behavior:'smooth',block:'start'}); });
 }
+initEnrich();  // enrichment table is open by default, like the map
 
 // --- mixture mode ---
 function mixAddRow(val){
