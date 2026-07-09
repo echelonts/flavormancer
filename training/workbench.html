@@ -321,10 +321,10 @@
   .loader-flask{width:150px;height:150px}
   .loader-ring{transform-origin:70px 70px;animation:ringspin 1.15s linear infinite}
   @keyframes ringspin{to{transform:rotate(360deg)}}
-  .loader-flask .bub{opacity:0;animation:bub 1.7s ease-in infinite}
+  .loader-flask .bub{opacity:0;transform-box:fill-box;transform-origin:center;animation:bub 1.7s ease-in infinite}
   .loader-flask .b1{animation-delay:0s}.loader-flask .b2{animation-delay:.5s}
   .loader-flask .b3{animation-delay:.9s}.loader-flask .b4{animation-delay:1.3s}
-  @keyframes bub{0%{opacity:0;transform:translateY(0) scale(.6)}25%{opacity:.95}100%{opacity:0;transform:translateY(-30px) scale(1)}}
+  @keyframes bub{0%{opacity:0;transform:translateY(4px) scale(.5)}25%{opacity:.95}100%{opacity:0;transform:translateY(-15px) scale(1)}}
   .loader-flask .wisp{opacity:.85;stroke-dasharray:6 8;animation:wisp 2s linear infinite}
   @keyframes wisp{to{stroke-dashoffset:-28}}
   .loader-title{font-family:'Cinzel Decorative',Georgia,serif;font-size:15px;letter-spacing:.06em;color:var(--cream);margin-top:6px}

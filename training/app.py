@@ -136,6 +136,10 @@ def _read_tags(smi, out):
     flavors = []
     if mol is not None:
         flavors = _FLAVOR_BY_SKEL.get(Chem.MolToInchiKey(mol).split("-")[0], [])
+    # a word can be BOTH a curated flavor and an aroma descriptor (coconut, banana, citrus…) —
+    # show it once, as the richer flavor tag; also don't repeat a taste as an aroma
+    seen = set(flavors) | set(tastes)
+    aromas = [a for a in aromas if a not in seen]
     return {"tastes": tastes, "aromas": aromas[:6], "flavors": flavors}
 
 
