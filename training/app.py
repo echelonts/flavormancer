@@ -756,7 +756,7 @@ def _load_enrichment():
             "mw": _num(r.get("mw")), "logp": _num(r.get("logp")), "tpsa": _num(r.get("tpsa")),
             "hbd": _num(r.get("hbd")), "hba": _num(r.get("hba")), "rot_bonds": _num(r.get("rot_bonds")),
             "melting_point_c": _num(r.get("melting_point_c")), "boiling_point_c": _num(r.get("boiling_point_c")),
-            "gras": bool(r.get("gras")),
+            "gras": bool(r.get("gras")), "is_isomer": bool(r.get("is_isomer")),
         })
     return rows
 

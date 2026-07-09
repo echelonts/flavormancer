@@ -62,6 +62,63 @@ def _by_skel(path, cols):
     return out
 
 
+def _documented_isomer_rows(name_by_skel):
+    """First-class rows for the stereoisomers that genuinely DIFFER in documented odor/taste
+    (R- vs S-carvone, (-)- vs (+)-menthol…). Most stereoisomers share their parent's data and
+    stay folded into one skeleton; these few carry their own cited notes, so they earn their own
+    row — searchable, sortable, openable like any molecule."""
+    from rdkit.Chem import Crippen, Descriptors, rdMolDescriptors
+    try:
+        import build_aroma_dataset as BA  # odor text -> descriptor tag
+    except Exception:  # noqa: BLE001
+        BA = None
+    docs = {}  # skeleton -> {full_ik: {smiles, odor?, taste?}}
+    for path, col in (("odor_notes.parquet", "odor"), ("taste_notes.parquet", "taste")):
+        try:
+            d = pd.read_parquet(path)
+        except Exception:  # noqa: BLE001
+            continue
+        if col not in d.columns:
+            continue
+        for ik, smi, txt in zip(d["inchikey"], d["smiles"], d[col]):
+            if isinstance(ik, str) and isinstance(smi, str) and isinstance(txt, str) and txt.strip():
+                rec = docs.setdefault(ik.split("-")[0], {}).setdefault(ik, {"smiles": smi})
+                rec[col] = txt.strip().split("\n")[0][:40]
+    rows = []
+    for skel, isos in docs.items():
+        distinct = {(v.get("odor"), v.get("taste")) for v in isos.values()}
+        if len(isos) < 2 or len(distinct) < 2:            # need >=2 isomers with DIFFERENT notes
+            continue
+        parent = name_by_skel.get(skel)
+        for full_ik, v in isos.items():
+            smi = v["smiles"]
+            if not any(c in smi for c in "@/\\"):          # must actually carry stereochemistry
+                continue
+            m = Chem.MolFromSmiles(smi)
+            if m is None:
+                continue
+            label = P._stereo_label(m)
+            odor, taste = v.get("odor", ""), v.get("taste", "")
+            aroma_top = ""
+            if BA and odor:
+                tags = sorted(BA.tag(odor))
+                aroma_top = tags[0] if tags else ""
+            rows.append({
+                "inchikey_skel": full_ik, "smiles": Chem.MolToSmiles(m),
+                "name": (f"{label} {parent}" if parent else f"{label} isomer"),
+                "mw": round(float(Descriptors.MolWt(m)), 1),
+                "logp": round(float(Crippen.MolLogP(m)), 2),
+                "tpsa": round(float(rdMolDescriptors.CalcTPSA(m)), 1),
+                "hbd": int(rdMolDescriptors.CalcNumHBD(m)), "hba": int(rdMolDescriptors.CalcNumHBA(m)),
+                "rot_bonds": int(rdMolDescriptors.CalcNumRotatableBonds(m)),
+                "rings": int(rdMolDescriptors.CalcNumRings(m)),
+                "melting_point_c": None, "boiling_point_c": None, "gras": skel in P._GRAS,
+                "taste_documented": taste, "taste_predicted": "", "aroma_top": aroma_top,
+                "p_sweet": 0.0, "p_bitter": 0.0, "p_umami": 0.0, "is_isomer": True,
+            })
+    return rows
+
+
 def _taste_by_skel():
     out = {}
     try:
@@ -107,6 +164,7 @@ if __name__ == "__main__":
             "boiling_point_c": pr.get("boiling_point_c"),
             "gras": skel in P._GRAS,
             "taste_documented": ",".join(taste_doc.get(skel, [])),
+            "is_isomer": False,
         })
         skels.append(skel)
         smis.append(smi)
@@ -134,9 +192,15 @@ if __name__ == "__main__":
         r["taste_predicted"] = ",".join(t for t in ("sweet", "bitter", "umami")
                                         if r[f"p_{t}"] >= 0.5)
 
+    # first-class rows for stereoisomers that differ in documented odor/taste
+    name_by_skel = {sk: (props.get(sk, {}).get("common_name") or props.get(sk, {}).get("iupac_name"))
+                    for sk in structs}
+    iso_rows = _documented_isomer_rows(name_by_skel)
+    if iso_rows:
+        rows.extend(iso_rows)
     out = pd.DataFrame(rows)
     out.to_parquet("master_enrichment.parquet")
     named = int(out["name"].notna().sum())
-    print(f"master_enrichment.parquet: {len(out)} molecules, {named} named, "
-          f"{int((out['aroma_top'] != '').sum())} with a dominant aroma, "
-          f"{int(out['gras'].sum())} GRAS")
+    print(f"master_enrichment.parquet: {len(out)} molecules ({len(iso_rows)} distinct-documented "
+          f"isomer rows), {named} named, {int((out['aroma_top'] != '').sum())} with a dominant "
+          f"aroma, {int(out['gras'].sum())} GRAS")
