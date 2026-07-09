@@ -716,6 +716,95 @@ def api_studio_terms():
     return {"flavors": _FLAVOR_CATS, "notes": _DESIGN_DESCS}
 
 
+# --- Master enrichment table: one rich row per molecule (browse the whole universe) ---------
+# Columns each carry a "why it matters" note so the table is legible to a non-chemist. Built by
+# build_enrichment.py (master_enrichment.parquet); gets richer as the PubChem crawl fills in
+# names / melting / boiling points.
+_ENRICH = []
+ENRICH_COLUMNS = [
+    {"key": "name", "label": "Name", "why": "Common or IUPAC identity (from public-domain PubChem)."},
+    {"key": "taste", "label": "Taste", "why": "Documented taste where known, else the model's call — what it tastes like."},
+    {"key": "aroma_top", "label": "Aroma", "why": "The strongest predicted odor descriptor — the note it most reads as."},
+    {"key": "mw", "label": "MW", "why": "Molecular weight (Da) — size. Heavier molecules are generally less volatile, so aroma fades."},
+    {"key": "logp", "label": "logP", "why": "Lipophilicity (oil↔water). Sets solubility, which carrier a flavor needs, and how it partitions in a product."},
+    {"key": "tpsa", "label": "TPSA", "why": "Polar surface area (Å²) — polarity / H-bonding. High TPSA ⇒ more water-soluble, less volatile."},
+    {"key": "hbd", "label": "HBD", "why": "H-bond donors — drive water solubility and lower volatility."},
+    {"key": "hba", "label": "HBA", "why": "H-bond acceptors — same story: solubility and volatility."},
+    {"key": "rot_bonds", "label": "RotB", "why": "Rotatable bonds — molecular flexibility (rigidity often tracks with a sharper odor)."},
+    {"key": "melting_point_c", "label": "MP °C", "why": "Melting point (measured) — solid vs liquid at room temperature."},
+    {"key": "boiling_point_c", "label": "BP °C", "why": "Boiling point (measured) — a direct handle on volatility, hence aroma strength."},
+    {"key": "gras", "label": "GRAS", "why": "On the FEMA/FDA food-safe (Generally Recognized As Safe) list — a flag, not a clearance."},
+]
+
+
+def _load_enrichment():
+    """Rows from master_enrichment.parquet with taste collapsed to a display string."""
+    try:
+        import pandas as pd
+        df = pd.read_parquet("master_enrichment.parquet")
+    except Exception:  # noqa: BLE001 — not built yet
+        return []
+    def _s(v):  # NaN (a truthy float) -> "" ; keep real strings
+        return v if isinstance(v, str) else ""
+
+    rows = []
+    for _, r in df.iterrows():
+        taste = _s(r.get("taste_documented")) or _s(r.get("taste_predicted"))
+        rows.append({
+            "smiles": r["smiles"], "name": _s(r.get("name")),
+            "taste": taste, "aroma_top": _s(r.get("aroma_top")),
+            "mw": _num(r.get("mw")), "logp": _num(r.get("logp")), "tpsa": _num(r.get("tpsa")),
+            "hbd": _num(r.get("hbd")), "hba": _num(r.get("hba")), "rot_bonds": _num(r.get("rot_bonds")),
+            "melting_point_c": _num(r.get("melting_point_c")), "boiling_point_c": _num(r.get("boiling_point_c")),
+            "gras": bool(r.get("gras")),
+        })
+    return rows
+
+
+def _num(v):
+    try:
+        f = float(v)
+        return None if f != f else (int(f) if f == int(f) else round(f, 2))
+    except (TypeError, ValueError):
+        return None
+
+
+@app.get("/api/enrichment_meta")
+def api_enrichment_meta():
+    """Column definitions (label + why-it-matters) for the enrichment table."""
+    return {"columns": ENRICH_COLUMNS, "count": len(_ENRICH)}
+
+
+@app.get("/api/enrichment")
+def api_enrichment(q: str = "", sort: str = "name", desc: int = 0, offset: int = 0, limit: int = 50):
+    """Sortable, searchable, paginated master enrichment table — the whole molecule universe."""
+    global _ENRICH
+    if not _ENRICH:
+        _ENRICH = _load_enrichment()
+    rows = _ENRICH
+    ql = q.strip().lower()
+    if ql:
+        rows = [r for r in rows if ql in (r["name"] or "").lower() or ql in r["smiles"].lower()
+                or ql in (r["taste"] or "").lower() or ql in (r["aroma_top"] or "").lower()]
+    keys = {c["key"] for c in ENRICH_COLUMNS}
+    if sort not in keys:
+        sort = "name"
+
+    def sortkey(r):
+        v = r.get(sort)
+        if isinstance(v, bool):
+            return (0, "", 1 if v else 0)
+        if isinstance(v, (int, float)):
+            return (0, "", v)
+        return (1 if not v else 0, str(v).lower(), 0)  # blanks last
+
+    rows = sorted(rows, key=sortkey, reverse=bool(desc))
+    total = len(rows)
+    page = rows[offset:offset + limit]
+    return {"rows": page, "total": total, "offset": offset, "limit": limit,
+            "columns": ENRICH_COLUMNS}
+
+
 @app.get("/api/studio")
 def api_studio(terms: str = "", gras: int = 0, offset: int = 0, limit: int = 20):
     """Unified search: given any mix of flavors and notes, rank the molecules that carry them.
