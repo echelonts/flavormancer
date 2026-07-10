@@ -103,6 +103,7 @@
   .references .ft-label{font-size:11px;color:var(--muted)}
   .references a{font-size:11.5px;color:var(--brand-2);text-decoration:none;border-bottom:1px dotted var(--brand-2)}
   .references a:hover{color:var(--ink);border-bottom-color:var(--ink)}
+  .ref-spectra{font-size:10px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:1px 7px;margin-left:2px}
   .meter .name{font-weight:600;font-size:14px;text-transform:capitalize}
   .meter .val{font-family:var(--mono);font-size:13px;color:var(--muted)}
   .meter .au{font-size:11px;color:var(--muted);opacity:.85}
@@ -827,7 +828,7 @@ function render(p, neighbors, svg, names){
   $('flavorTags').innerHTML = tags.length ? `<span class="ft-label">reads as:</span>`+tags.join('') : '';
   const refs = p.references || [];
   $('references').innerHTML = refs.length ? `<span class="ft-label">spectra &amp; more:</span>`+
-    refs.map(r=>`<a href="${r.url}" target="_blank" rel="noopener" title="${r.note}">${r.label} ↗</a>`).join('') : '';
+    refs.map(r=>{ const sp=(r.spectra&&r.spectra.length)?` <span class="ref-spectra">${r.spectra.join(' · ')}</span>`:''; return `<a href="${r.url}" target="_blank" rel="noopener" title="${r.note}">${r.label} ↗</a>${sp}`; }).join('') : '';
   const inDomain = !(p.applicability && p.applicability.in_domain === false);
   const db = $('domainBanner');
   db.style.display = inDomain ? 'none' : 'block';
