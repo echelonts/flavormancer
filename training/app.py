@@ -118,7 +118,31 @@ def api_predict(q: Query):
                          f"Enter a valid SMILES or a recognized compound name."}
     out = P.predict(smi, include_aroma=False)
     out["flavor_tags"] = _read_tags(smi, out)
+    out["references"] = _references(smi)
     return out
+
+
+def _references(smi):
+    """Deep links to the authoritative public pages for this molecule — where the spectra
+    (IR / MS / UV / NMR), GC retention indices, and full literature live. We LINK rather than
+    host: PubChem is public domain, but NIST WebBook data is licensed for individual use only,
+    so redistribution isn't clean — a hyperlink always is."""
+    import urllib.parse
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        return []
+    ik = Chem.MolToInchiKey(mol)
+    refs = [{"label": "PubChem", "note": "identity, properties, spectra",
+             "url": f"https://pubchem.ncbi.nlm.nih.gov/#query={urllib.parse.quote(ik)}"}]
+    try:
+        inchi = Chem.MolToInchi(mol)
+        if inchi:
+            refs.append({"label": "NIST WebBook", "note": "IR / MS spectra, GC retention index",
+                         "url": "https://webbook.nist.gov/cgi/cbook.cgi?InChI="
+                                + urllib.parse.quote(inchi) + "&Units=SI"})
+    except Exception:  # noqa: BLE001 — InChI generation can fail on odd valences
+        pass
+    return refs
 
 
 def _read_tags(smi, out):
