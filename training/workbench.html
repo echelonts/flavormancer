@@ -165,8 +165,8 @@
   .map-toggle3d .st-tab{padding:3px 12px}
   .map-reset{font:inherit;font-size:12px;padding:3px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--muted);cursor:pointer;margin-left:auto}
   .map-reset:hover{border-color:var(--aroma)}
-  .map-key{font-size:12px;color:var(--muted);line-height:1.55;margin-top:8px;max-width:900px}
-  .map-method{margin-top:10px;max-width:900px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+  .map-key{font-size:12px;color:var(--muted);line-height:1.55;margin-top:8px}
+  .map-method{margin-top:10px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
   .map-method>summary{cursor:pointer;padding:9px 13px;font-size:12px;font-weight:600;color:var(--brand-2);list-style:none}
   .map-method>summary::-webkit-details-marker{display:none}
   .map-method>summary::before{content:'▸ ';color:var(--muted)}
@@ -329,8 +329,7 @@
   .enrich-search{flex:1;max-width:420px;font:inherit;font-size:13px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
   .enrich-search:focus{outline:none;border-color:var(--brand-2)}
   .enrich-count{font-size:12px;color:var(--muted)}
-  .enrich-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;scrollbar-width:none}
-  .enrich-scroll::-webkit-scrollbar{display:none}  /* wide body means no scroll on desktop; hidden on mobile */
+  .enrich-scroll{overflow:auto;max-height:74vh;border:1px solid var(--line);border-radius:10px}  /* scrolls both ways, themed like the site */
   .enrich-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px}
   .enrich-table th{position:sticky;top:0;background:var(--panel);text-align:left;padding:9px 11px;font-weight:650;
     color:var(--brand-2);border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none}
@@ -354,6 +353,7 @@
   .design-head,.browse-head,.toggle,.map-head,.mapToggle{transition:color .15s ease}
   #flavorMap{max-width:100%;height:auto}
   .map-canvas-wrap{max-width:100%}
+  #flavorMap{width:100%;height:auto;display:block}  /* fill the content width like the rest of the page */
   /* smooth reveal for result cards */
   @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   #results .card,#behaviorCard,#aromaCard{animation:fadeUp .28s ease both}
@@ -501,7 +501,7 @@
         <span id="mapLegend" class="map-legend"></span>
         <button type="button" id="mapReset" class="map-reset">Reset view</button>
       </div>
-      <div class="map-canvas-wrap"><canvas id="flavorMap" width="960" height="560"></canvas>
+      <div class="map-canvas-wrap"><canvas id="flavorMap" width="1440" height="760"></canvas>
         <div id="mapTip" class="map-tip" style="display:none"></div></div>
       <div class="map-key">Each dot is a molecule; <b>nearby dots are structurally similar</b>.
         Color = <b>dominant taste</b> (toggle to <b>aroma</b>); tight groups are structural families.
@@ -670,12 +670,16 @@
           odor notes. <span class="pd">public domain</span></li>
         <li><b>ChemTastesDB</b> — curated molecular taste labels (sweet / bitter / umami /
           sour / tasteless). <span class="ac">academic, cited</span></li>
+        <li><b>SweetenersDB</b> — relative sweetness values for the sweetness-intensity
+          regressor. <span class="lic">MIT</span></li>
         <li><b>FEMA GRAS</b> — food-safe (Generally Recognized As Safe) flavor-substance
           reference. <span class="pd">public listing</span></li>
         <li><b>Tox21</b> (NIH / EPA / NCATS / FDA) — in-vitro assay data for the caution-only
           structural tox cross-check. <span class="pd">public domain</span></li>
         <li>Curated <b>character-impact compounds</b> — well-documented public flavor-chemistry
           facts (which molecule gives a flavor its signature note).</li>
+        <li><b>PubChem</b> &amp; <b>NIST WebBook</b> — deep-linked per molecule for spectra
+          (IR / MS) and GC retention indices. We link, never rehost (NIST is individual-use).</li>
       </ul>
     </div>
     <div class="src-col">
