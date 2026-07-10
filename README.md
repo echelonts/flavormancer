@@ -24,9 +24,11 @@ running entirely on hardware you own.
 > it's organized by connectivity, with meaningfully-distinct isomers promoted.
 
 > **This is the commercial edition** — Apache-2.0 and **commercial-clean**: every
-> model trains only on permissively-licensed open data, so it's free to use, sell,
-> and run behind your firewall. A more robust, **open-source academic edition with
-> the full aroma model is coming soon** — see [Two editions](#two-editions).
+> model (taste **and** aroma) trains only on permissively-licensed / public-domain
+> data, so it's free to use, sell, and run behind your firewall. The commercial-clean
+> aroma model ships here as **presence/absence**; a higher-fidelity **academic
+> edition** adds the scored-intensity model from research odor data (NonCommercial
+> terms) — see [Two editions](#two-editions).
 
 > **Status:** the Python training pipeline and prediction core are built and
 > tested; the .NET serving layer, React workbench, and packaging are in progress.
@@ -39,8 +41,17 @@ running entirely on hardware you own.
 Given one molecule, Flavormancer returns a structured profile where **every value
 is tagged by how it was derived**, so nothing reads as more certain than its source:
 
-- **Taste** — sweet / bitter / umami probabilities (trained models) and sweetness
-  intensity (regressor), plus sour and salty as transparent chemistry rules.
+- **Taste** — **six trained heads**: sweet / bitter / umami / **sour** / **salty** /
+  **tasteless** (RandomForests on fingerprint + physicochemical features), plus a
+  sweetness-**intensity** regressor. Sour and salty *also* keep a transparent chemistry
+  rule (acid group / alkali-salt) as a deterministic cross-check alongside the model.
+- **Aroma** — **16 odor-descriptor heads** (citrus, floral, minty, almond, fatty,
+  petroleum, earthy, medicinal, sulfurous, camphor, fruity, fishy, garlic, ethereal,
+  ammoniacal, pungent) trained on **public-domain** HSDB odor text + curated
+  character-impact facts, surfaced for *any* molecule, each with its held-out CV-AUROC
+  (0.73–0.97). Presence/absence, honestly — **intensity** is the "comes with your data"
+  upgrade (no public intensity data exists). Documented odor + detection thresholds are
+  shown where cited.
 - **Behavior** — logP, molecular weight, TPSA, H-bonding, ring/atom counts
   (computed); water solubility (ESOL estimate); volatility tier and pKa ranges
   (qualitative); measured boiling point / vapor pressure when a property table is
@@ -57,12 +68,25 @@ is tagged by how it was derived**, so nothing reads as more certain than its sou
   tables are loaded).
 - **Substitution search** — nearest-neighbor lookup over the labeled set for
   reformulation and cost-down ("find me a molecule that behaves like this one").
+- **Flavor Studio** — one hub to pick any mix of everyday **flavors** (banana,
+  saffron, pumpkin, bubble gum…) *and* **notes** (citrus, floral…) → ranked food-safe
+  molecules + drop-in swaps. A flavor *is* a set of notes, so they live in one picker.
+- **Flavor-space map** — every molecule embedded 2D/3D: a **similarity** layout
+  (UMAP over fingerprints) and an **interpretable property-axes** layout (MW × logP ×
+  TPSA), colored by taste, aroma, or both.
+- **Chirality explorer** — enumerates every stereoisomer (R/S *and* E/Z), surfacing
+  the ones with distinct documented odor/taste (R- vs S-carvone) as their own reads.
+- **Master enrichment table** — sortable/searchable grid of the whole universe with a
+  "why it matters" note on every chemistry column.
+- **External references** — per-molecule deep links to PubChem (public domain) and
+  NIST WebBook for spectra (IR/MS/NMR) and GC retention indices, with an availability
+  flag showing what each source has. We *link*, never rehost.
 
-**Aroma** (odor-descriptor prediction) is **not** built into this edition and isn't
-pre-trained. It *can* be trained for a customer on **their own odor data**, or on a
-**commercially-licensed** dataset (e.g. Leffingwell **PMP 2001**), when that data is
-provided. The full *open* aroma model — trained on research odor data that carries
-NonCommercial terms — lives in the academic edition.
+> **On aroma intensity (the one gated piece).** The aroma heads above are
+> presence/absence — *which* notes apply, from public-domain data. **Scored
+> intensity** (*how strong*) is the marquee upgrade that comes with a customer's own
+> panel data or a **commercially-licensed** set (Leffingwell **PMP 2001**); no
+> public-domain intensity data exists. That's the only aroma capability still gated.
 
 > *What aroma training needs from you:* molecules (SMILES, or **GC-MS** to identify
 > the compounds in your products) paired with your panel's **expert odor descriptors**
@@ -111,7 +135,7 @@ Flavormancer ships as two editions of one method:
 | Edition | Commercial | Academic / open-source *(coming soon)* |
 | License | Apache-2.0 | open-source, **research / NonCommercial** |
 | Data | commercial-clean open data only | adds research odor datasets with **NonCommercial** terms |
-| Aroma | *would* be trained on your own data, or a licensed set (e.g. PMP 2001), when provided | full open model included (research odor data) |
+| Aroma | **16 presence/absence descriptor heads ship** (public-domain HSDB); scored **intensity** is trained on your data or a licensed set (PMP 2001) | full open model incl. **intensity** (research odor data) |
 | Use | free to use, sell, run on-prem | research, teaching, advancing the method |
 
 The split is deliberate. The richest aroma data is licensed for research only, so

@@ -6,10 +6,10 @@ shape of the tool. The organizing discipline throughout: **every output is tagge
 by how it's derived, and nothing claims more certainty than its source supports.**
 
 > **Edition note.** This catalogues the **commercial** edition (Apache-2.0,
-> commercial-clean data). **Aroma** (odor descriptors) is **not** here — it moves to
-> the open-source **academic edition** (coming soon), which adds research odor data
-> carrying NonCommercial terms. In the commercial product, aroma trains on the
-> customer's own licensed / in-house data.
+> commercial-clean data). **Aroma ships here** as 16 presence/absence odor-descriptor
+> heads trained on public-domain HSDB text — what's still gated is scored **intensity**
+> (*how strong* a note is), which needs research/customer panel data and lives in the
+> **academic edition** (or trains on a customer's own data, on-prem).
 
 **Confidence tiers used below**
 - **computed** — exact from structure (RDKit). Not a prediction; a calculation.
@@ -23,18 +23,22 @@ by how it's derived, and nothing claims more certainty than its source supports.
 
 ## A. Live now — built into `predict.py` and the pipeline
 
-**Taste**
-- Sweet / bitter / umami — probabilities (**trained**, RandomForest on merged open taste DBs).
+**Taste** — six trained heads (RandomForest on Morgan fingerprint + physicochemical features)
+- Sweet / bitter / umami — probabilities (**trained**; CV-AUROC ~0.95 / 0.95 / 0.99).
+- Sour — **trained** indicative head (0.91) **plus** an acidic-group **rule** as a cross-check.
+- Salty — **trained** indicative head (0.93) **plus** a cation-aware inorganic-salt **rule**.
+- Tasteless — **trained** tasted-vs-tasteless head (0.89).
 - Sweetness intensity — vs-sucrose strength (**trained**, regressor on SweetenersDB).
-- Sour — acidic-group flag (**rule**).
-- Salty — cation-aware inorganic-salt flag with organic-anion guard (**rule**).
 - Multitaste — fires when 2+ taste heads are high (**trained**-derived).
 - Known-taste ground truth — verified labels override predictions (**lookup**).
 
-**Aroma** — *not in the commercial edition.*
-- Odor-descriptor prediction needs research odor datasets with NonCommercial terms,
-  so it ships in the separate **academic edition** (coming soon), not here. In the
-  commercial product, aroma trains on **your** licensed / in-house odor data, on-prem.
+**Aroma** — **16 odor-descriptor heads ship** (**trained**)
+- Presence/absence per descriptor (citrus, floral, minty, almond, fatty, petroleum, earthy,
+  medicinal, sulfurous, camphor, fruity, fishy, garlic, ethereal, ammoniacal, pungent) —
+  RandomForests on fingerprint + physicochemical features, over public-domain HSDB odor text +
+  curated character-impact facts. CV-AUROC **0.73–0.97**; surfaced for **any** molecule.
+- Documented odor + detection thresholds shown where cited (**lookup**, public-domain HSDB).
+- **Not** yet: scored **intensity** — needs research/customer panel data (the gated upgrade).
   See [`AROMA.md`](AROMA.md).
 
 **Physicochemical & behavior**
@@ -71,9 +75,19 @@ by how it's derived, and nothing claims more certainty than its source supports.
   flag, FEMA-max overdose flag; quantitative when thresholds loaded, **qualitative**
   volatility ranking otherwise.
 
-**Analytical & search**
-- GC-MS Kovats retention index — honest hook/stub (a trainable QSPR, see B).
-- Flavor-space map + nearest-neighbor substitution search (pgvector; demo layer).
+**Analytical, search & workbench**
+- **Flavor Studio** — one picker over everyday flavors *and* notes → ranked food-safe
+  molecules + drop-in swaps (the "molecule behind strawberry", live).
+- **Flavor-space map** — 2D/3D **similarity** (UMAP) + **interpretable property axes**
+  (MW × logP × TPSA), colored by taste / aroma / both.
+- **Chirality explorer** — every stereoisomer (R/S + E/Z); isomers with distinct
+  documented odor/taste surfaced as their own reads.
+- **Master enrichment table** — the whole universe, sortable/searchable, each column
+  annotated with why it matters.
+- **Nearest-neighbor substitution search** (Tanimoto/Morgan; pgvector at the product layer).
+- **External references** — per-molecule links to PubChem (public domain) + NIST WebBook
+  for spectra (IR/MS/NMR) and GC retention index, with an availability flag (**link, not host**).
+- GC-MS Kovats retention index as an on-read *value* — data-gated (licensed/customer table); see B.
 
 ---
 
