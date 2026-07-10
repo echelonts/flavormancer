@@ -15,6 +15,13 @@ running entirely on hardware you own.
 > corpus **2,255** · documented taste **676** · GRAS reference **2,781** · sweetness
 > intensity **316** · curated character-impact flavors **95 flavors / 77 molecules**.
 > Every one of the 8,393 is enriched with names + measured properties from public-domain PubChem.
+>
+> *How the 8,393 break down:* the flavor-space map and enrichment table show **8,052 unique
+> structures** (deduped by connectivity skeleton). The rest are **329 stereoisomers** folded
+> into their parent skeleton — of which the **19 that carry their own documented odor/taste**
+> (e.g. R- vs S-limonene, (Z)- vs (E)-maleic acid) are surfaced as first-class rows — plus
+> **16** molecules PubChem has no public structure for (GRAS-only, by name). Nothing is dropped;
+> it's organized by connectivity, with meaningfully-distinct isomers promoted.
 
 > **This is the commercial edition** — Apache-2.0 and **commercial-clean**: every
 > model trains only on permissively-licensed open data, so it's free to use, sell,
