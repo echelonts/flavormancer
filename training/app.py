@@ -122,6 +122,31 @@ def api_predict(q: Query):
     return out
 
 
+def _load_spectra():
+    """inchikey-skeleton -> [available spectra types] from spectra.parquet (build_spectra.py):
+    public-domain PubChem availability metadata. Empty until the crawl has run."""
+    try:
+        import pandas as pd
+        df = pd.read_parquet("spectra.parquet")
+        labels = [("has_ms", "MS"), ("has_ir", "IR"), ("has_nmr", "NMR"),
+                  ("has_uv", "UV"), ("has_raman", "Raman")]
+        out = {}
+        for _, r in df.iterrows():
+            ik = r.get("inchikey")
+            if isinstance(ik, str):
+                out[ik.split("-")[0]] = [lab for col, lab in labels if bool(r.get(col))]
+        return out
+    except Exception:  # noqa: BLE001 — not crawled yet
+        return {}
+
+
+_SPECTRA = _load_spectra()
+
+
+def _spectra_flags(inchikey):
+    return _SPECTRA.get(inchikey.split("-")[0], [])
+
+
 def _references(smi):
     """Deep links to the authoritative public pages for this molecule — where the spectra
     (IR / MS / UV / NMR), GC retention indices, and full literature live. We LINK rather than
@@ -132,8 +157,11 @@ def _references(smi):
     if mol is None:
         return []
     ik = Chem.MolToInchiKey(mol)
-    refs = [{"label": "PubChem", "note": "identity, properties, spectra",
-             "url": f"https://pubchem.ncbi.nlm.nih.gov/#query={urllib.parse.quote(ik)}"}]
+    have = _spectra_flags(ik)  # which spectra PubChem actually has (public-domain availability metadata)
+    note = ("PubChem has " + " · ".join(have) if have else "identity, properties, spectra")
+    refs = [{"label": "PubChem", "note": note,
+             "url": f"https://pubchem.ncbi.nlm.nih.gov/#query={urllib.parse.quote(ik)}",
+             "spectra": have}]
     try:
         inchi = Chem.MolToInchi(mol)
         if inchi:
