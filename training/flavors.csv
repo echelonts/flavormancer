@@ -100,3 +100,30 @@ cola,ethyl acetate,CCOC(C)=O,other
 rum,ethyl formate,CCOC=O,other
 green,cis-3-hexen-1-ol,CC/C=C\CCO,vegetal
 grassy,cis-3-hexen-1-ol,CC/C=C\CCO,vegetal
+bubble gum,isoamyl acetate,CC(=O)OCCC(C)C,sweet
+butterscotch,maltol,Cc1occc(=O)c1O,sweet
+marshmallow,ethyl maltol,CCc1occc(=O)c1O,sweet
+corn,dimethyl sulfide,CSC,vegetal
+green pea,2-isopropyl-3-methoxypyrazine,COc1nccnc1C(C)C,vegetal
+asparagus,dimethyl sulfide,CSC,vegetal
+beetroot,geosmin,CC1CCCC2(C)C(O)CCCC12,vegetal
+pumpkin,beta-ionone,CC(=O)/C=C/C1C(C)=CCCC1(C)C,vegetal
+butternut squash,beta-ionone,CC(=O)/C=C/C1C(C)=CCCC1(C)C,vegetal
+sweet potato,maltol,Cc1occc(=O)c1O,vegetal
+carrot,terpinolene,CC1=CCC(=C(C)C)CC1,vegetal
+cabbage,dimethyl disulfide,CSSC,vegetal
+broccoli,dimethyl trisulfide,CSSSC,vegetal
+radish,allyl isothiocyanate,C=CCN=C=S,vegetal
+truffle,dimethyl sulfide,CSC,savory
+blueberry,ethyl 2-methylbutyrate,CCOC(=O)C(C)CC,fruit
+blackberry,furaneol,CC1=C(O)C(=O)C(C)O1,fruit
+cranberry,benzaldehyde,O=Cc1ccccc1,fruit
+papaya,methyl butanoate,CCCC(=O)OC,fruit
+feijoa,methyl benzoate,COC(=O)c1ccccc1,fruit
+jackfruit,butyl acetate,CCCCOC(C)=O,fruit
+plantain,isoamyl acetate,CC(=O)OCCC(C)C,fruit
+tangerine,methyl N-methylanthranilate,CNc1ccccc1C(=O)OC,citrus
+bergamot,linalyl acetate,C=CC(C)(CCC=C(C)C)OC(C)=O,citrus
+basil,estragole,C=CCc1ccc(OC)cc1,herb
+tarragon,estragole,C=CCc1ccc(OC)cc1,herb
+cilantro,(E)-2-decenal,CCCCCCC/C=C/C=O,herb
