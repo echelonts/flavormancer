@@ -109,6 +109,10 @@ rule), **estimate** (published QSPR with known error), **lookup** (from a loaded
 reference table), and **qualitative** (a class/flag, not a number). Full map in
 [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
 
+> **How does it all actually work?** A plain-English tour of the method behind every
+> feature — fingerprints, the taste/aroma models, the map, chirality, the mixture
+> reactions — is in **[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)**.
+
 ## Why it's built this way
 
 The value isn't any single number — those you can look up. It's four design choices:
