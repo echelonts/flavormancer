@@ -1275,7 +1275,11 @@ function draw2D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=18;
   ctx.clearRect(0,0,W,H);
   const px=p=>(pad+p.x*(W-2*pad))*_v2.s+_v2.ox, py=p=>(H-pad-p.y*(H-2*pad))*_v2.s+_v2.oy;
-  for(const p of _mapPts){ ctx.beginPath(); ctx.arc(px(p),py(p),2.6,0,7); ctx.fillStyle=mapColor(p); ctx.globalAlpha=.8; ctx.fill(); }
+  ctx.globalCompositeOperation='lighter';  // additive glow — dense clusters luminesce
+  for(const p of _mapPts){ const c=mapColor(p),x=px(p),y=py(p); ctx.fillStyle=c;
+    ctx.beginPath(); ctx.arc(x,y,4.6,0,7); ctx.globalAlpha=.09; ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,2.4,0,7); ctx.globalAlpha=.85; ctx.fill(); }
+  ctx.globalCompositeOperation='source-over';
   ctx.globalAlpha=1; _mapProj={px,py};
 }
 // interpretable-axes view: real molecular weight (x) vs logP hydrophobicity (y), with labelled
@@ -1312,7 +1316,11 @@ function drawProps(){
   ctx.save(); ctx.translate(14, mt+plotH/2); ctx.rotate(-Math.PI/2); ctx.textBaseline='top';
   ctx.fillText('logP (hydrophobicity)  →  oilier', 0, 0); ctx.restore();
   // points
-  for(const p of _mapPts){ if(p.mw==null||p.logp==null) continue; ctx.beginPath(); ctx.arc(bx(p.mw),by(p.logp),2.6,0,7); ctx.fillStyle=mapColor(p); ctx.globalAlpha=.78; ctx.fill(); }
+  ctx.globalCompositeOperation='lighter';
+  for(const p of _mapPts){ if(p.mw==null||p.logp==null) continue; const c=mapColor(p),x=bx(p.mw),y=by(p.logp); ctx.fillStyle=c;
+    ctx.beginPath(); ctx.arc(x,y,4.4,0,7); ctx.globalAlpha=.08; ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,2.4,0,7); ctx.globalAlpha=.82; ctx.fill(); }
+  ctx.globalCompositeOperation='source-over';
   ctx.globalAlpha=1;
   _mapProj={px:p=>p.mw==null?-9999:bx(p.mw), py:p=>p.logp==null?-9999:by(p.logp)};
 }
@@ -1346,7 +1354,11 @@ function draw3D(){
       ctx.beginPath(); ctx.moveTo(O.sx,O.sy); ctx.lineTo(E.sx,E.sy); ctx.stroke(); ctx.globalAlpha=1; ctx.fillStyle=col; ctx.fillText(lab, E.sx, E.sy-6); }
   }
   const all=_mapPts.map(p=>({p,pr:proj(p)})).sort((a,b)=>a.pr.d-b.pr.d);  // far first
-  for(const {p,pr} of all){ const t=pr.d+0.5; ctx.beginPath(); ctx.arc(pr.sx,pr.sy,1.7+2.1*t,0,7); ctx.fillStyle=mapColor(p); ctx.globalAlpha=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fill(); }
+  ctx.globalCompositeOperation='lighter';  // additive glow with depth (nearer = brighter/bigger)
+  for(const {p,pr} of all){ const t=pr.d+0.5, rr=1.7+2.1*t, a=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fillStyle=mapColor(p);
+    ctx.beginPath(); ctx.arc(pr.sx,pr.sy,rr*1.9,0,7); ctx.globalAlpha=a*.14; ctx.fill();
+    ctx.beginPath(); ctx.arc(pr.sx,pr.sy,rr,0,7); ctx.globalAlpha=a; ctx.fill(); }
+  ctx.globalCompositeOperation='source-over';
   ctx.globalAlpha=1; _mapProj={px:p=>proj(p).sx, py:p=>proj(p).sy};
 }
 function nearestMapPt(ev){
