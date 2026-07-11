@@ -172,6 +172,10 @@
   .map-toggle3d .st-tab{padding:3px 12px}
   .map-reset{font:inherit;font-size:12px;padding:3px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--muted);cursor:pointer;margin-left:auto}
   .map-reset:hover{border-color:var(--aroma)}
+  .map-axis-key{font-size:11.5px;color:var(--cream);margin-top:9px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .map-axis-key .ax{display:inline-flex;align-items:center;gap:5px}
+  .map-axis-key .ax i{width:16px;height:3px;border-radius:2px;display:inline-block}
+  .map-axis-key .ax-abstract{color:var(--muted)}
   .map-key{font-size:12px;color:var(--muted);line-height:1.55;margin-top:8px}
   .map-method{margin-top:10px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
   .map-method>summary{cursor:pointer;padding:9px 13px;font-size:12px;font-weight:600;color:var(--brand-2);list-style:none}
@@ -183,7 +187,8 @@
   .map-key b{color:var(--ink)}
   .map-canvas-wrap{position:relative;width:100%;overflow-x:auto}
   #flavorMap{max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:crosshair}
-  .map-tip{position:absolute;pointer-events:none;background:#1c2620;color:#fff;font-size:11px;padding:3px 7px;border-radius:5px;white-space:nowrap;transform:translate(-50%,-140%)}
+  .map-tip{position:absolute;pointer-events:none;background:#1c2620;color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-150%);box-shadow:0 4px 14px rgba(0,0,0,.4)}
+  .map-tip .tip-coord{font-family:var(--mono);font-size:10px;color:#9FE8D8}
   .neighbor .s{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all}
   .neighbor .sim{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap}
   .neighbor .kt{font-family:var(--mono);font-size:11px;color:var(--muted)}
@@ -505,8 +510,8 @@
     <div class="mix-examples"><span>Or a flavor-forming combo:</span>
       <button type="button" class="mix-ex" data-ings="acetic acid|ethanol">acetic acid + ethanol → ethyl acetate</button>
       <button type="button" class="mix-ex" data-ings="butyric acid|ethanol">butyric acid + ethanol → ethyl butyrate (pineapple)</button>
-      <button type="button" class="mix-ex" data-ings="acetic acid|isoamyl alcohol">acetic acid + isoamyl alcohol → banana</button>
-      <button type="button" class="mix-ex" data-ings="benzaldehyde|methylamine">benzaldehyde + amine → Schiff base</button>
+      <button type="button" class="mix-ex" data-ings="acetic acid|isoamyl alcohol">acetic acid + isoamyl alcohol → isoamyl acetate (banana)</button>
+      <button type="button" class="mix-ex" data-ings="benzaldehyde|methylamine">benzaldehyde + methylamine → an imine (Schiff base)</button>
     </div>
     <div id="mixRows"></div>
     <button class="mix-add" id="mixAdd">+ add ingredient</button>
@@ -538,6 +543,7 @@
       </div>
       <div class="map-canvas-wrap"><canvas id="flavorMap" width="1440" height="760"></canvas>
         <div id="mapTip" class="map-tip" style="display:none"></div></div>
+      <div id="mapAxisKey" class="map-axis-key"></div>
       <div class="map-key">Each dot is a molecule; <b>nearby dots are structurally similar</b>.
         Color = <b>dominant taste</b> (toggle to <b>aroma</b>); tight groups are structural families.
         <b>2D:</b> scroll to zoom (into the cursor), drag to pan. <b>3D:</b> drag to rotate,
@@ -1245,7 +1251,18 @@ async function loadMap(){
   mapLegendRender();
   _mapReady=true; attachMapEvents(cv); drawMap();
 }
-function drawMap(){ _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D()); }
+function drawMap(){ _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D()); updateAxisKey(); }
+function updateAxisKey(){
+  const el=$('mapAxisKey'); if(!el) return;
+  if(_mapLayout==='properties'){
+    const z = _mapMode==='3d' ? `<span class="ax"><i style="background:#A88AE0"></i>Z — TPSA (Å², polarity)</span>` : '';
+    el.innerHTML = `<span class="ax"><i style="background:#E0805E"></i>X — molecular weight (Da)</span>`+
+      `<span class="ax"><i style="background:#3FC4AA"></i>Y — logP (oil↔water)</span>`+z+
+      `<span class="ax-abstract">real, labelled axes — hover a dot for its exact values</span>`;
+  } else {
+    el.innerHTML = `<span class="ax-abstract"><b>Position = structural similarity</b> (UMAP embedding — axes have no units; only proximity matters, so nearby dots share substructure). Hover any dot for its MW · logP · TPSA.</span>`;
+  }
+}
 
 function draw2D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=18;
@@ -1296,12 +1313,13 @@ let _prop3=null;
 function draw3D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
   ctx.clearRect(0,0,W,H);
-  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.66*(_v3.z||1), cY=Math.cos(_v3.ry),sY=Math.sin(_v3.ry),cX=Math.cos(_v3.rx),sX=Math.sin(_v3.rx);
+  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.74*(_v3.z||1), cY=Math.cos(_v3.ry),sY=Math.sin(_v3.ry),cX=Math.cos(_v3.rx),sX=Math.sin(_v3.rx);
   const props = _mapLayout==='properties';
   if(props && !_prop3){  // real-axis 3D: MW × logP × TPSA, normalized to the unit cube
     const pc=(a,q)=>{ const s=a.filter(v=>v!=null).sort((x,y)=>x-y); return s[Math.floor(q*(s.length-1))]; };
     const mw=_mapPts.map(p=>p.mw), lp=_mapPts.map(p=>p.logp), tp=_mapPts.map(p=>p.tpsa);
-    _prop3={mwMax:pc(mw,.98)||1, lpMin:pc(lp,.01), lpMax:pc(lp,.99), tpMax:pc(tp,.98)||1};
+    // wider percentile domain so fewer outliers pile against the cube faces (less corner-squish)
+    _prop3={mwMax:pc(mw,.995)||1, lpMin:pc(lp,.005), lpMax:pc(lp,.995), tpMax:pc(tp,.995)||1};
   }
   const cl=(v)=>Math.max(0,Math.min(1,v));
   const coord=p=>{
@@ -1344,7 +1362,8 @@ function attachMapEvents(cv){
       drawMap(); tip.style.display='none'; return; }
     const p=nearestMapPt(ev); _mapLastHover=p;
     if(p){ const r=cv.getBoundingClientRect(); tip.style.display='block'; tip.style.left=(ev.clientX-r.left)+'px'; tip.style.top=(ev.clientY-r.top)+'px';
-      tip.innerHTML=`<b>${p.name||p.smiles}</b><br><span style="color:${mapColor(p)}">●</span> ${mapLabel(p)} · <span style="opacity:.8">${p.smiles}</span>`; }
+      const coord=(p.mw!=null)?`<br><span class="tip-coord">MW ${p.mw} Da · logP ${p.logp} · TPSA ${p.tpsa} Å²</span>`:'';
+      tip.innerHTML=`<b>${p.name||p.smiles}</b><br><span style="color:${mapColor(p)}">●</span> ${mapLabel(p)} · <span style="opacity:.8">${p.smiles}</span>${coord}`; }
     else tip.style.display='none';
   });
   cv.addEventListener('mouseleave', ()=>{ tip.style.display='none'; });
