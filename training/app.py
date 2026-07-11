@@ -786,6 +786,37 @@ def api_studio_terms():
     return {"flavors": _FLAVOR_CATS, "notes": _DESIGN_DESCS}
 
 
+@app.get("/api/nl")
+def api_nl(q: str = ""):
+    """Natural-language intent -> Studio picks. A lightweight, offline, commercial-clean parser:
+    it scans free text ('make a food-safe cherry flavoring with fruity notes') for the flavor and
+    note words the Studio already knows, plus a food-safe (GRAS) intent. No model, no GPU — a
+    keyword/whole-word match. (A real on-prem LLM emitting structured intent is the future
+    upgrade; see the roadmap — this covers the 'type what you want' story today.)"""
+    import re
+    ql = q.lower()
+    known = set(_FLAVORS.keys()) | set(_DESIGN_DESCS)
+    # match longest terms first so 'bubble gum' / 'green pea' win over 'gum' / 'green'
+    hits = []
+    for t in sorted(known, key=len, reverse=True):
+        if re.search(r"(?<![a-z])" + re.escape(t) + r"(?![a-z])", ql):
+            # skip a term wholly inside an already-matched longer term's span
+            if not any(t != h and t in h for h in hits):
+                hits.append(t)
+    # order them as they appear in the query, dedup
+    seen, terms = set(), []
+    for t in sorted(hits, key=lambda x: ql.find(x)):
+        if t not in seen:
+            seen.add(t)
+            terms.append(t)
+    gras = bool(re.search(r"food[\s-]?safe|gras|edible|safe to eat", ql))
+    return {"query": q, "terms": terms, "gras": gras,
+            "understood": bool(terms),
+            "note": ("Matched to what the Studio knows; a full natural-language model is on the "
+                     "roadmap." if terms else "No known flavors or notes recognized — try words "
+                     "like 'cherry', 'fruity', 'citrus', 'food-safe'.")}
+
+
 # --- Master enrichment table: one rich row per molecule (browse the whole universe) ---------
 # Columns each carry a "why it matters" note so the table is legible to a non-chemist. Built by
 # build_enrichment.py (master_enrichment.parquet); gets richer as the PubChem crawl fills in
