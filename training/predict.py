@@ -789,13 +789,14 @@ def _taste_profile(out):
 # tool (swap an expensive or supply-constrained ingredient for a close analogue,
 # with its known tastes shown). This is the clean Track-A core; the product
 # (Track B, #22) mirrors it as a pgvector ANN query over the same fingerprints.
-_SUB_INDEX = None  # lazily built: (list[bitvect], list[smiles], list[known_tastes])
+_SUB_INDEX = None  # lazily built: (fps, smiles, known_tastes, predicted_aromas)
 
 
 def _build_sub_index():
     global _SUB_INDEX
-    fps, smis, tastes = [], [], []
+    fps, smis, tastes, feats = [], [], [], []
     if _MASTER.exists():
+        import numpy as np
         import pandas as pd  # noqa: F811
         m = pd.read_parquet(_MASTER)
         basic = [t for t in ("sweet", "bitter", "umami", "sour", "salty") if t in m.columns]
@@ -806,7 +807,20 @@ def _build_sub_index():
             fps.append(_MORGAN.GetFingerprint(mol))
             smis.append(Chem.MolToSmiles(mol))
             tastes.append([t for t in basic if r.get(t) == 1])
-    _SUB_INDEX = (fps, smis, tastes)
+            feats.append(_feat(mol)[0])
+        # predicted aroma descriptors per molecule (batched over the 16 heads) — so the palette
+        # match can score aroma as well as taste, once, at first use
+        aromas = [[] for _ in smis]
+        if _AROMA_MODELS and feats:
+            X = np.vstack(feats)
+            for name, clf in _AROMA_MODELS.items():
+                col = clf.predict_proba(X)[:, 1]
+                for i in range(len(smis)):
+                    if col[i] >= 0.5:
+                        aromas[i].append(name)
+    else:
+        aromas = []
+    _SUB_INDEX = (fps, smis, tastes, aromas)
 
 
 def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
@@ -819,7 +833,7 @@ def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
         return {"error": f"unparseable SMILES: {smiles}"}
     if _SUB_INDEX is None:
         _build_sub_index()
-    fps, smis, tastes = _SUB_INDEX
+    fps, smis, tastes, _aromas = _SUB_INDEX
     if not fps:
         return {"neighbors": [], "note": "no reference set loaded (taste_master.parquet absent)"}
     q = _MORGAN.GetFingerprint(mol)
@@ -846,29 +860,104 @@ def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
             "basis": "Tanimoto / Morgan r2 2048-bit over labeled molecules"}
 
 
-def palette_match(tastes, k=5):
-    """Single molecules whose KNOWN taste-label set best matches a target taste set
-    (Jaccard over sweet/bitter/umami/sour/salty). NOT a blend-perception model — a
-    label-set similarity over the labeled molecules, for the 'one molecule like this
-    mixture' view. A blend's actual palette isn't the union of its parts (suppression /
-    synergy); this is an honest structural-label approximation."""
+def palette_match(tastes, aromas=None, k=5):
+    """Single molecules that best resemble a target flavor PALETTE — taste labels AND aroma
+    descriptors — scored by the mean of taste-Jaccard and aroma-Jaccard over the labeled set
+    (whichever targets you give). NOT a blend-perception model (a blend's palette isn't the
+    union of its parts — suppression/synergy); an honest label-set approximation for the 'one
+    molecule like this mixture' view. Taste is documented ground truth; aroma is the model's
+    predicted descriptors."""
     if _SUB_INDEX is None:
         _build_sub_index()
-    _, smis, tlist = _SUB_INDEX
-    target = set(tastes)
-    if not target or not smis:
-        return {"target": sorted(target), "matches": []}
+    _, smis, tlist, alist = _SUB_INDEX
+    t_target, a_target = set(tastes or []), set(aromas or [])
+    if not (t_target or a_target) or not smis:
+        return {"target": {"tastes": sorted(t_target), "aromas": sorted(a_target)}, "matches": []}
     scored = []
-    for smi, ts in zip(smis, tlist):
-        s = set(ts)
-        if not s:
-            continue
-        j = len(target & s) / len(target | s)
-        if j > 0:
-            scored.append((j, smi, sorted(s)))
+    for smi, ts, ars in zip(smis, tlist, alist):
+        s, a = set(ts), set(ars)
+        parts = []
+        if t_target:
+            parts.append(len(t_target & s) / len(t_target | s) if (t_target | s) else 0.0)
+        if a_target:
+            parts.append(len(a_target & a) / len(a_target | a) if (a_target | a) else 0.0)
+        score = sum(parts) / len(parts) if parts else 0.0
+        if score > 0:
+            scored.append((score, smi, sorted(s), sorted(a)))
     scored.sort(key=lambda e: -e[0])
-    return {"target": sorted(target),
-            "matches": [{"smiles": sm, "tastes": ts, "match": round(j, 2)} for j, sm, ts in scored[:k]]}
+    return {"target": {"tastes": sorted(t_target), "aromas": sorted(a_target)},
+            "matches": [{"smiles": sm, "tastes": ts, "aromas": ar, "match": round(sc, 2)}
+                        for sc, sm, ts, ar in scored[:k]]}
+
+
+# --- Reaction-template augmentation for the mixture screen -------------------------------------
+# INDICATIVE forward reaction templates (RDKit reaction SMARTS) for the flavor-relevant
+# condensations that can occur when ingredients sit together — esters (fruity notes forming),
+# Schiff bases (the Maillard first step), (hemi)acetals, hemithioacetals. This AUGMENTS the
+# documented-hazard lookup (it never replaces it): "these two could plausibly react to form X",
+# not "this is safe". A template firing means the functional groups are present, not that the
+# reaction proceeds under any given condition.
+_RXN_TEMPLATES = [
+    ("esterification — acid + alcohol → ester (a fruity note forms)",
+     "[CX3:1](=[OX1:2])[OX2H1].[OX2H1][#6:3]>>[C:1](=[O:2])O[#6:3]"),
+    ("Schiff base — aldehyde + primary amine → imine (Maillard first step)",
+     "[CX3H1:1]=[OX1:2].[NX3;H2:3][#6:4]>>[C:1]=[N:3][#6:4]"),
+    ("hemiacetal — aldehyde + alcohol",
+     "[CX3H1:1]=[OX1:2].[OX2H1:3][#6:4]>>[C:1]([OX2H1])[O:3][#6:4]"),
+    ("hemithioacetal — aldehyde + thiol (savory/allium precursors)",
+     "[CX3H1:1]=[OX1:2].[SX2H1:3][#6:4]>>[C:1]([OX2H1])[S:3][#6:4]"),
+]
+_RXNS = None
+
+
+def _rxns():
+    global _RXNS
+    if _RXNS is None:
+        from rdkit.Chem import AllChem
+        out = []
+        for name, sm in _RXN_TEMPLATES:
+            try:
+                out.append((name, AllChem.ReactionFromSmarts(sm)))
+            except Exception:  # noqa: BLE001 — a template that won't parse is just skipped
+                pass
+        _RXNS = out
+    return _RXNS
+
+
+def reaction_products(smiles_list, max_products=12):
+    """Plausible template products of combining the given molecules (pairwise). INDICATIVE only —
+    'the groups to form this are present', not 'it happens'. Returns [{smiles, reaction, reactants}]."""
+    mols = [(s, Chem.MolFromSmiles(s)) for s in smiles_list]
+    mols = [(s, m) for s, m in mols if m is not None]
+    seen, out = set(), []
+    for name, rxn in _rxns():
+        for si, mi in mols:
+            for sj, mj in mols:
+                if si == sj:
+                    continue
+                try:
+                    runs = rxn.RunReactants((mi, mj))
+                except Exception:  # noqa: BLE001
+                    continue
+                for prods in runs:
+                    for p in prods:
+                        try:
+                            Chem.SanitizeMol(p)
+                            smi = Chem.MolToSmiles(p)
+                        except Exception:  # noqa: BLE001 — template made an invalid product
+                            continue
+                        pm = Chem.MolFromSmiles(smi)
+                        if pm is None:
+                            continue
+                        ik = Chem.MolToInchiKey(pm)
+                        if ik in seen or ik in {Chem.MolToInchiKey(m) for _, m in mols}:
+                            continue  # skip dups and products identical to an input
+                        seen.add(ik)
+                        out.append({"smiles": smi, "reaction": name,
+                                    "reactants": [Chem.MolToSmiles(mi), Chem.MolToSmiles(mj)]})
+                        if len(out) >= max_products:
+                            return out
+    return out
 
 
 def predict(smiles: str, include_aroma: bool = False) -> dict:
