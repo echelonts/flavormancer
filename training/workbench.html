@@ -555,6 +555,7 @@
         <span class="map-toggle3d"><button type="button" id="map2d" class="st-tab on">2D</button><button type="button" id="map3d" class="st-tab">3D</button></span>
         <span class="map-toggle3d"><button type="button" id="mapCT" class="st-tab on">taste</button><button type="button" id="mapCA" class="st-tab">aroma</button><button type="button" id="mapCB" class="st-tab">both</button></span>
         <span id="mapLegend" class="map-legend"></span>
+        <button type="button" id="mapLabels" class="st-tab on">labels</button>
         <button type="button" id="mapReset" class="map-reset">Reset view</button>
       </div>
       <div class="map-canvas-wrap"><canvas id="flavorMap" width="1440" height="760"></canvas>
@@ -1205,7 +1206,8 @@ initBrowse();
 // --- flavor-space map: 2D (zoom/pan) + rotatable 3D point cloud, colored by taste ---
 const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD24E',salty:'#63A6E0',tasteless:'#B8C0C6',other:'#8A96A0'};
 let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste', _mapLayout='similarity';
-let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6,z:1}, _drag=null, _dragged=false;
+let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6,z:1}, _drag=null, _dragged=false, _spinVel={ry:0,rx:0}, _inertia=null;
+function startInertia(){ cancelAnimationFrame(_inertia); const step=()=>{ _v3.ry+=_spinVel.ry; _v3.rx+=_spinVel.rx; _spinVel.ry*=0.93; _spinVel.rx*=0.93; drawMap(); if(Math.abs(_spinVel.ry)>0.0006||Math.abs(_spinVel.rx)>0.0006) _inertia=requestAnimationFrame(step); }; _inertia=requestAnimationFrame(step); }
 const GREY='#5A6068';
 // 'both' = the full flavor picture: taste color where a taste is known, else the aroma color,
 // else grey — so every molecule with any known taste OR aroma is colored (taste takes priority).
@@ -1239,7 +1241,8 @@ $('mapLprop').addEventListener('click', ()=>setMapLayout('properties'));
 $('mapCT').addEventListener('click', ()=>setMapColor('taste'));
 $('mapCA').addEventListener('click', ()=>setMapColor('aroma'));
 $('mapCB').addEventListener('click', ()=>setMapColor('both'));
-$('mapReset').addEventListener('click', ()=>{ _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1}; drawMap(); });
+$('mapReset').addEventListener('click', ()=>{ cancelAnimationFrame(_inertia); _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1}; drawMap(); });
+$('mapLabels').addEventListener('click', ()=>{ _showLabels=!_showLabels; $('mapLabels').classList.toggle('on',_showLabels); drawMap(); });
 function setMapMode(m){
   _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap();
 }
@@ -1267,7 +1270,21 @@ async function loadMap(){
   mapLegendRender();
   _mapReady=true; attachMapEvents(cv); drawMap();
 }
-function drawMap(){ _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D()); updateAxisKey(); }
+function drawMap(){ _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D()); if(_showLabels) drawClusterLabels(); updateAxisKey(); }
+let _showLabels=true;
+// name the dominant regions: draw each class label at the centroid of its points (screen space)
+function drawClusterLabels(){
+  if(!_mapProj) return;
+  const cv=$('flavorMap'), ctx=cv.getContext('2d'), groups={};
+  for(const p of _mapPts){ const l=mapLabel(p); if(!l||l==='other') continue; (groups[l]=groups[l]||[]).push(p); }
+  ctx.save(); ctx.font='700 15px "Cinzel Decorative",Georgia,serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(const l in groups){ const pts=groups[l]; if(pts.length<15) continue;
+    let sx=0,sy=0,n=0; for(const p of pts){ const x=_mapProj.px(p),y=_mapProj.py(p); if(x<-9000||!isFinite(x)) continue; sx+=x; sy+=y; n++; }
+    if(!n) continue; sx/=n; sy/=n;
+    ctx.globalAlpha=.95; ctx.lineWidth=4; ctx.strokeStyle='rgba(6,10,14,.92)'; ctx.strokeText(l, sx, sy);
+    ctx.fillStyle=mapColor(pts[0]); ctx.fillText(l, sx, sy); }
+  ctx.globalAlpha=1; ctx.restore();
+}
 function updateAxisKey(){
   const el=$('mapAxisKey'); if(!el) return;
   if(_mapLayout==='properties'){
@@ -1380,13 +1397,13 @@ function nearestMapPt(ev){
 }
 function attachMapEvents(cv){
   const tip=$('mapTip');
-  cv.addEventListener('mousedown', ev=>{ _drag={x:ev.clientX,y:ev.clientY,v2:{..._v2},v3:{..._v3}}; _dragged=false; });
-  window.addEventListener('mouseup', ()=>{ _drag=null; });
+  cv.addEventListener('mousedown', ev=>{ cancelAnimationFrame(_inertia); _spinVel={ry:0,rx:0}; _drag={x:ev.clientX,y:ev.clientY,v2:{..._v2},v3:{..._v3}}; _dragged=false; });
+  window.addEventListener('mouseup', ()=>{ const was=_drag; _drag=null; if(was && _mapMode==='3d' && (Math.abs(_spinVel.ry)>0.001||Math.abs(_spinVel.rx)>0.001)) startInertia(); });
   cv.addEventListener('mousemove', ev=>{
     if(_drag && !(_mapMode==='2d' && _mapLayout==='properties')){  // property axes are fixed — no pan
       _dragged=true; const dx=ev.clientX-_drag.x, dy=ev.clientY-_drag.y;
       if(_mapMode==='2d'){ _v2.ox=_drag.v2.ox+dx; _v2.oy=_drag.v2.oy+dy; }
-      else { _v3.ry=_drag.v3.ry+dx*0.008; _v3.rx=_drag.v3.rx+dy*0.008; }
+      else { const nry=_drag.v3.ry+dx*0.008, nrx=_drag.v3.rx+dy*0.008; _spinVel={ry:nry-_v3.ry, rx:nrx-_v3.rx}; _v3.ry=nry; _v3.rx=nrx; }
       drawMap(); tip.style.display='none'; return; }
     const p=nearestMapPt(ev); _mapLastHover=p;
     if(p){ const r=cv.getBoundingClientRect(); tip.style.display='block'; tip.style.left=(ev.clientX-r.left)+'px'; tip.style.top=(ev.clientY-r.top)+'px';
