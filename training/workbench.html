@@ -334,7 +334,11 @@
   .schip{font:inherit;font-size:12px;padding:3px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);cursor:pointer;text-transform:capitalize}
   .schip:hover{border-color:var(--brand-2)}
   .schip-note{border-style:dashed}
-  .schip.on{background:var(--brand-grad);color:#08121A;border-color:transparent;font-weight:650}
+  .schip.on{background:var(--brand-grad);color:#08121A;border-color:transparent;font-weight:650;box-shadow:0 2px 12px rgba(43,196,196,.32);transform:translateY(-1px)}
+  .schip{transition:all .13s ease}
+  .design-grid .dcell{animation:fadeUp .3s ease both}
+  .design-grid .dcell:nth-child(2){animation-delay:.03s}.design-grid .dcell:nth-child(3){animation-delay:.06s}
+  .design-grid .dcell:nth-child(4){animation-delay:.09s}.design-grid .dcell:nth-child(n+5){animation-delay:.12s}
   .studio-clear{font:inherit;font-size:12px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
   .studio-clear:hover{border-color:var(--brand-2);color:var(--ink)}
   /* --- flavor library --- */
