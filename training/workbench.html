@@ -344,6 +344,8 @@
   .studio-group>.sg-label{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);width:96px;flex:none;text-align:right;padding-right:4px}
   .sg-ico{font-size:14px;line-height:1;filter:saturate(1.1)}
   .studio-group-notes{margin-left:0}
+  .studio-count{display:inline-flex;align-items:center;justify-content:center;min-width:0;width:0;height:18px;margin-left:0;padding:0;overflow:hidden;border-radius:9px;background:rgba(8,18,26,.28);color:inherit;font-size:11px;font-weight:700;opacity:0;transition:all .16s ease}
+  .studio-count.on{min-width:18px;width:auto;padding:0 6px;margin-left:8px;opacity:1}
   .schip{font:inherit;font-size:12px;padding:3px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);cursor:pointer;text-transform:capitalize}
   .schip:hover{border-color:var(--brand-2)}
   .schip-note{border-style:dashed}
@@ -503,7 +505,7 @@
 
   <div class="design-section" id="studio">
     <div class="design-head" id="studioToggle"><span id="studioCaret">▾</span> Flavor Studio
-      <span class="mapsub">— a flavor <i>is</i> a set of notes, so it's one list. Pick any mix of <b>flavors</b> and <b>notes</b>; Studio ranks the food-safe molecules that carry them (a flavor's character molecule, or a molecule with that note) — 2D/3D structures + drop-in swaps.</span></div>
+      <span class="mapsub">— pick any mix of <b>flavors</b> and <b>notes</b> (explained below); Studio ranks the food-safe molecules that carry them, with 2D/3D structures + drop-in swaps.</span></div>
     <div id="studioWrap">
       <div class="studio-nl">
         <input id="studioNl" class="studio-nl-input" autocomplete="off"
@@ -519,7 +521,7 @@
       <div id="studioChips" class="studio-chips"></div>
       <div class="design-controls">
         <label class="design-gras"><input type="checkbox" id="designGras" checked> food-safe (GRAS) only</label>
-        <button class="mix-btn" id="studioGo">Find molecules</button>
+        <button class="mix-btn" id="studioGo">Find molecules<span id="studioGoCount" class="studio-count"></span></button>
         <button type="button" id="studioClear" class="studio-clear">clear</button>
       </div>
       <div id="studioResults" class="design-grid"></div>
@@ -1495,12 +1497,20 @@ async function initStudio(){
     $('studioChips').innerHTML = html;
     $('studioChips').querySelectorAll('.schip').forEach(b=> b.addEventListener('click', ()=>{
       const t=b.dataset.term; if(_studioSel.has(t)){ _studioSel.delete(t); b.classList.remove('on'); } else { _studioSel.add(t); b.classList.add('on'); }
+      syncStudioCount();
     }));
   }catch(_){ setTimeout(initStudio, 4000); }
 }
+function syncStudioCount(){
+  const n=_studioSel.size, el=$('studioGoCount'); if(!el) return;
+  el.textContent = n ? String(n) : '';
+  el.classList.toggle('on', n>0);
+  const clr=$('studioClear'); if(clr) clr.style.visibility = n ? 'visible' : 'hidden';
+}
 initStudio();
 $('studioResults').innerHTML=STUDIO_EMPTY;
-$('studioClear').addEventListener('click', ()=>{ _studioSel.clear(); $('studioChips').querySelectorAll('.schip.on').forEach(x=>x.classList.remove('on')); $('studioResults').innerHTML=STUDIO_EMPTY; $('studioNlMsg').textContent=''; });
+syncStudioCount();
+$('studioClear').addEventListener('click', ()=>{ _studioSel.clear(); $('studioChips').querySelectorAll('.schip.on').forEach(x=>x.classList.remove('on')); $('studioResults').innerHTML=STUDIO_EMPTY; $('studioNlMsg').textContent=''; syncStudioCount(); });
 // natural-language intent: free text -> pick the matching Studio chips + run
 async function studioNL(){
   const text=$('studioNl').value.trim(); if(!text) return;
@@ -1508,6 +1518,7 @@ async function studioNL(){
   const terms=d.terms||[];
   _studioSel.clear(); $('studioChips').querySelectorAll('.schip.on').forEach(x=>x.classList.remove('on'));
   terms.forEach(t=>{ _studioSel.add(t); const b=$('studioChips').querySelector(`.schip[data-term="${t.replace(/"/g,'&quot;')}"]`); if(b) b.classList.add('on'); });
+  syncStudioCount();
   if(typeof d.gras==='boolean') $('designGras').checked=d.gras;
   $('studioNlMsg').textContent = terms.length ? `Understood: ${terms.join(' · ')}${d.gras?' · food-safe only':''}. ${d.note||''}` : (d.note||'Nothing recognized.');
   if(terms.length) runStudio(0);
