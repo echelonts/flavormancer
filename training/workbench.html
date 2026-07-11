@@ -80,6 +80,11 @@
     border:none;border-radius:9px;background:var(--brand-grad);color:#fff;cursor:pointer}
   .bar button:disabled{opacity:.5;cursor:default}
   .hint{font-family:var(--mono);font-size:12px;color:var(--muted);margin:8px 2px 0}
+  .tour{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:12px 2px 0}
+  .tour-label{font-size:12px;color:var(--cream)}
+  .tour-chip{font:inherit;font-size:12.5px;padding:4px 12px;border:1px solid var(--line);border-radius:20px;
+    background:var(--panel);color:var(--ink);cursor:pointer;transition:all .14s}
+  .tour-chip:hover{border-color:transparent;background:var(--brand-grad);color:#08121A;transform:translateY(-1px)}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}
   @media(max-width:760px){.grid{grid-template-columns:1fr}}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
@@ -444,6 +449,17 @@
   <div class="hint">Type a <b>common or IUPAC name</b> (e.g. <code>vanillin</code>) or a
     <b>SMILES</b> string (e.g. <code>O=Cc1ccc(O)c(OC)c1</code>). SMILES omit implicit
     hydrogens — water is just <code>O</code>. These models are for <b>organic</b> molecules.</div>
+  <div class="tour">
+    <span class="tour-label">New here? Try one:</span>
+    <button type="button" class="tour-chip" data-q="vanillin">vanillin</button>
+    <button type="button" class="tour-chip" data-q="CC(=C)[C@H]1CC=C(C)C(=O)C1" title="spearmint — flip it to S for caraway in the chirality explorer">(R)-carvone</button>
+    <button type="button" class="tour-chip" data-q="menthol">menthol</button>
+    <button type="button" class="tour-chip" data-q="isoamyl acetate">isoamyl acetate</button>
+    <button type="button" class="tour-chip" data-q="limonene">limonene</button>
+    <button type="button" class="tour-chip" data-q="geosmin">geosmin</button>
+    <button type="button" class="tour-chip" data-q="caffeine">caffeine</button>
+    <button type="button" class="tour-chip" data-q="furaneol">furaneol</button>
+  </div>
 
   <div class="design-section" id="studio">
     <div class="design-head" id="studioToggle"><span id="studioCaret">▾</span> Flavor Studio
@@ -1051,6 +1067,7 @@ document.getElementById('btn3d').addEventListener('click', ()=>setView('3d'));
 
 go.addEventListener('click', run);
 q.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
+document.querySelectorAll('.tour-chip').forEach(b=> b.addEventListener('click', ()=>{ q.value=b.dataset.q; run(); }));
 // substitution card: 3D toggle button, rotate-in-place (no analyze), or click card -> analyze
 $('neighbors').addEventListener('click', e=>{
   const btn = e.target.closest('.mini-3d');
