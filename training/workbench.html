@@ -310,7 +310,12 @@
   .design-pager .pg{font:inherit;font-size:12px;padding:4px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer}
   .design-pager .pg:disabled{opacity:.4;cursor:default}.design-pager .pg:not(:disabled):hover{border-color:var(--brand-2)}
   /* --- flavor studio (unified flavors + notes picker) --- */
-  .studio-hint{font-size:12px;color:var(--muted);margin:12px 2px 8px}
+  .studio-nl{display:flex;gap:8px;margin:14px 0 4px}
+  .studio-nl-input{flex:1;font:inherit;font-size:13.5px;padding:10px 14px;border:1px solid var(--line);
+    border-radius:9px;background:var(--panel);color:var(--ink)}
+  .studio-nl-input:focus{outline:none;border-color:var(--brand-2)}
+  .studio-nl-msg{font-size:12px;color:var(--cream);min-height:0;margin:2px 2px 0}
+  .studio-hint{font-size:12px;color:var(--muted);margin:10px 2px 8px}
   .studio-chips{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;padding:2px 2px 6px}
   .studio-group{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
   .studio-group>.sg-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);width:70px;flex:none;text-align:right;padding-right:4px}
@@ -466,7 +471,13 @@
     <div class="design-head" id="studioToggle"><span id="studioCaret">▾</span> Flavor Studio
       <span class="mapsub">— a flavor <i>is</i> a set of notes, so it's one list. Pick any mix of <b>flavors</b> and <b>notes</b>; Studio ranks the food-safe molecules that carry them (a flavor's character molecule, or a molecule with that note) — 2D/3D structures + drop-in swaps.</span></div>
     <div id="studioWrap">
-      <div class="studio-hint">Pick one or more <b>flavors</b> or <b>notes</b> — the more you pick, the higher a molecule that hits several ranks.</div>
+      <div class="studio-nl">
+        <input id="studioNl" class="studio-nl-input" autocomplete="off"
+          placeholder="Describe it — e.g. “a food-safe cherry flavoring with fruity, sweet notes” — then Interpret">
+        <button type="button" id="studioNlGo" class="mix-btn">Interpret</button>
+      </div>
+      <div id="studioNlMsg" class="studio-nl-msg"></div>
+      <div class="studio-hint">…or pick <b>flavors</b> / <b>notes</b> below — the more you pick, the higher a molecule that hits several ranks.</div>
       <div id="studioChips" class="studio-chips"></div>
       <div class="design-controls">
         <label class="design-gras"><input type="checkbox" id="designGras" checked> food-safe (GRAS) only</label>
@@ -1378,7 +1389,20 @@ async function initStudio(){
 }
 initStudio();
 $('studioResults').innerHTML=STUDIO_EMPTY;
-$('studioClear').addEventListener('click', ()=>{ _studioSel.clear(); $('studioChips').querySelectorAll('.schip.on').forEach(x=>x.classList.remove('on')); $('studioResults').innerHTML=STUDIO_EMPTY; });
+$('studioClear').addEventListener('click', ()=>{ _studioSel.clear(); $('studioChips').querySelectorAll('.schip.on').forEach(x=>x.classList.remove('on')); $('studioResults').innerHTML=STUDIO_EMPTY; $('studioNlMsg').textContent=''; });
+// natural-language intent: free text -> pick the matching Studio chips + run
+async function studioNL(){
+  const text=$('studioNl').value.trim(); if(!text) return;
+  const d=await getJSON('/api/nl?q='+encodeURIComponent(text));
+  const terms=d.terms||[];
+  _studioSel.clear(); $('studioChips').querySelectorAll('.schip.on').forEach(x=>x.classList.remove('on'));
+  terms.forEach(t=>{ _studioSel.add(t); const b=$('studioChips').querySelector(`.schip[data-term="${t.replace(/"/g,'&quot;')}"]`); if(b) b.classList.add('on'); });
+  if(typeof d.gras==='boolean') $('designGras').checked=d.gras;
+  $('studioNlMsg').textContent = terms.length ? `Understood: ${terms.join(' · ')}${d.gras?' · food-safe only':''}. ${d.note||''}` : (d.note||'Nothing recognized.');
+  if(terms.length) runStudio(0);
+}
+$('studioNlGo').addEventListener('click', studioNL);
+$('studioNl').addEventListener('keydown', e=>{ if(e.key==='Enter') studioNL(); });
 async function runStudio(offset){
   const res=$('studioResults');
   if(!_studioSel.size){ res.innerHTML=STUDIO_EMPTY; return; }
