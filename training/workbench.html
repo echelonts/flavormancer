@@ -392,7 +392,12 @@
     header h1{font-size:34px}
     header .sub{font-size:11.5px;letter-spacing:.09em}
     .bar{flex-direction:column}
+    .bar input{font-size:13.5px;padding:12px 13px}
     .bar button{padding:12px}
+    .hint{font-size:11px}
+    .tour{gap:6px}.tour-chip{font-size:12px;padding:3px 10px}
+    .mapsub{font-size:11px;display:block;margin-top:3px}
+    .map-axis-key{font-size:10.5px;gap:8px}
     .grid{gap:14px}
     .card{padding:16px 15px}
     .design-section,.browse{padding:13px 13px}
@@ -422,7 +427,7 @@
   .loader-flask .bub{opacity:0;transform-box:fill-box;transform-origin:center;animation:bub 1.7s ease-in infinite}
   .loader-flask .b1{animation-delay:0s}.loader-flask .b2{animation-delay:.5s}
   .loader-flask .b3{animation-delay:.9s}.loader-flask .b4{animation-delay:1.3s}
-  @keyframes bub{0%{opacity:0;transform:translateY(4px) scale(.5)}25%{opacity:.95}100%{opacity:0;transform:translateY(-15px) scale(1)}}
+  @keyframes bub{0%{opacity:0;transform:translateY(6px) scale(.4)}20%{opacity:.9}100%{opacity:0;transform:translateY(-18px) scale(.95)}}
   .loader-flask .wisp{opacity:.85;stroke-dasharray:6 8;animation:wisp 2s linear infinite}
   @keyframes wisp{to{stroke-dashoffset:-28}}
   .loader-title{font-family:'Cinzel Decorative',Georgia,serif;font-size:15px;letter-spacing:.06em;color:var(--cream);margin-top:6px}
@@ -464,7 +469,7 @@
 </header>
 <main>
   <div class="bar">
-    <input id="q" placeholder="Compound name or SMILES — e.g. vanillin, or OC(=O)CC(O)(CC(=O)O)C(=O)O"
+    <input id="q" placeholder="Compound name or SMILES — e.g. vanillin"
            autocomplete="off" spellcheck="false">
     <button id="go">Read flavor</button>
   </div>
@@ -522,7 +527,7 @@
       <button type="button" class="mix-ex" data-ings="acetic acid|ethanol">acetic acid + ethanol → ethyl acetate</button>
       <button type="button" class="mix-ex" data-ings="butyric acid|ethanol">butyric acid + ethanol → ethyl butyrate (pineapple)</button>
       <button type="button" class="mix-ex" data-ings="acetic acid|isoamyl alcohol">acetic acid + isoamyl alcohol → isoamyl acetate (banana)</button>
-      <button type="button" class="mix-ex" data-ings="benzaldehyde|methylamine">benzaldehyde + methylamine → an imine (Schiff base)</button>
+      <button type="button" class="mix-ex" data-ings="benzaldehyde|methylamine">benzaldehyde + methylamine → N-methylbenzaldimine (a Schiff base)</button>
     </div>
     <div id="mixRows"></div>
     <button class="mix-add" id="mixAdd">+ add ingredient</button>
@@ -628,13 +633,13 @@
         <path d="M58 44 h24 v14 l16 34 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 l16 -34 z"
               fill="rgba(43,196,196,.10)" stroke="url(#lg-brand)" stroke-width="3" stroke-linejoin="round"/>
         <path d="M56 44 h28" stroke="url(#lg-brand)" stroke-width="3.4" stroke-linecap="round"/>
-        <!-- liquid -->
-        <path d="M50 82 l7 -15 h26 l7 15 a6 6 0 0 1 -5.5 8.4 h-29 a6 6 0 0 1 -5.5 -8.4 z" fill="url(#lg-brand)" opacity=".7"/>
-        <!-- fizzing bubbles -->
-        <circle class="bub b1" cx="64" cy="80" r="2.4" fill="#EAF6F4"/>
-        <circle class="bub b2" cx="72" cy="84" r="1.8" fill="#EAF6F4"/>
-        <circle class="bub b3" cx="77" cy="78" r="2.1" fill="#EAF6F4"/>
-        <circle class="bub b4" cx="68" cy="86" r="1.5" fill="#EAF6F4"/>
+        <!-- liquid: fills from the flask bottom up to a surface line, leaving headspace on top -->
+        <path d="M50.5 74 L89.5 74 L98 92 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 Z" fill="url(#lg-brand)" opacity=".72"/>
+        <!-- fizzing bubbles rise through the solution to the surface (~y74) -->
+        <circle class="bub b1" cx="64" cy="90" r="2.4" fill="#EAF6F4"/>
+        <circle class="bub b2" cx="73" cy="93" r="1.8" fill="#EAF6F4"/>
+        <circle class="bub b3" cx="77" cy="87" r="2.1" fill="#EAF6F4"/>
+        <circle class="bub b4" cx="68" cy="95" r="1.5" fill="#EAF6F4"/>
       </svg>
       <div class="loader-title" id="loaderTitle">Brewing the flavor read…</div>
       <ul class="loader-steps" id="loaderSteps">
