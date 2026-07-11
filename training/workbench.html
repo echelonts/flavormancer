@@ -171,8 +171,10 @@
   .map-section{margin:16px 0 8px;border-top:1px solid #EEF0EC;padding-top:12px}
   .map-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);cursor:pointer}
   .map-head .mapsub{font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);opacity:.8}
-  .map-legend{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 6px;font-size:12px}
-  .map-legend span{display:inline-flex;align-items:center;gap:5px}
+  .map-legend{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px;font-size:12px}
+  .map-legend span{display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:2px 8px;border-radius:20px;border:1px solid transparent;transition:all .12s}
+  .map-legend span:hover{border-color:var(--line)}
+  .map-legend span.on{border-color:var(--brand-2);background:rgba(43,196,196,.10);color:var(--ink)}
   .map-legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
   .map-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:10px 0 8px}
   .map-toggle3d{display:inline-flex}
@@ -469,7 +471,7 @@
 </header>
 <main>
   <div class="bar">
-    <input id="q" placeholder="Compound name or SMILES — e.g. vanillin"
+    <input id="q" placeholder="Compound name or SMILES — e.g. vanillin, or O=Cc1ccc(O)c(OC)c1"
            autocomplete="off" spellcheck="false">
     <button id="go">Read flavor</button>
   </div>
@@ -563,8 +565,9 @@
       <div id="mapAxisKey" class="map-axis-key"></div>
       <div class="map-key">Each dot is a molecule; <b>nearby dots are structurally similar</b>.
         Color = <b>dominant taste</b> (toggle to <b>aroma</b>); tight groups are structural families.
-        <b>2D:</b> scroll to zoom (into the cursor), drag to pan. <b>3D:</b> drag to rotate,
-        scroll to zoom. Hover for the molecule, click to open its read.</div>
+        <b>Click a class in the legend</b> to spotlight it (the rest dim). <b>2D:</b> scroll to zoom
+        into the cursor, drag to pan. <b>3D:</b> drag to rotate (fling it — it coasts), scroll to
+        zoom into the cursor. Hover for the molecule + its MW/logP/TPSA; click to open its read.</div>
       <details class="map-method">
         <summary>How it's built &amp; how to read it</summary>
         <div class="map-method-body">
@@ -780,6 +783,7 @@ const aromaColor = n => AROMA_COLORS[n] || 'var(--aroma)';
 
 const $ = id => document.getElementById(id);
 const go = $('go'), q = $('q');
+if(window.innerWidth<560) q.placeholder='Name or SMILES — e.g. vanillin';  // full example needs desktop width
 
 async function post(path, body){
   const r = await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},
@@ -1206,7 +1210,7 @@ initBrowse();
 // --- flavor-space map: 2D (zoom/pan) + rotatable 3D point cloud, colored by taste ---
 const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD24E',salty:'#63A6E0',tasteless:'#B8C0C6',other:'#8A96A0'};
 let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste', _mapLayout='similarity';
-let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6,z:1}, _drag=null, _dragged=false, _spinVel={ry:0,rx:0}, _inertia=null;
+let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6,z:1,ox:0,oy:0}, _drag=null, _dragged=false, _spinVel={ry:0,rx:0}, _inertia=null;
 function startInertia(){ cancelAnimationFrame(_inertia); const step=()=>{ _v3.ry+=_spinVel.ry; _v3.rx+=_spinVel.rx; _spinVel.ry*=0.93; _spinVel.rx*=0.93; drawMap(); if(Math.abs(_spinVel.ry)>0.0006||Math.abs(_spinVel.rx)>0.0006) _inertia=requestAnimationFrame(step); }; _inertia=requestAnimationFrame(step); }
 const GREY='#5A6068';
 // 'both' = the full flavor picture: taste color where a taste is known, else the aroma color,
@@ -1241,7 +1245,7 @@ $('mapLprop').addEventListener('click', ()=>setMapLayout('properties'));
 $('mapCT').addEventListener('click', ()=>setMapColor('taste'));
 $('mapCA').addEventListener('click', ()=>setMapColor('aroma'));
 $('mapCB').addEventListener('click', ()=>setMapColor('both'));
-$('mapReset').addEventListener('click', ()=>{ cancelAnimationFrame(_inertia); _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1}; drawMap(); });
+$('mapReset').addEventListener('click', ()=>{ cancelAnimationFrame(_inertia); _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1,ox:0,oy:0}; drawMap(); });
 $('mapLabels').addEventListener('click', ()=>{ _showLabels=!_showLabels; $('mapLabels').classList.toggle('on',_showLabels); drawMap(); });
 function setMapMode(m){
   _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap();
@@ -1255,11 +1259,15 @@ function setMapColor(c){ _mapColorBy=c;
   $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma'); $('mapCB').classList.toggle('on',c==='both');
   mapLegendRender(); drawMap();
 }
+let _mapHi = new Set();  // classes highlighted from the legend (empty = show all evenly)
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
   // show every class (all taste heads / all 15 aroma heads / both), 'other' always last
   const labs=Object.keys(counts).sort((a,b)=> a==='other'?1 : b==='other'?-1 : counts[b]-counts[a]).slice(0,20);
-  $('mapLegend').innerHTML=labs.map(l=>`<span><i style="background:${legendColor(l)}"></i>${l} (${counts[l]})</span>`).join('');
+  $('mapLegend').innerHTML=labs.map(l=>`<span class="leg${_mapHi.has(l)?' on':''}" data-l="${l.replace(/"/g,'&quot;')}"><i style="background:${legendColor(l)}"></i>${l} (${counts[l]})</span>`).join('');
+  $('mapLegend').querySelectorAll('.leg').forEach(s=> s.addEventListener('click', ()=>{
+    const l=s.dataset.l; if(_mapHi.has(l)) _mapHi.delete(l); else _mapHi.add(l); mapLegendRender(); drawMap();
+  }));
 }
 
 async function loadMap(){
@@ -1301,11 +1309,14 @@ function draw2D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=18;
   ctx.clearRect(0,0,W,H);
   const px=p=>(pad+p.x*(W-2*pad))*_v2.s+_v2.ox, py=p=>(H-pad-p.y*(H-2*pad))*_v2.s+_v2.oy;
-  ctx.globalCompositeOperation='lighter';  // additive glow — dense clusters luminesce
-  for(const p of _mapPts){ const c=mapColor(p),x=px(p),y=py(p); ctx.fillStyle=c;
-    ctx.beginPath(); ctx.arc(x,y,4.6,0,7); ctx.globalAlpha=.09; ctx.fill();
-    ctx.beginPath(); ctx.arc(x,y,2.4,0,7); ctx.globalAlpha=.85; ctx.fill(); }
+  const hl=_mapHi.size;
+  ctx.globalCompositeOperation='lighter';  // glow only on shown/highlighted points (subtle by default)
+  for(const p of _mapPts){ if(hl && !_mapHi.has(mapLabel(p))) continue; const x=px(p),y=py(p); ctx.fillStyle=mapColor(p);
+    ctx.beginPath(); ctx.arc(x,y,hl?5.2:3.2,0,7); ctx.globalAlpha=hl?.16:.045; ctx.fill(); }
   ctx.globalCompositeOperation='source-over';
+  for(const p of _mapPts){ const on=!hl||_mapHi.has(mapLabel(p)),x=px(p),y=py(p);
+    ctx.fillStyle=on?mapColor(p):'#39424C'; ctx.beginPath(); ctx.arc(x,y,on?2.4:1.4,0,7); ctx.globalAlpha=on?(hl?.96:.82):.16; ctx.fill(); }
+  ctx.globalAlpha=1;
   ctx.globalAlpha=1; _mapProj={px,py};
 }
 // interpretable-axes view: real molecular weight (x) vs logP hydrophobicity (y), with labelled
@@ -1342,11 +1353,14 @@ function drawProps(){
   ctx.save(); ctx.translate(14, mt+plotH/2); ctx.rotate(-Math.PI/2); ctx.textBaseline='top';
   ctx.fillText('logP (hydrophobicity)  →  oilier', 0, 0); ctx.restore();
   // points
+  const hl=_mapHi.size;
   ctx.globalCompositeOperation='lighter';
-  for(const p of _mapPts){ if(p.mw==null||p.logp==null) continue; const c=mapColor(p),x=bx(p.mw),y=by(p.logp); ctx.fillStyle=c;
-    ctx.beginPath(); ctx.arc(x,y,4.4,0,7); ctx.globalAlpha=.08; ctx.fill();
-    ctx.beginPath(); ctx.arc(x,y,2.4,0,7); ctx.globalAlpha=.82; ctx.fill(); }
+  for(const p of _mapPts){ if(p.mw==null||p.logp==null||(hl&&!_mapHi.has(mapLabel(p)))) continue; const x=bx(p.mw),y=by(p.logp); ctx.fillStyle=mapColor(p);
+    ctx.beginPath(); ctx.arc(x,y,hl?5:3,0,7); ctx.globalAlpha=hl?.15:.04; ctx.fill(); }
   ctx.globalCompositeOperation='source-over';
+  for(const p of _mapPts){ if(p.mw==null||p.logp==null) continue; const on=!hl||_mapHi.has(mapLabel(p)),x=bx(p.mw),y=by(p.logp);
+    ctx.fillStyle=on?mapColor(p):'#39424C'; ctx.beginPath(); ctx.arc(x,y,on?2.4:1.4,0,7); ctx.globalAlpha=on?(hl?.95:.8):.15; ctx.fill(); }
+  ctx.globalAlpha=1;
   ctx.globalAlpha=1;
   _mapProj={px:p=>p.mw==null?-9999:bx(p.mw), py:p=>p.logp==null?-9999:by(p.logp)};
 }
@@ -1370,7 +1384,8 @@ function draw3D(){
              p.logp==null?0:cl((p.logp-d.lpMin)/((d.lpMax-d.lpMin)||1)),
              p.tpsa==null?0:cl(p.tpsa/d.tpMax) ];
   };
-  const rot=(X,Y,Z)=>{ const x1=X*cY-Z*sY, z1=X*sY+Z*cY, y1=Y*cX-z1*sX, z2=Y*sX+z1*cX; return {sx:cx+x1*R, sy:cy-y1*R, d:z2}; };
+  const ox=_v3.ox||0, oy=_v3.oy||0;  // pan so 3D dolly can anchor at the cursor
+  const rot=(X,Y,Z)=>{ const x1=X*cY-Z*sY, z1=X*sY+Z*cY, y1=Y*cX-z1*sX, z2=Y*sX+z1*cX; return {sx:cx+ox+x1*R, sy:cy+oy-y1*R, d:z2}; };
   const proj=p=>{ const c=coord(p); return rot(c[0]-.5, c[1]-.5, c[2]-.5); };
   if(props){  // draw labelled 3D axes from the cube origin
     const O=rot(-.5,-.5,-.5);
@@ -1380,11 +1395,13 @@ function draw3D(){
       ctx.beginPath(); ctx.moveTo(O.sx,O.sy); ctx.lineTo(E.sx,E.sy); ctx.stroke(); ctx.globalAlpha=1; ctx.fillStyle=col; ctx.fillText(lab, E.sx, E.sy-6); }
   }
   const all=_mapPts.map(p=>({p,pr:proj(p)})).sort((a,b)=>a.pr.d-b.pr.d);  // far first
-  ctx.globalCompositeOperation='lighter';  // additive glow with depth (nearer = brighter/bigger)
-  for(const {p,pr} of all){ const t=pr.d+0.5, rr=1.7+2.1*t, a=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fillStyle=mapColor(p);
-    ctx.beginPath(); ctx.arc(pr.sx,pr.sy,rr*1.9,0,7); ctx.globalAlpha=a*.14; ctx.fill();
-    ctx.beginPath(); ctx.arc(pr.sx,pr.sy,rr,0,7); ctx.globalAlpha=a; ctx.fill(); }
+  const hl=_mapHi.size;
+  ctx.globalCompositeOperation='lighter';  // glow with depth; subtle by default, strong when highlighting
+  for(const {p,pr} of all){ if(hl && !_mapHi.has(mapLabel(p))) continue; const t=pr.d+0.5, rr=1.7+2.1*t, a=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fillStyle=mapColor(p);
+    ctx.beginPath(); ctx.arc(pr.sx,pr.sy,rr*(hl?2.1:1.5),0,7); ctx.globalAlpha=a*(hl?.2:.07); ctx.fill(); }
   ctx.globalCompositeOperation='source-over';
+  for(const {p,pr} of all){ const on=!hl||_mapHi.has(mapLabel(p)); const t=pr.d+0.5, rr=1.7+2.1*t, a=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fillStyle=on?mapColor(p):'#39424C';
+    ctx.beginPath(); ctx.arc(pr.sx,pr.sy,on?rr:rr*.7,0,7); ctx.globalAlpha=on?a:a*.28; ctx.fill(); }
   ctx.globalAlpha=1; _mapProj={px:p=>proj(p).sx, py:p=>proj(p).sy};
 }
 function nearestMapPt(ev){
@@ -1424,7 +1441,11 @@ function attachMapEvents(cv){
       _v2.oy = my - (my-_v2.oy)*k;
       _v2.s *= k;
     } else {
-      _v3.z = Math.max(0.35, Math.min(6, (_v3.z||1)*k));  // 3D dolly
+      // cursor-anchored 3D dolly: scale about the pointer, not the centre
+      const r=cv.getBoundingClientRect(), s=cv.width/r.width;
+      const mx=(ev.clientX-r.left)*s, my=(ev.clientY-r.top)*s, cx=cv.width/2, cy=cv.height/2;
+      const z0=_v3.z||1, z1=Math.max(0.35,Math.min(6,z0*k)), kk=z1/z0;
+      _v3.ox=(mx-cx)*(1-kk)+(_v3.ox||0)*kk; _v3.oy=(my-cy)*(1-kk)+(_v3.oy||0)*kk; _v3.z=z1;
     }
     drawMap();
   }, {passive:false});
