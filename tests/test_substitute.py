@@ -17,7 +17,7 @@ def test_substitute_rejects_bad_smiles():
 
 
 def test_substitute_graceful_without_data(monkeypatch):
-    monkeypatch.setattr(predict, "_SUB_INDEX", ([], [], []))
+    monkeypatch.setattr(predict, "_SUB_INDEX", ([], [], [], []))
     out = predict.substitute("CCO")
     assert out["neighbors"] == []
     assert "note" in out
@@ -27,7 +27,7 @@ def test_substitute_ranks_by_similarity(monkeypatch):
     mols = ["CCO", "CCCO", "c1ccccc1"]  # ethanol, propanol, benzene
     fps = [predict._MORGAN.GetFingerprint(Chem.MolFromSmiles(s)) for s in mols]
     canon = [_canon(s) for s in mols]
-    monkeypatch.setattr(predict, "_SUB_INDEX", (fps, canon, [[], [], []]))
+    monkeypatch.setattr(predict, "_SUB_INDEX", (fps, canon, [[], [], []], [[], [], []]))
     out = predict.substitute("CCO", k=2)
     neighbors = out["neighbors"]
     # the query itself is excluded

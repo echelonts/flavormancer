@@ -135,6 +135,7 @@
   .nb-aroma{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
   .nb-aroma .atag{font-size:10px;padding:1px 7px;border-radius:20px;background:transparent;color:var(--aroma);border:1px solid;text-transform:capitalize}
   .kt{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+  .rx-from{font-size:10px;color:var(--muted);line-height:1.3;margin-top:3px}
   .kt .tchip{font-size:10px;font-weight:600;padding:1px 8px;border-radius:20px;color:#10140F;text-transform:capitalize}
   .kt .muted{color:var(--muted);font-size:11px}
   .browse{margin:14px 0 4px;border:1px solid #2C6E74;border-radius:12px;padding:15px 18px;background:linear-gradient(180deg,#15211F,#181D24)}
@@ -489,6 +490,12 @@
       <button type="button" class="mix-ex" data-ings="sodium nitrite|dimethylamine">nitrite + amine → nitrosamine</button>
       <button type="button" class="mix-ex" data-ings="glucose|asparagine" data-proc="high_heat">sugar + asparagine + heat → acrylamide</button>
       <button type="button" class="mix-ex" data-ings="ethanol|urea">ethanol + urea → ethyl carbamate</button>
+    </div>
+    <div class="mix-examples"><span>Or a flavor-forming combo:</span>
+      <button type="button" class="mix-ex" data-ings="acetic acid|ethanol">acetic acid + ethanol → ethyl acetate</button>
+      <button type="button" class="mix-ex" data-ings="butyric acid|ethanol">butyric acid + ethanol → ethyl butyrate (pineapple)</button>
+      <button type="button" class="mix-ex" data-ings="acetic acid|isoamyl alcohol">acetic acid + isoamyl alcohol → banana</button>
+      <button type="button" class="mix-ex" data-ings="benzaldehyde|methylamine">benzaldehyde + amine → Schiff base</button>
     </div>
     <div id="mixRows"></div>
     <button class="mix-add" id="mixAdd">+ add ingredient</button>
@@ -1492,11 +1499,22 @@ $('mixCheck').addEventListener('click', async ()=>{
     C.forEach(h=>html+=`<div class="hazard cond">○ <b>${h.possible_product}</b> — from ${h.precursors.join(' + ')}; <b>would form with</b>: ${(h.requires_process||[]).join(', ')}. ${h.note}</div>`);
     const pal=r.palette||{}, M=pal.matches||[];
     if(M.length){
-      html+=`<div class="bsub">Single molecules with a similar taste palette (${(pal.target||[]).join(' · ')||'—'})</div><div class="mix-ings">`+M.map(it=>`
-        <div class="mix-ing" data-smi="${it.smiles}" style="cursor:pointer" title="Click to analyze">
+      const tg=pal.target||{}; const tgt=[...(tg.tastes||[]),...(tg.aromas||[])].join(' · ')||'—';
+      html+=`<div class="bsub">Single molecules that best match this blend's palette — taste + aroma (${tgt})</div><div class="mix-ings">`+M.map(it=>{
+        const notes=[...(it.tastes||[]),...(it.aromas||[])].join(' · ');
+        return `<div class="mix-ing" data-smi="${it.smiles}" style="cursor:pointer" title="Click to analyze">
           <div class="nb-struct">${it.svg||''}</div>
-          <div class="nb-info"><div class="nb-name">${it.name||it.smiles}</div><div class="kt">${(it.tastes||[]).join(' · ')}</div></div>
-          <div class="sim">${Math.round(it.match*100)}% match</div></div>`).join('')+'</div>';
+          <div class="nb-info"><div class="nb-name">${it.name||it.smiles}</div><div class="kt">${notes}</div></div>
+          <div class="sim">${Math.round(it.match*100)}% match</div></div>`;}).join('')+'</div>';
+    }
+    const RX=r.reactions||[];
+    if(RX.length){
+      html+=`<div class="bsub">Plausible reaction products <span style="font-weight:400;color:var(--muted)">— template-based, indicative (the groups to form these are present; not a claim they proceed)</span></div><div class="mix-ings">`+RX.map(rx=>`
+        <div class="mix-ing" data-smi="${rx.smiles}" style="cursor:pointer" title="Click to analyze the product">
+          <div class="nb-struct">${rx.svg||''}</div>
+          <div class="nb-info"><div class="nb-name">${rx.name||rx.smiles}</div>
+            <div class="kt">${[...(rx.tastes||[]),...(rx.aromas||[])].join(' · ')||'—'}</div>
+            <div class="rx-from">${rx.reaction}</div></div></div>`).join('')+'</div>';
     }
     html+='<div class="empty" style="font-size:12px">Each ingredient is read individually and screened for documented hazards. How the blend actually <i>tastes</i> together (suppression / synergy) needs your formulation data — not predictable from public data.</div>';
     $('mixResults').innerHTML=html;

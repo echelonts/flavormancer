@@ -317,7 +317,7 @@ def api_mixture(m: MixtureQuery):
     """Per-ingredient reads + documented-hazard screen + a single-molecule palette match."""
     smis = [s for s in (_resolve(x) for x in m.ingredients) if s]
     out = P.check_mixture(smis, m.processes)
-    reads, palette = [], set()
+    reads, palette, aroma_palette = [], set(), set()
     for s in smis:
         r = P.predict(s)
         tp = r.get("taste_profile", [])
@@ -330,16 +330,34 @@ def api_mixture(m: MixtureQuery):
             if t not in tastes:
                 tastes.append(t)
         palette.update(tastes)
+        aromas = [d["odor"] for d in _aroma_tags(s)]  # this ingredient's aroma notes
+        aroma_palette.update(aromas)
         reads.append({"smiles": r["smiles"], "name": _names(s)[0], "svg": _svg(s, 110, 80),
-                      "top_taste": tp[0]["taste"] if tp else None, "tastes": tastes,
+                      "top_taste": tp[0]["taste"] if tp else None, "tastes": tastes, "aromas": aromas[:4],
                       "gras": r["safety"]["gras_status"], "alerts": r["safety"]["structural_alerts"],
                       "tox_flags": r["safety"]["tox_screen"].get("flags", []) if r["applicability"]["in_domain"] else []})
-    pal = P.palette_match(sorted(palette), k=5)
+    pal = P.palette_match(sorted(palette), sorted(aroma_palette), k=5)
     for mt in pal.get("matches", []):
         mt["svg"] = _svg(mt["smiles"], 110, 80)
         mt["name"] = _names(mt["smiles"])[0]
     out["ingredients"] = reads
     out["palette"] = pal
+    # indicative reaction-template products (augments the documented-hazard screen) — with the
+    # product's own predicted taste + aroma so you see what would form, flavor-wise
+    rxns = P.reaction_products(smis)
+    for rx in rxns:
+        rx["svg"] = _svg(rx["smiles"], 110, 80)
+        rx["name"] = _names(rx["smiles"])[0]
+        rx["aromas"] = [d["odor"] for d in _aroma_tags(rx["smiles"])][:3]
+        pr = P.predict(rx["smiles"])
+        rtastes = [t for t in ("sweet", "bitter", "umami")
+                   if isinstance(pr.get(t), (int, float)) and pr[t] >= 0.5]
+        if pr.get("sour"):
+            rtastes.append("sour")
+        if pr.get("salty") is True:
+            rtastes.append("salty")
+        rx["tastes"] = rtastes
+    out["reactions"] = rxns
     return out
 
 
