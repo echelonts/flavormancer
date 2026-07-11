@@ -330,9 +330,20 @@
   .studio-nl-input:focus{outline:none;border-color:var(--brand-2)}
   .studio-nl-msg{font-size:12px;color:var(--cream);min-height:0;margin:2px 2px 0}
   .studio-hint{font-size:12px;color:var(--muted);margin:10px 2px 8px}
-  .studio-chips{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;padding:2px 2px 6px}
+  .studio-legend{display:flex;flex-direction:column;gap:4px;margin:10px 2px 10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,rgba(138,107,224,.06),rgba(43,196,196,.05))}
+  .studio-legend span{font-size:12px;color:var(--muted);line-height:1.45}
+  .studio-legend b{color:var(--ink);font-weight:650}
+  .studio-legend i{color:var(--cream);font-style:normal}
+  .studio-legend-tip{margin-top:2px;color:var(--accent)!important}
+  .studio-chips{display:flex;flex-direction:column;gap:12px;max-height:340px;overflow-y:auto;padding:2px 4px 6px}
+  .studio-section{display:flex;flex-direction:column;gap:8px}
+  .ss-head{display:flex;align-items:baseline;gap:8px;font-size:13px;font-weight:700;color:var(--ink);padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .ss-sub{font-size:11px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0}
+  .ss-body{display:flex;flex-direction:column;gap:7px}
   .studio-group{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
-  .studio-group>.sg-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);width:70px;flex:none;text-align:right;padding-right:4px}
+  .studio-group>.sg-label{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);width:96px;flex:none;text-align:right;padding-right:4px}
+  .sg-ico{font-size:14px;line-height:1;filter:saturate(1.1)}
+  .studio-group-notes{margin-left:0}
   .schip{font:inherit;font-size:12px;padding:3px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);cursor:pointer;text-transform:capitalize}
   .schip:hover{border-color:var(--brand-2)}
   .schip-note{border-style:dashed}
@@ -500,7 +511,11 @@
         <button type="button" id="studioNlGo" class="mix-btn">Interpret</button>
       </div>
       <div id="studioNlMsg" class="studio-nl-msg"></div>
-      <div class="studio-hint">…or pick <b>flavors</b> / <b>notes</b> below — the more you pick, the higher a molecule that hits several ranks.</div>
+      <div class="studio-legend">
+        <span><b>🍓 Flavors</b> — a named flavor you know (banana, saffron) → the molecule that <i>makes</i> it</span>
+        <span><b>👃 Notes</b> — a single aroma/taste <i>quality</i> (citrus, floral, sweet) → molecules that <i>carry</i> it</span>
+        <span class="studio-legend-tip">Pick any mix — a molecule ranks by how many of your picks it hits.</span>
+      </div>
       <div id="studioChips" class="studio-chips"></div>
       <div class="design-controls">
         <label class="design-gras"><input type="checkbox" id="designGras" checked> food-safe (GRAS) only</label>
@@ -1462,10 +1477,21 @@ async function initStudio(){
   try{
     const d = await getJSON('/api/studio_terms'); const cats=d.flavors||[], notes=d.notes||[];
     if(!cats.length && !notes.length){ setTimeout(initStudio, 4000); return; }
-    let html = notes.length ? `<div class="studio-group"><span class="sg-label">notes</span>`+
-      notes.map(n=>`<button type="button" class="schip schip-note" data-term="${n.replace(/"/g,'&quot;')}">${n}</button>`).join('')+`</div>` : '';
-    html += cats.map(c=>`<div class="studio-group"><span class="sg-label">${c.category}</span>`+
-      c.flavors.map(f=>`<button type="button" class="schip schip-flavor" data-term="${f.replace(/"/g,'&quot;')}">${f}</button>`).join('')+`</div>`).join('');
+    const esc = s => s.replace(/"/g,'&quot;');
+    const CAT_ICON={fruit:'🍓',citrus:'🍋',berry:'🫐','tropical':'🍍',melon:'🍈',stone:'🍑',orchard:'🍎',sweet:'🍬',confection:'🍭',dessert:'🍰',caramel:'🍮',vegetal:'🥦',green:'🥬',herb:'🌿',herbal:'🌿',floral:'🌸',savory:'🍖',meaty:'🥩',umami:'🍄',spice:'🌶️',spicy:'🌶️',warm:'🍂',dairy:'🧀',creamy:'🥛',nut:'🥜',nutty:'🥜',roast:'☕',roasted:'☕',coffee:'☕',allium:'🧅',woody:'🪵',smoky:'🔥',earthy:'🍄',beverage:'🥤',wine:'🍷',minty:'🌱',cooling:'🌱',other:'⚗️',misc:'⚗️'};
+    const icon = c => CAT_ICON[String(c).toLowerCase()] || '⚗️';
+    // Flavors — named flavors grouped by category, each with an icon
+    let html = `<div class="studio-section"><div class="ss-head">🍓 Flavors <span class="ss-sub">a flavor you know → the molecule that makes it</span></div><div class="ss-body">`;
+    html += cats.map(c=>`<div class="studio-group"><span class="sg-label" title="${esc(c.category)}"><span class="sg-ico">${icon(c.category)}</span>${c.category}</span>`+
+      c.flavors.map(f=>`<button type="button" class="schip schip-flavor" data-term="${esc(f)}">${f}</button>`).join('')+`</div>`).join('');
+    html += `</div></div>`;
+    // Notes — model-predicted aroma/taste qualities
+    if(notes.length){
+      html += `<div class="studio-section"><div class="ss-head">👃 Notes <span class="ss-sub">an aroma/taste quality → molecules that carry it</span></div><div class="ss-body">`+
+        `<div class="studio-group studio-group-notes">`+
+        notes.map(n=>`<button type="button" class="schip schip-note" data-term="${esc(n)}">${n}</button>`).join('')+
+        `</div></div></div>`;
+    }
     $('studioChips').innerHTML = html;
     $('studioChips').querySelectorAll('.schip').forEach(b=> b.addEventListener('click', ()=>{
       const t=b.dataset.term; if(_studioSel.has(t)){ _studioSel.delete(t); b.classList.remove('on'); } else { _studioSel.add(t); b.classList.add('on'); }
