@@ -823,7 +823,10 @@ def api_nl(q: str = ""):
 # names / melting / boiling points.
 _ENRICH = []
 ENRICH_COLUMNS = [
-    {"key": "name", "label": "Name", "why": "Common or IUPAC identity (from public-domain PubChem)."},
+    {"key": "svg", "label": "Structure", "why": "2D depiction drawn straight from the structure (RDKit).", "sort": False},
+    {"key": "name", "label": "Common name", "why": "Everyday name (PubChem Title, public domain) where one exists."},
+    {"key": "iupac", "label": "IUPAC name", "why": "Systematic IUPAC name (public-domain PubChem) — the unambiguous identity."},
+    {"key": "smiles", "label": "SMILES", "why": "The machine-readable structure string the models actually read."},
     {"key": "taste", "label": "Taste", "why": "Documented taste where known, else the model's call — what it tastes like."},
     {"key": "aroma_top", "label": "Aroma", "why": "The strongest predicted odor descriptor — the note it most reads as."},
     {"key": "mw", "label": "MW", "why": "Molecular weight (Da) — size. Heavier molecules are generally less volatile, so aroma fades."},
@@ -851,8 +854,10 @@ def _load_enrichment():
     rows = []
     for _, r in df.iterrows():
         taste = _s(r.get("taste_documented")) or _s(r.get("taste_predicted"))
+        skel = r.get("inchikey_skel")
+        iupac = (_NAME_TABLE.get(skel) or (None, None))[1] if isinstance(skel, str) else None
         rows.append({
-            "smiles": r["smiles"], "name": _s(r.get("name")),
+            "smiles": r["smiles"], "name": _s(r.get("name")), "iupac": iupac or "",
             "taste": taste, "aroma_top": _s(r.get("aroma_top")),
             "mw": _num(r.get("mw")), "logp": _num(r.get("logp")), "tpsa": _num(r.get("tpsa")),
             "hbd": _num(r.get("hbd")), "hba": _num(r.get("hba")), "rot_bonds": _num(r.get("rot_bonds")),
@@ -887,8 +892,8 @@ def api_enrichment(q: str = "", sort: str = "name", desc: int = 0, offset: int =
     if ql:
         rows = [r for r in rows if ql in (r["name"] or "").lower() or ql in r["smiles"].lower()
                 or ql in (r["taste"] or "").lower() or ql in (r["aroma_top"] or "").lower()]
-    keys = {c["key"] for c in ENRICH_COLUMNS}
-    if sort not in keys:
+    sortable = {c["key"] for c in ENRICH_COLUMNS if c.get("sort", True)}
+    if sort not in sortable:
         sort = "name"
 
     def sortkey(r):
@@ -901,9 +906,15 @@ def api_enrichment(q: str = "", sort: str = "name", desc: int = 0, offset: int =
 
     rows = sorted(rows, key=sortkey, reverse=bool(desc))
     total = len(rows)
-    page = rows[offset:offset + limit]
+    page = [dict(r, svg=_svg_cell(r["smiles"])) for r in rows[offset:offset + limit]]
     return {"rows": page, "total": total, "offset": offset, "limit": limit,
             "columns": ENRICH_COLUMNS}
+
+
+@lru_cache(maxsize=4096)
+def _svg_cell(smi):
+    """A compact 2D depiction for one enrichment-table row (cached; rendered per visible page)."""
+    return _svg(smi, 104, 62)
 
 
 @app.get("/api/studio")
