@@ -558,6 +558,7 @@
         <span class="map-toggle3d"><button type="button" id="mapCT" class="st-tab on">taste</button><button type="button" id="mapCA" class="st-tab">aroma</button><button type="button" id="mapCB" class="st-tab">both</button></span>
         <span id="mapLegend" class="map-legend"></span>
         <button type="button" id="mapLabels" class="st-tab on">labels</button>
+        <button type="button" id="mapClusters" class="st-tab on" title="Soft density shading under each class — spotlight a class in the legend to see where it concentrates">clusters</button>
         <button type="button" id="mapReset" class="map-reset">Reset view</button>
       </div>
       <div class="map-canvas-wrap"><canvas id="flavorMap" width="1440" height="760"></canvas>
@@ -1247,6 +1248,7 @@ $('mapCA').addEventListener('click', ()=>setMapColor('aroma'));
 $('mapCB').addEventListener('click', ()=>setMapColor('both'));
 $('mapReset').addEventListener('click', ()=>{ cancelAnimationFrame(_inertia); _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1,ox:0,oy:0}; drawMap(); });
 $('mapLabels').addEventListener('click', ()=>{ _showLabels=!_showLabels; $('mapLabels').classList.toggle('on',_showLabels); drawMap(); });
+$('mapClusters').addEventListener('click', ()=>{ _showClusters=!_showClusters; $('mapClusters').classList.toggle('on',_showClusters); drawMap(); });
 function setMapMode(m){
   _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap();
 }
@@ -1279,7 +1281,23 @@ async function loadMap(){
   _mapReady=true; attachMapEvents(cv); drawMap();
 }
 function drawMap(){ _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D()); if(_showLabels) drawClusterLabels(); updateAxisKey(); }
-let _showLabels=true;
+let _showLabels=true, _showClusters=true;
+// Cluster density shading: paint a soft additive splat per point in its class color, UNDER the
+// dots, so where a class concentrates reads as a colored cloud. Subtle for all classes at once;
+// punchy when a class is spotlighted from the legend — that's the "where does bitter live?" moment.
+function drawDensity(ctx, screenOf){
+  if(!_showClusters) return;
+  const hl=_mapHi.size, R=hl?30:15, A=hl?0.06:0.02;
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  for(const p of _mapPts){
+    const l=mapLabel(p); if(!l||l==='other') continue;
+    if(hl && !_mapHi.has(l)) continue;
+    const s=screenOf(p); if(!s||s.x<-9000||!isFinite(s.x)||!isFinite(s.y)) continue;
+    ctx.fillStyle=mapColor(p); ctx.globalAlpha=A;
+    ctx.beginPath(); ctx.arc(s.x,s.y,R,0,7); ctx.fill();
+  }
+  ctx.restore();
+}
 // name the dominant regions: draw each class label at the centroid of its points (screen space)
 function drawClusterLabels(){
   if(!_mapProj) return;
@@ -1309,6 +1327,7 @@ function draw2D(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=18;
   ctx.clearRect(0,0,W,H);
   const px=p=>(pad+p.x*(W-2*pad))*_v2.s+_v2.ox, py=p=>(H-pad-p.y*(H-2*pad))*_v2.s+_v2.oy;
+  drawDensity(ctx, p=>({x:px(p),y:py(p)}));
   const hl=_mapHi.size;
   ctx.globalCompositeOperation='lighter';  // glow only on shown/highlighted points (subtle by default)
   for(const p of _mapPts){ if(hl && !_mapHi.has(mapLabel(p))) continue; const x=px(p),y=py(p); ctx.fillStyle=mapColor(p);
@@ -1352,6 +1371,8 @@ function drawProps(){
   ctx.fillText('Molecular weight (Da)  →  bigger', ml+plotW/2, mt+plotH+22);
   ctx.save(); ctx.translate(14, mt+plotH/2); ctx.rotate(-Math.PI/2); ctx.textBaseline='top';
   ctx.fillText('logP (hydrophobicity)  →  oilier', 0, 0); ctx.restore();
+  // cluster density under the points
+  drawDensity(ctx, p=>(p.mw==null||p.logp==null)?{x:-9999}:{x:bx(p.mw),y:by(p.logp)});
   // points
   const hl=_mapHi.size;
   ctx.globalCompositeOperation='lighter';
@@ -1395,6 +1416,7 @@ function draw3D(){
       ctx.beginPath(); ctx.moveTo(O.sx,O.sy); ctx.lineTo(E.sx,E.sy); ctx.stroke(); ctx.globalAlpha=1; ctx.fillStyle=col; ctx.fillText(lab, E.sx, E.sy-6); }
   }
   const all=_mapPts.map(p=>({p,pr:proj(p)})).sort((a,b)=>a.pr.d-b.pr.d);  // far first
+  drawDensity(ctx, p=>{ const s=proj(p); return {x:s.sx,y:s.sy}; });
   const hl=_mapHi.size;
   ctx.globalCompositeOperation='lighter';  // glow with depth; subtle by default, strong when highlighting
   for(const {p,pr} of all){ if(hl && !_mapHi.has(mapLabel(p))) continue; const t=pr.d+0.5, rr=1.7+2.1*t, a=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fillStyle=mapColor(p);
