@@ -430,8 +430,13 @@
   .loader-flask .b1{animation-delay:0s}.loader-flask .b2{animation-delay:.5s}
   .loader-flask .b3{animation-delay:.9s}.loader-flask .b4{animation-delay:1.3s}
   @keyframes bub{0%{opacity:0;transform:translateY(6px) scale(.4)}20%{opacity:.9}100%{opacity:0;transform:translateY(-18px) scale(.95)}}
-  .loader-flask .wisp{opacity:.85;stroke-dasharray:6 8;animation:wisp 2s linear infinite}
+  .loader-flask .wisp{stroke-dasharray:5 9;transform-box:fill-box;transform-origin:bottom;animation:wisp 2.2s linear infinite, wispRise 3.4s ease-in-out infinite}
+  .loader-flask .w1{opacity:.85;animation-delay:0s,0s}
+  .loader-flask .w2{opacity:.6;animation-delay:.5s,.4s}
+  .loader-flask .w3{opacity:.55;animation-delay:1s,.9s}
+  .loader-flask .w4{opacity:.5;animation-delay:1.5s,1.3s}
   @keyframes wisp{to{stroke-dashoffset:-28}}
+  @keyframes wispRise{0%,100%{transform:translateY(2px) scaleY(.96)}50%{transform:translateY(-2px) scaleY(1.02)}}
   .loader-title{font-family:'Cinzel Decorative',Georgia,serif;font-size:15px;letter-spacing:.06em;color:var(--cream);margin-top:6px}
   .loader-steps{list-style:none;margin:14px auto 0;padding:0;display:flex;flex-direction:column;gap:7px;min-width:250px}
   .loader-steps li{display:flex;align-items:center;justify-content:center;gap:9px;font-size:12.5px;color:var(--muted);transition:color .2s}
@@ -631,8 +636,6 @@
         </defs>
         <circle cx="70" cy="70" r="62" fill="none" stroke="url(#lg-brand)" stroke-width="3" opacity=".55"/>
         <circle class="loader-ring" cx="70" cy="70" r="62" fill="none" stroke="url(#lg-brand)" stroke-width="3" stroke-linecap="round" stroke-dasharray="80 320"/>
-        <!-- aroma wisp -->
-        <path class="wisp" d="M70 34 C58 26 82 20 70 12" fill="none" stroke="#D9AB74" stroke-width="2.4" stroke-linecap="round"/>
         <!-- flask -->
         <path d="M58 44 h24 v14 l16 34 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 l16 -34 z"
               fill="rgba(43,196,196,.10)" stroke="url(#lg-brand)" stroke-width="3" stroke-linejoin="round"/>
@@ -644,6 +647,14 @@
         <circle class="bub b2" cx="73" cy="93" r="1.8" fill="#EAF6F4"/>
         <circle class="bub b3" cx="77" cy="87" r="2.1" fill="#EAF6F4"/>
         <circle class="bub b4" cx="68" cy="95" r="1.5" fill="#EAF6F4"/>
+        <!-- aroma wisps: rise from just above the solvent surface (~y72), serpentine up
+             through the neck and out of the mouth (y44) into the air above -->
+        <g class="wisps" fill="none" stroke-linecap="round">
+          <path class="wisp w1" d="M69 72 C63 64 75 58 69 50 C63 43 77 36 70 28 C65 22 73 16 69 9"  stroke="#D9AB74" stroke-width="2.4"/>
+          <path class="wisp w2" d="M63 71 C57 64 69 59 62 52 C56 46 66 40 62 33 C59 28 64 24 62 19" stroke="#2BC4C4" stroke-width="2"/>
+          <path class="wisp w3" d="M76 71 C82 64 70 59 77 52 C83 46 73 41 77 34 C79 30 75 26 77 22" stroke="#8A6BE0" stroke-width="2"/>
+          <path class="wisp w4" d="M70 73 C66 68 74 63 70 57 C67 52 72 48 70 43"                    stroke="#D9AB74" stroke-width="1.7"/>
+        </g>
       </svg>
       <div class="loader-title" id="loaderTitle">Brewing the flavor read…</div>
       <ul class="loader-steps" id="loaderSteps">
