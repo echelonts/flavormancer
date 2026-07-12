@@ -342,8 +342,14 @@
   .ss-body{display:flex;flex-direction:column;gap:7px}
   .studio-group{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
   .studio-group>.sg-label{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);width:96px;flex:none;text-align:right;padding-right:4px}
-  .sg-ico{font-size:14px;line-height:1;filter:saturate(1.1)}
+  .sg-ico{display:inline-flex;line-height:0}
   .studio-group-notes{margin-left:0}
+  .ic-sprite{position:absolute;width:0;height:0;overflow:hidden}
+  .ic{width:1.05em;height:1.05em;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.15em;flex:none}
+  .ic circle{fill:none}
+  .ss-head .ic{width:16px;height:16px;color:var(--accent)}
+  .sg-ico .ic{width:15px;height:15px;color:var(--muted)}
+  .studio-legend .ic{width:15px;height:15px;color:var(--accent);vertical-align:-.2em}
   .studio-count{display:inline-flex;align-items:center;justify-content:center;min-width:0;width:0;height:18px;margin-left:0;padding:0;overflow:hidden;border-radius:9px;background:rgba(8,18,26,.28);color:inherit;font-size:11px;font-weight:700;opacity:0;transition:all .16s ease}
   .studio-count.on{min-width:18px;width:auto;padding:0 6px;margin-left:8px;opacity:1}
   .schip{font:inherit;font-size:12px;padding:3px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);cursor:pointer;text-transform:capitalize}
@@ -475,6 +481,25 @@
 </style>
 </head>
 <body>
+<!-- Icon sprite: single-weight line glyphs, stroke=currentColor so they inherit the theme.
+     Referenced as <svg class="ic"><use href="#ic-NAME"/></svg>. No emoji anywhere. -->
+<svg class="ic-sprite" width="0" height="0" aria-hidden="true" focusable="false"><defs>
+  <symbol id="ic-fruit" viewBox="0 0 24 24"><path d="M12 8.2C11 6.4 8.8 5.6 7 6.6 5.2 7.6 4.8 10.4 5.8 13.2 6.7 15.8 8.8 19 12 19s5.3-3.2 6.2-5.8c1-2.8.6-5.6-1.2-6.6-1.8-1-4-.2-5 1.6Z"/><path d="M12 8.2V5.2"/><path d="M12.4 6.4C13.2 4.6 15.2 4.2 16.8 4.6 16.9 6.2 15.9 7.6 14 7.6"/></symbol>
+  <symbol id="ic-citrus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.4"/><circle cx="12" cy="12" r="1.2"/><path d="M14.2 12H18.4M13.1 13.9 15.2 17.5M10.9 13.9 8.8 17.5M9.8 12H5.6M10.9 10.1 8.8 6.5M13.1 10.1 15.2 6.5"/></symbol>
+  <symbol id="ic-sweet" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M8 12 4 9.3V14.7ZM16 12 20 9.3V14.7Z"/></symbol>
+  <symbol id="ic-vegetal" viewBox="0 0 24 24"><path d="M6 18C6 11 11 6 18 6 18 13 13 18 6 18Z"/><path d="M8 16 16 8"/></symbol>
+  <symbol id="ic-herb" viewBox="0 0 24 24"><path d="M12 20V5"/><path d="M12 8C10.5 8 9.4 6.9 9.4 5.4 10.9 5.4 12 6.5 12 8Z"/><path d="M12 11.5C13.7 11.5 15 10.2 15 8.5 13.3 8.5 12 9.8 12 11.5Z"/><path d="M12 14.5C10.3 14.5 9 13.2 9 11.5 10.7 11.5 12 12.8 12 14.5Z"/></symbol>
+  <symbol id="ic-floral" viewBox="0 0 24 24"><circle cx="12" cy="6.6" r="2.4"/><circle cx="16.3" cy="9.7" r="2.4"/><circle cx="14.6" cy="14.7" r="2.4"/><circle cx="9.4" cy="14.7" r="2.4"/><circle cx="7.7" cy="9.7" r="2.4"/><circle cx="12" cy="11.3" r="1.7"/></symbol>
+  <symbol id="ic-savory" viewBox="0 0 24 24"><path d="M4 12H20C20 16 16.5 19 12 19S4 16 4 12Z"/><path d="M3 12H21"/><path d="M9 8.5C9 7 10.5 7 10.5 5.5M14 8.5C14 7 15.5 7 15.5 5.5"/></symbol>
+  <symbol id="ic-spice" viewBox="0 0 24 24"><path d="M16 9C13 9 9 11 9 15c0 3 2 5 5 4 4-1.4 5-8 2-10Z"/><path d="M16 9c-1-1-1.5-3-1-5"/></symbol>
+  <symbol id="ic-dairy" viewBox="0 0 24 24"><path d="M4 16 18 9c1.4-.7 2.6.5 2.2 1.9L19 16c-.2.7-.8 1-1.5 1H5.5C4 17 3.3 16.7 4 16Z"/><path d="M4 16 18 9"/><circle cx="9" cy="14" r="1"/><circle cx="13.5" cy="13" r=".8"/></symbol>
+  <symbol id="ic-nut" viewBox="0 0 24 24"><path d="M6.5 9C6.5 6 17.5 6 17.5 9Z"/><path d="M6.5 9H17.5"/><path d="M7.5 9C7.5 13.5 9.5 18 12 18S16.5 13.5 16.5 9"/><path d="M12 6V4"/></symbol>
+  <symbol id="ic-roast" viewBox="0 0 24 24"><path d="M12 5C15.5 5 18 8 18 12S15.5 19 12 19 6 16 6 12 8.5 5 12 5Z"/><path d="M12 5.5C10.4 8 10.4 16 12 18.5"/></symbol>
+  <symbol id="ic-allium" viewBox="0 0 24 24"><path d="M12 3.5C9.8 8 6.8 10.2 6.8 14.2 6.8 17.7 9.1 20.2 12 20.2S17.2 17.7 17.2 14.2C17.2 10.2 14.2 8 12 3.5Z"/><path d="M12 5.5C10.7 9.5 9.7 13 10.2 20M12 5.5C13.3 9.5 14.3 13 13.8 20"/></symbol>
+  <symbol id="ic-other" viewBox="0 0 24 24"><path d="M9 3H15M10 3V9L5.5 17.5C5 18.5 5.7 20 7 20H17C18.3 20 19 18.5 18.5 17.5L14 9V3"/><path d="M7.4 15H16.6"/></symbol>
+  <symbol id="ic-flavors" viewBox="0 0 24 24"><path d="M12 3C9.5 3 7.8 5.3 7.8 8.1 7.8 10.9 9.5 13.2 12 13.2S16.2 10.9 16.2 8.1 14.5 3 12 3Z"/><path d="M12 13.2V21"/></symbol>
+  <symbol id="ic-notes" viewBox="0 0 24 24"><path d="M6 18.5C8 15.5 8 13 6 10M11 19.5C13 16.5 13 13.5 11 10.5M16 18.5C18 15.5 18 13 16 10"/></symbol>
+</defs></svg>
 <header>
   <img class="logo" src="/static/logo.png" alt="Flavormancer logo">
   <div class="brand">
@@ -514,8 +539,8 @@
       </div>
       <div id="studioNlMsg" class="studio-nl-msg"></div>
       <div class="studio-legend">
-        <span><b>🍓 Flavors</b> — a named flavor you know (banana, saffron) → the molecule that <i>makes</i> it</span>
-        <span><b>👃 Notes</b> — a single aroma/taste <i>quality</i> (citrus, floral, sweet) → molecules that <i>carry</i> it</span>
+        <span><b><svg class="ic"><use href="#ic-flavors"/></svg> Flavors</b> — a named flavor you know (banana, saffron) → the molecule that <i>makes</i> it</span>
+        <span><b><svg class="ic"><use href="#ic-notes"/></svg> Notes</b> — a single aroma/taste <i>quality</i> (citrus, floral, sweet) → molecules that <i>carry</i> it</span>
         <span class="studio-legend-tip">Pick any mix — a molecule ranks by how many of your picks it hits.</span>
       </div>
       <div id="studioChips" class="studio-chips"></div>
@@ -1480,16 +1505,24 @@ async function initStudio(){
     const d = await getJSON('/api/studio_terms'); const cats=d.flavors||[], notes=d.notes||[];
     if(!cats.length && !notes.length){ setTimeout(initStudio, 4000); return; }
     const esc = s => s.replace(/"/g,'&quot;');
-    const CAT_ICON={fruit:'🍓',citrus:'🍋',berry:'🫐','tropical':'🍍',melon:'🍈',stone:'🍑',orchard:'🍎',sweet:'🍬',confection:'🍭',dessert:'🍰',caramel:'🍮',vegetal:'🥦',green:'🥬',herb:'🌿',herbal:'🌿',floral:'🌸',savory:'🍖',meaty:'🥩',umami:'🍄',spice:'🌶️',spicy:'🌶️',warm:'🍂',dairy:'🧀',creamy:'🥛',nut:'🥜',nutty:'🥜',roast:'☕',roasted:'☕',coffee:'☕',allium:'🧅',woody:'🪵',smoky:'🔥',earthy:'🍄',beverage:'🥤',wine:'🍷',minty:'🌱',cooling:'🌱',other:'⚗️',misc:'⚗️'};
-    const icon = c => CAT_ICON[String(c).toLowerCase()] || '⚗️';
-    // Flavors — named flavors grouped by category, each with an icon
-    let html = `<div class="studio-section"><div class="ss-head">🍓 Flavors <span class="ss-sub">a flavor you know → the molecule that makes it</span></div><div class="ss-body">`;
-    html += cats.map(c=>`<div class="studio-group"><span class="sg-label" title="${esc(c.category)}"><span class="sg-ico">${icon(c.category)}</span>${c.category}</span>`+
+    // category -> icon-sprite id (custom SVG glyphs, no emoji). Extra synonyms map to the
+    // nearest existing glyph so a future category still gets a sensible icon.
+    const CAT_ICON={fruit:'fruit',berry:'fruit',tropical:'fruit',melon:'fruit',stone:'fruit',orchard:'fruit',
+      citrus:'citrus',sweet:'sweet',confection:'sweet',dessert:'sweet',caramel:'sweet',
+      vegetal:'vegetal',green:'vegetal',herb:'herb',herbal:'herb',floral:'floral',
+      savory:'savory',meaty:'savory',umami:'savory',spice:'spice',spicy:'spice',warm:'spice',
+      dairy:'dairy',creamy:'dairy',nut:'nut',nutty:'nut',roast:'roast',roasted:'roast',coffee:'roast',
+      allium:'allium',earthy:'herb',woody:'herb',smoky:'roast',beverage:'other',minty:'herb',cooling:'herb',
+      other:'other',misc:'other'};
+    const svgIcon = c => `<svg class="ic"><use href="#ic-${CAT_ICON[String(c).toLowerCase()]||'other'}"/></svg>`;
+    // Flavors — named flavors grouped by category, each with its glyph
+    let html = `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors <span class="ss-sub">a flavor you know → the molecule that makes it</span></div><div class="ss-body">`;
+    html += cats.map(c=>`<div class="studio-group"><span class="sg-label" title="${esc(c.category)}"><span class="sg-ico">${svgIcon(c.category)}</span>${c.category}</span>`+
       c.flavors.map(f=>`<button type="button" class="schip schip-flavor" data-term="${esc(f)}">${f}</button>`).join('')+`</div>`).join('');
     html += `</div></div>`;
     // Notes — model-predicted aroma/taste qualities
     if(notes.length){
-      html += `<div class="studio-section"><div class="ss-head">👃 Notes <span class="ss-sub">an aroma/taste quality → molecules that carry it</span></div><div class="ss-body">`+
+      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Notes <span class="ss-sub">an aroma/taste quality → molecules that carry it</span></div><div class="ss-body">`+
         `<div class="studio-group studio-group-notes">`+
         notes.map(n=>`<button type="button" class="schip schip-note" data-term="${esc(n)}">${n}</button>`).join('')+
         `</div></div></div>`;
