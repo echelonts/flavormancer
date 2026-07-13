@@ -81,7 +81,22 @@ def _load_name_table():
         return {}
 
 
-_NAME_TABLE = _load_name_table()
+def _merge_iupac_backfill(table):
+    """Fold in IUPAC names that build_iupac_backfill.py recovered from PubChem for molecules
+    the main properties crawl missed (skeleton -> keep any common name, add the IUPAC)."""
+    try:
+        import pandas as pd
+        bf = pd.read_parquet("iupac_backfill.parquet")
+    except Exception:  # noqa: BLE001 — backfill not built; nothing to merge
+        return table
+    for skel, u in zip(bf["inchikey_skel"], bf["iupac_name"]):
+        if isinstance(skel, str) and isinstance(u, str) and u:
+            common = table.get(skel, (None, None))[0]
+            table[skel] = (common, u)
+    return table
+
+
+_NAME_TABLE = _merge_iupac_backfill(_load_name_table())
 
 
 @lru_cache(maxsize=8192)
