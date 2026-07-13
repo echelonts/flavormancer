@@ -81,9 +81,9 @@
     background:radial-gradient(closest-side,rgba(43,196,196,.11),transparent 72%);animation:heroPulse 6.5s ease-in-out infinite}
   header>*{position:relative;z-index:1}
   @keyframes heroPulse{0%,100%{opacity:.5}50%{opacity:1}}
-  main{width:74%;max-width:1460px;margin:0 auto;padding:28px 30px 64px}
-  @media(max-width:1300px){main{width:86%}}
-  @media(max-width:900px){main{width:auto;padding:22px 16px 52px}}
+  /* full-width and centered, capped for readability on large monitors; fluid side padding so
+     phones/tablets/laptops all fill the screen (no dead 'column' margins under ~1500px). */
+  main{width:100%;max-width:1500px;margin:0 auto;padding:28px clamp(16px,4vw,40px) 64px}
   .bar{display:flex;gap:10px;align-items:stretch}
   .bar input{flex:1;font-family:var(--mono);font-size:15.5px;padding:15px 17px;
     border:1px solid var(--line);border-radius:11px;background:var(--panel);color:var(--ink);
