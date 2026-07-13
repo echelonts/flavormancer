@@ -394,6 +394,12 @@
   .et-gras{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;background:var(--aroma);color:#08121A}
   .et-iso{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;background:rgba(217,171,116,.22);color:var(--cream);margin-left:5px}
   .et-tag{font-size:10px;padding:1px 7px;border-radius:20px;text-transform:capitalize}
+  .enrich-table th.nosort{cursor:default}
+  .enrich-table th.nosort:hover{color:var(--brand-2)}
+  .enrich-table td.et-struct{padding:3px 6px;background:var(--struct-bg);width:116px}
+  .enrich-table td.et-struct svg{display:block;width:104px;height:62px;border-radius:4px}
+  .et-clip{display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+  .et-smiles{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--muted);max-width:200px}
   /* --- polish: motion, hover, responsive --- */
   .card,.design-section,.browse,#mixPanel{transition:border-color .18s ease,box-shadow .18s ease}
   .design-section:hover,.browse:hover{box-shadow:0 6px 26px rgba(0,0,0,.22)}
@@ -1613,8 +1619,8 @@ let _enCols=[], _enSort='name', _enDesc=false, _enOffset=0, _enQ=''; const EN_PA
 $('enrichToggle').addEventListener('click', ()=>{ const w=$('enrichWrap'); const o=w.style.display==='none'; w.style.display=o?'block':'none'; $('enrichCaret').textContent=o?'▾':'▸'; if(o && !_enCols.length) initEnrich(); });
 async function initEnrich(){
   const m = await getJSON('/api/enrichment_meta'); _enCols = m.columns||[];
-  $('enrichHead').innerHTML = '<tr>'+_enCols.map(c=>`<th data-k="${c.key}" title="${c.why.replace(/"/g,'&quot;')}">${c.label} <span class="th-ar" data-k="${c.key}"></span></th>`).join('')+'</tr>';
-  $('enrichHead').querySelectorAll('th').forEach(th=> th.addEventListener('click', ()=>{
+  $('enrichHead').innerHTML = '<tr>'+_enCols.map(c=>`<th data-k="${c.key}" class="${c.sort===false?'nosort':''}" title="${c.why.replace(/"/g,'&quot;')}">${c.label}${c.sort===false?'':` <span class="th-ar" data-k="${c.key}"></span>`}</th>`).join('')+'</tr>';
+  $('enrichHead').querySelectorAll('th:not(.nosort)').forEach(th=> th.addEventListener('click', ()=>{
     const k=th.dataset.k; if(_enSort===k){ _enDesc=!_enDesc; } else { _enSort=k; _enDesc=(k!=='name'); } _enOffset=0; loadEnrich();
   }));
   loadEnrich();
@@ -1623,6 +1629,9 @@ let _enTimer=null;
 $('enrichSearch').addEventListener('input', e=>{ clearTimeout(_enTimer); _enTimer=setTimeout(()=>{ _enQ=e.target.value; _enOffset=0; loadEnrich(); }, 250); });
 function etCell(c, r){
   const v=r[c.key];
+  if(c.key==='svg') return `<td class="et-struct">${v||'<span class="et-mut">—</span>'}</td>`;
+  if(c.key==='smiles') return `<td><span class="et-clip et-smiles" title="${(v||'').replace(/"/g,'&quot;')}">${v||''}</span></td>`;
+  if(c.key==='iupac') return `<td>${v?`<span class="et-clip" title="${v.replace(/"/g,'&quot;')}">${v}</span>`:'<span class="et-mut">—</span>'}</td>`;
   if(c.key==='name'){ const iso=r.is_isomer?' <span class="et-iso" title="A stereoisomer with its own documented odor/taste">isomer</span>':''; return `<td class="et-name">${v||'<span class="et-mut">—</span>'}${iso}</td>`; }
   if(c.key==='gras') return `<td>${v?'<span class="et-gras">GRAS</span>':''}</td>`;
   if(c.key==='taste') return `<td>${(v||'').split(',').filter(Boolean).map(t=>`<span class="et-tag" style="background:${(TASTE_COLORS[t]||'#8A96A0')};color:#08121A">${t}</span>`).join(' ')}</td>`;
