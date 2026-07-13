@@ -127,8 +127,8 @@
   .ref-spectra{font-size:10px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:1px 7px;margin-left:2px}
   .meter .name{font-weight:600;font-size:14px;text-transform:capitalize}
   .meter .val{font-family:var(--mono);font-size:13px;color:var(--muted)}
-  .meter .au{font-size:11px;color:var(--muted);opacity:.85}
-  .meter .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;
+  .meter .au,.ameter .au{font-size:11px;color:var(--muted);opacity:.85}
+  .meter .tag,.ameter .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;
     margin-left:8px;vertical-align:middle;letter-spacing:.04em}
   .tag.measured{background:var(--accent-soft);color:var(--accent)}
   .tag.predicted{background:#EDEFEC;color:var(--muted)}
@@ -909,6 +909,25 @@ const TASTE_HELP = {
   salty:'small mineral (alkali) salts — paired with a cation rule',
   tasteless:'little or no basic taste expected from structure'
 };
+// per-descriptor "what this note smells like" — the aroma parallel to TASTE_HELP
+const AROMA_HELP = {
+  citrus:'lemon / orange peel — bright, zesty terpenes',
+  floral:'flowery — rose, jasmine, violet character',
+  minty:'cooling mint — menthol / carvone family',
+  almond:'marzipan — benzaldehyde, nutty-sweet',
+  fatty:'oily / tallowy — long-chain aldehydes &amp; acids',
+  petroleum:'solvent / naphtha — hydrocarbon character',
+  earthy:'soil / beetroot — geosmin-like',
+  medicinal:'phenolic / clove — antiseptic edge',
+  sulfurous:'eggy / alliaceous — sulfur volatiles',
+  camphor:'camphoraceous — cooling, penetrating',
+  fruity:'ripe fruit — esters &amp; lactones',
+  fishy:'amine / trimethylamine — marine',
+  garlic:'allium — pungent sulfur',
+  ethereal:'light &amp; volatile — fresh, solvent-like',
+  ammoniacal:'ammonia / amine — sharp, pungent',
+  pungent:'sharp / irritating — acrid bite'
+};
 function meter(name, value, measured, auroc, note){
   const pct = Math.round(value*100);
   const tag = measured ? '<span class="tag measured">measured</span>'
@@ -1150,7 +1169,20 @@ function renderAroma(ar){
   if(pred && (pred.descriptors||[]).length){
     const lowconf = pred.any_confident===false;
     html += `<div class="aroma-prev-tag">All ${pred.descriptors.length} aroma descriptor models · presence/absence, public-domain HSDB${lowconf?' — none firing strongly for this molecule':''}</div>`;
-    html += pred.descriptors.map(d=>{ const pct=Math.round(d.score*100); const col=aromaColor(d.odor); const au=d.auroc?` · AUROC ${d.auroc}`:''; return `<div class="ameter${d.confident?'':' dim'}"><div class="arow"><span class="aname" style="color:${col}">${d.odor}${d.confident?'':' '}</span><span class="aval">${pct}%${au}</span></div><div class="atrack"><div class="afill" style="width:${pct}%;background:${col}"></div></div></div>`; }).join('');
+    // which predicted notes are ALSO documented for this molecule -> tag them "documented" (measured)
+    const docSet = new Set(((ar.documented&&ar.documented.notes)||[]).map(n=>String(n).toLowerCase()));
+    html += pred.descriptors.map(d=>{
+      const pct=Math.round(d.score*100); const col=aromaColor(d.odor);
+      const isDoc = docSet.has(String(d.odor).toLowerCase());
+      const tag = isDoc ? '<span class="tag measured">documented</span>' : '<span class="tag predicted">predicted</span>';
+      const lvl = pct>=65?'likely':pct>=40?'possible':pct>=15?'weak':'unlikely';
+      const au = (d.auroc && !isDoc) ? ` <span class="au">· AUROC ${d.auroc}</span>` : '';
+      const help = AROMA_HELP[d.odor] ? `<div class="meter-help">${AROMA_HELP[d.odor]}</div>` : '';
+      return `<div class="ameter${d.confident?'':' dim'}">`+
+        `<div class="arow"><span class="aname" style="color:${col}">${d.odor}${tag}</span>`+
+        `<span class="aval"><b>${lvl}</b> · ${pct}%${au}</span></div>`+
+        `<div class="atrack"><div class="afill" style="width:${pct}%;background:${col}"></div></div>${help}</div>`;
+    }).join('');
   }
   const doc = ar.documented;
   if(doc && (doc.notes||[]).length){
