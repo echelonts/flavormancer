@@ -43,8 +43,17 @@
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--ui);
-    font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  /* ambient alchemical aura — faint colored light pooling in the viewport corners (fixed, so it
+     stays put as you scroll), layered over the base surface color */
+  body{margin:0;color:var(--ink);font-family:var(--ui);
+    font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(58% 48% at 10% 4%, rgba(138,107,224,.13), transparent 60%),
+      radial-gradient(52% 42% at 92% 98%, rgba(43,196,196,.11), transparent 62%),
+      radial-gradient(42% 38% at 97% 6%, rgba(217,171,116,.07), transparent 60%),
+      radial-gradient(46% 40% at 3% 94%, rgba(78,132,200,.07), transparent 62%),
+      var(--surface);
+    background-attachment:fixed}
   ::selection{background:rgba(43,196,196,.30);color:#fff}
   *::-webkit-scrollbar{width:11px;height:11px}
   *::-webkit-scrollbar-thumb{background:#2A343E;border-radius:7px;border:2px solid var(--surface)}
@@ -414,7 +423,7 @@
   /* smooth reveal for result cards */
   @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   #results .card,#behaviorCard,#aromaCard{animation:fadeUp .28s ease both}
-  #behaviorCard{animation-delay:.04s}#aromaCard{animation-delay:.08s}
+  #behaviorCard{animation-delay:.04s;margin-top:18px}#aromaCard{animation-delay:.08s}
   /* mobile */
   @media(max-width:640px){
     header{padding:22px 14px 18px}
@@ -489,8 +498,19 @@
   footer.sources .lic{background:rgba(255,255,255,.06);color:var(--muted)}
   .src-note{font-size:11px;color:var(--muted);line-height:1.55;margin:14px 0 0;
     border-top:1px solid var(--line);padding-top:12px}
-  .src-foot{max-width:980px;margin:26px auto 0;text-align:center;font-size:10.5px;
-    letter-spacing:.06em;color:var(--muted);opacity:.8}
+  .src-foot{max-width:980px;margin:26px auto 0;padding-top:22px;text-align:center;
+    border-top:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+  .foot-tag{font-size:10.5px;letter-spacing:.06em;color:var(--muted);opacity:.85}
+  .foot-brand{font-family:'Cinzel Decorative',Georgia,serif;letter-spacing:.04em;
+    background:var(--brand-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .foot-credit{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:9px;
+    font-size:12px;color:var(--muted)}
+  .foot-credit a{color:var(--brand-2);text-decoration:none;border-bottom:1px solid transparent;transition:border-color .15s}
+  .foot-credit a:hover{border-bottom-color:var(--brand-2)}
+  .foot-credit a b{color:var(--ink);font-weight:650}
+  .foot-dot{opacity:.4}
+  .foot-copy{font-size:10px;letter-spacing:.08em;color:var(--muted);opacity:.6}
+  .foot-copy i{color:var(--cream);font-style:normal}
 </style>
 </head>
 <body>
@@ -821,8 +841,18 @@
         leads for the bench, never a safety, regulatory, or clearance determination.</p>
     </div>
   </div>
-  <div class="src-foot">Flavormancer · on-prem taste &amp; aroma prediction from chemical
-    structure · built on commercial-clean public data</div>
+  <div class="src-foot">
+    <div class="foot-tag"><b class="foot-brand">Flavormancer</b> — on-prem taste &amp; aroma prediction
+      from chemical structure · built on commercial-clean public data</div>
+    <div class="foot-credit">
+      <span>Crafted by <a href="https://github.com/echelonts" target="_blank" rel="noopener"><b>Echelon&nbsp;Technology&nbsp;Solutions</b></a></span>
+      <span class="foot-dot">·</span>
+      <a href="https://github.com/echelonts" target="_blank" rel="noopener">GitHub org</a>
+      <span class="foot-dot">·</span>
+      <a href="https://github.com/echelonts/flavormancer" target="_blank" rel="noopener">this repo ↗</a>
+    </div>
+    <div class="foot-copy">© 2026 Echelon Technology Solutions · <i>before you pour</i></div>
+  </div>
 </footer>
 
 <script src="/static/3Dmol-min.js"></script>
