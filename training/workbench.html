@@ -614,6 +614,7 @@
         <span id="mapLegend" class="map-legend"></span>
         <button type="button" id="mapLabels" class="st-tab on">labels</button>
         <button type="button" id="mapClusters" class="st-tab on" title="Soft density shading under each class — spotlight a class in the legend to see where it concentrates">clusters</button>
+        <button type="button" id="mapSpin" class="st-tab">spin</button>
         <button type="button" id="mapReset" class="map-reset">Reset view</button>
       </div>
       <div class="map-canvas-wrap"><canvas id="flavorMap" width="1440" height="760"></canvas>
@@ -1319,6 +1320,10 @@ $('mapCB').addEventListener('click', ()=>setMapColor('both'));
 $('mapReset').addEventListener('click', ()=>{ cancelAnimationFrame(_inertia); _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1,ox:0,oy:0}; drawMap(); });
 $('mapLabels').addEventListener('click', ()=>{ _showLabels=!_showLabels; $('mapLabels').classList.toggle('on',_showLabels); drawMap(); });
 $('mapClusters').addEventListener('click', ()=>{ _showClusters=!_showClusters; $('mapClusters').classList.toggle('on',_showClusters); drawMap(); });
+let _spinOn=false, _autoRaf=null;
+$('mapSpin').addEventListener('click', ()=>{ _spinOn=!_spinOn; $('mapSpin').classList.toggle('on',_spinOn);
+  if(_spinOn){ if(_mapMode!=='3d') setMapMode('3d'); autoSpin(); } else cancelAnimationFrame(_autoRaf); });
+function autoSpin(){ cancelAnimationFrame(_autoRaf); const step=()=>{ if(!_spinOn) return; if(_mapMode==='3d' && !_drag){ _v3.ry+=0.0016; drawMap(); } _autoRaf=requestAnimationFrame(step); }; _autoRaf=requestAnimationFrame(step); }
 function setMapMode(m){
   _mapMode=m; $('map2d').classList.toggle('on',m==='2d'); $('map3d').classList.toggle('on',m==='3d'); drawMap();
 }
