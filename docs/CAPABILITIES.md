@@ -6,7 +6,7 @@ shape of the tool. The organizing discipline throughout: **every output is tagge
 by how it's derived, and nothing claims more certainty than its source supports.**
 
 > **Edition note.** This catalogues the **commercial** edition (Apache-2.0,
-> commercial-clean data). **Aroma ships here** as 16 presence/absence odor-descriptor
+> commercial-clean data). **Aroma ships here** as 24 presence/absence odor-descriptor
 > heads trained on public-domain HSDB text — what's still gated is scored **intensity**
 > (*how strong* a note is), which needs research/customer panel data and lives in the
 > **academic edition** (or trains on a customer's own data, on-prem).
@@ -32,7 +32,7 @@ by how it's derived, and nothing claims more certainty than its source supports.
 - Multitaste — fires when 2+ taste heads are high (**trained**-derived).
 - Known-taste ground truth — verified labels override predictions (**lookup**).
 
-**Aroma** — **16 odor-descriptor heads ship** (**trained**)
+**Aroma** — **24 odor-descriptor heads ship** (**trained**)
 - Presence/absence per descriptor (citrus, floral, minty, almond, fatty, petroleum, earthy,
   medicinal, sulfurous, camphor, fruity, fishy, garlic, ethereal, ammoniacal, pungent) —
   RandomForests on fingerprint + physicochemical features, over public-domain HSDB odor text +

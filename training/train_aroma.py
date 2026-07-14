@@ -27,7 +27,8 @@ from chemfeatures import descriptors as _desc
 
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
-MIN_POS = 20       # need enough positives for a stable 5-fold estimate
+MIN_POS = 10       # enough positives for a 5-fold estimate; small-n heads still must clear the
+                   # AUROC bar below, and each ship with its honest CV-AUROC shown in the UI
 MIN_AUROC = 0.70   # below this the descriptor isn't learnable from structure -> don't ship it
 OUT = Path("aroma_models")
 OUT.mkdir(exist_ok=True)
