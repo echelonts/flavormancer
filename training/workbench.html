@@ -132,6 +132,9 @@
     margin-left:8px;vertical-align:middle;letter-spacing:.04em}
   .tag.measured{background:var(--accent-soft);color:var(--accent)}
   .tag.predicted{background:#EDEFEC;color:var(--muted)}
+  .tag.computed{background:rgba(99,166,224,.16);color:#63A6E0}
+  .tag.estimate{background:rgba(232,169,74,.16);color:var(--sweet)}
+  .tag.qualitative{background:#242C35;color:var(--muted)}
   .track{height:9px;background:#EDEFEC;border-radius:6px;overflow:hidden}
   .fill{height:100%;border-radius:6px;width:0;transition:width .5s ease}
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
@@ -1027,6 +1030,16 @@ function render(p, neighbors, svg, names){
     // tasteless: a documented tasted-vs-tasteless head — high = likely little/no basic taste
     if(typeof p.tasteless === 'number'){
       m += meter('tasteless', p.tasteless, known.has('tasteless'), (p.taste_meta&&p.taste_meta.tasteless||{}).auroc, 'high = likely little taste');
+      // sweetness intensity — a model REGRESSION (× sucrose), shown as its own row so it reads
+      // like the taste bars: a predicted tag, the value, a log-scaled bar, and its basis.
+      if(typeof p.sweet_intensity==='number' && p.sweet>=0.5){
+        const x=Math.pow(10,p.sweet_intensity), val=x>=10?Math.round(x):x.toFixed(1);
+        const w=Math.max(4,Math.min(100,(Math.log10(x)+1)/6*100));  // 0.1×–100000× -> 0–100%
+        m += `<div class="meter"><div class="row"><span class="name">Sweet intensity<span class="tag predicted">predicted</span></span>`+
+          `<span class="val"><b>~${val}×</b> <span class="au">· vs sucrose</span></span></div>`+
+          `<div class="track"><div class="fill" style="background:var(--sweet)" data-w="${w}"></div></div>`+
+          `<div class="meter-help">relative sweetness from the SweetenersDB regressor — how many times sweeter than sucrose (log scale)</div></div>`;
+      }
     }
     if(m) m += '<div class="meters-note">Each is an independent confidence that the molecule carries that taste — they don\'t sum to 100%. A molecule can be both (sweet <i>and</i> bitter) or weakly any. Sour and salty pair a trained head with a chemistry rule as a cross-check; tasteless is its own head (tasted vs. not).</div>';
     $('meters').innerHTML = m || '<div class="empty">No taste heads trained yet.</div>';
@@ -1041,11 +1054,7 @@ function render(p, neighbors, svg, names){
     p.sour && p.sour_reason && p.sour_reason.length ? `sour · ${p.sour_reason[0]}` : 'not sour'));
   if(!inDomain) c.push(chip('salty', p.salty===true, p.salty===true?'var(--salty)':null,
     p.salty===true ? 'salty (rule)' : 'salty — not a simple salt'));
-  const logP = ((p.physchem||{}).computed||{}).logP;
-  if(inDomain && p.sweet >= 0.5 && typeof p.sweet_intensity === 'number' && typeof logP==='number' && logP < 2){
-    const x = Math.pow(10, p.sweet_intensity);
-    c.push(chip('intensity', true, 'var(--sweet)', `~${x>=10?Math.round(x):x.toFixed(1)}× as sweet as sucrose (est.)`));
-  }
+  // (sweetness intensity now renders as its own meter row alongside the taste bars)
   if(inDomain && p.multitaste) c.push(chip('multi', true, 'var(--aroma)', 'multi-taste'));
   $('chips').innerHTML = c.join('');
 
@@ -1081,17 +1090,18 @@ function render(p, neighbors, svg, names){
 function renderBehavior(p){
   const pc=p.physchem||{}, sf=p.safety||{}, st=p.stability||{}, ch=p.chemesthesis||{}, lb=p.labeling||{};
   const comp=pc.computed||{}, est=pc.estimate||{}, meas=pc.measured||{}, qual=pc.qualitative||{};
-  const MEAS=' <span class="tag measured">measured</span>', EST=' <span class="tag predicted">estimate</span>';
+  const MEAS=' <span class="tag measured">measured</span>', EST=' <span class="tag estimate">estimate</span>';
+  const COMP=' <span class="tag computed">computed</span>', QUAL=' <span class="tag qualitative">qualitative</span>';
   const kv = rows => '<div class="kv">'+rows.map(r=>{ const w=r[2]||PHYS_WHY[r[0]]; return `<div class="k">${r[0]}${w?`<div class="k-why">${w}</div>`:''}</div><div class="v">${r[1]}</div>`; }).join('')+'</div>';
   const chips = (arr,style)=> '<div class="chips">'+arr.map(x=>`<span class="chip" ${style||''}>${x}</span>`).join('')+'</div>';
   const WARN='style="background:#FBEDE9;color:#8A3A22;border-color:#E7C4B8"';
 
   const rows=[];
-  if(typeof comp.mol_weight==='number') rows.push(['Molecular weight', comp.mol_weight+' g/mol']);
-  if(typeof comp.logP==='number') rows.push(['logP (lipophilicity)', comp.logP]);
-  if(typeof comp.tpsa==='number') rows.push(['Polar surface area', comp.tpsa+' Å²']);
-  if(typeof comp.h_bond_donors==='number') rows.push(['H-bond donors / acceptors', comp.h_bond_donors+' / '+comp.h_bond_acceptors]);
-  if(typeof comp.rotatable_bonds==='number') rows.push(['Rotatable bonds', comp.rotatable_bonds]);
+  if(typeof comp.mol_weight==='number') rows.push(['Molecular weight', comp.mol_weight+' g/mol'+COMP]);
+  if(typeof comp.logP==='number') rows.push(['logP (lipophilicity)', comp.logP+COMP]);
+  if(typeof comp.tpsa==='number') rows.push(['Polar surface area', comp.tpsa+' Å²'+COMP]);
+  if(typeof comp.h_bond_donors==='number') rows.push(['H-bond donors / acceptors', comp.h_bond_donors+' / '+comp.h_bond_acceptors+COMP]);
+  if(typeof comp.rotatable_bonds==='number') rows.push(['Rotatable bonds', comp.rotatable_bonds+COMP]);
   if(typeof est.water_solubility_logS==='number') rows.push(['Water solubility (logS)', est.water_solubility_logS+EST]);
   if(typeof meas.boiling_point_c==='number'){
     const atP=(typeof meas.boiling_point_pressure_mmhg==='number')?` (at ${meas.boiling_point_pressure_mmhg} mmHg)`:'';
@@ -1099,11 +1109,11 @@ function renderBehavior(p){
   }
   if(typeof meas.melting_point_c==='number') rows.push(['Melting point', meas.melting_point_c+' °C'+MEAS]);
   const form=pc.formulation||{};
-  if(form.phase_at_rt) rows.push(['Phase at ~25 °C', form.phase_at_rt]);
-  if(qual.aroma_volatility) rows.push(['Volatility', qual.aroma_volatility]);
+  if(form.phase_at_rt) rows.push(['Phase at ~25 °C', form.phase_at_rt+QUAL]);
+  if(qual.aroma_volatility) rows.push(['Volatility', qual.aroma_volatility+QUAL]);
   if(typeof meas.vapor_pressure_pa==='number') rows.push(['Vapor pressure', meas.vapor_pressure_pa+' Pa'+MEAS]);
   const ions=(qual.ionizable_groups||[]).map(g=>`${g.group} (pKa≈${g.typical_pKa})`).join(', ');
-  if(ions) rows.push(['Ionizable groups', ions]);
+  if(ions) rows.push(['Ionizable groups', ions+QUAL]);
   let html = kv(rows);
 
   if(form.carrier) html += '<div class="bsub">Formulation</div><div class="fnote">'+form.carrier+'</div>';
