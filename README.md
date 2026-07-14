@@ -45,11 +45,12 @@ is tagged by how it was derived**, so nothing reads as more certain than its sou
   **tasteless** (RandomForests on fingerprint + physicochemical features), plus a
   sweetness-**intensity** regressor. Sour and salty *also* keep a transparent chemistry
   rule (acid group / alkali-salt) as a deterministic cross-check alongside the model.
-- **Aroma** — **16 odor-descriptor heads** (citrus, floral, minty, almond, fatty,
+- **Aroma** — **24 odor-descriptor heads** (citrus, floral, minty, almond, fatty,
   petroleum, earthy, medicinal, sulfurous, camphor, fruity, fishy, garlic, ethereal,
-  ammoniacal, pungent) trained on **public-domain** HSDB odor text + curated
-  character-impact facts, surfaced for *any* molecule, each with its held-out CV-AUROC
-  (0.73–0.97). Presence/absence, honestly — **intensity** is the "comes with your data"
+  ammoniacal, pungent, pine, rose, rancid, alcoholic, woody, green, grassy, putrid)
+  trained on **public-domain** HSDB odor text + curated character-impact facts, surfaced
+  for *any* molecule, each with its held-out CV-AUROC (0.71–0.98). Presence/absence,
+  honestly — **intensity** is the "comes with your data"
   upgrade (no public intensity data exists). Documented odor + detection thresholds are
   shown where cited.
 - **Behavior** — logP, molecular weight, TPSA, H-bonding, ring/atom counts
@@ -139,7 +140,7 @@ Flavormancer ships as two editions of one method:
 | Edition | Commercial | Academic / open-source *(coming soon)* |
 | License | Apache-2.0 | open-source, **research / NonCommercial** |
 | Data | commercial-clean open data only | adds research odor datasets with **NonCommercial** terms |
-| Aroma | **16 presence/absence descriptor heads ship** (public-domain HSDB); scored **intensity** is trained on your data or a licensed set (PMP 2001) | full open model incl. **intensity** (research odor data) |
+| Aroma | **24 presence/absence descriptor heads ship** (public-domain HSDB); scored **intensity** is trained on your data or a licensed set (PMP 2001) | full open model incl. **intensity** (research odor data) |
 | Use | free to use, sell, run on-prem | research, teaching, advancing the method |
 
 The split is deliberate. The richest aroma data is licensed for research only, so
