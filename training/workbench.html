@@ -410,6 +410,11 @@
   .enrich-table th.nosort:hover{color:var(--brand-2)}
   .enrich-table td.et-struct{padding:3px 6px;background:var(--struct-bg);width:116px}
   .enrich-table td.et-struct svg{display:block;width:104px;height:62px;border-radius:4px}
+  .et-structwrap{position:relative;width:104px;height:62px}
+  .et-3dbox{width:104px;height:62px}
+  .et-3dbox.is3d{border-radius:4px;overflow:hidden}
+  .et-3dbox.is3d canvas{border-radius:4px}
+  .mini-3d.et-3d{top:2px;right:2px;padding:0 4px;font-size:9px;line-height:15px}
   .et-clip{display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
   .et-smiles{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--muted);max-width:200px}
   /* --- polish: motion, hover, responsive --- */
@@ -1758,7 +1763,11 @@ let _enTimer=null;
 $('enrichSearch').addEventListener('input', e=>{ clearTimeout(_enTimer); _enTimer=setTimeout(()=>{ _enQ=e.target.value; _enOffset=0; loadEnrich(); }, 250); });
 function etCell(c, r){
   const v=r[c.key];
-  if(c.key==='svg') return `<td class="et-struct">${v||'<span class="et-mut">—</span>'}</td>`;
+  if(c.key==='svg'){
+    if(!v) return `<td class="et-struct"><span class="et-mut">—</span></td>`;
+    const b3d = _has3D ? `<button type="button" class="mini-3d et-3d" data-smi="${(r.smiles||'').replace(/"/g,'&quot;')}" data-m="2d">3D</button>` : '';
+    return `<td class="et-struct"><div class="et-structwrap"><div class="et-3dbox">${v}</div>${b3d}</div></td>`;
+  }
   if(c.key==='smiles') return `<td><span class="et-clip et-smiles" title="${(v||'').replace(/"/g,'&quot;')}">${v||''}</span></td>`;
   if(c.key==='iupac') return `<td>${v?`<span class="et-clip" title="${v.replace(/"/g,'&quot;')}">${v}</span>`:'<span class="et-mut">—</span>'}</td>`;
   if(c.key==='name'){ const iso=r.is_isomer?' <span class="et-iso" title="A stereoisomer with its own documented odor/taste">isomer</span>':''; return `<td class="et-name">${v||'<span class="et-mut">—</span>'}${iso}</td>`; }
@@ -1772,7 +1781,17 @@ async function loadEnrich(){
   const d = await getJSON(`/api/enrichment?q=${encodeURIComponent(_enQ)}&sort=${_enSort}&desc=${_enDesc?1:0}&offset=${_enOffset}&limit=${EN_PAGE}`);
   const tot=d.total||0;
   $('enrichBody').innerHTML = (d.rows||[]).map(r=>`<tr data-smi="${r.smiles.replace(/"/g,'&quot;')}">`+_enCols.map(c=>etCell(c,r)).join('')+'</tr>').join('') || `<tr><td colspan="${_enCols.length}" class="et-mut" style="padding:16px">No molecules match.</td></tr>`;
-  $('enrichBody').querySelectorAll('tr[data-smi]').forEach(tr=> tr.addEventListener('click', ()=>{ q.value=tr.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }));
+  $('enrichBody').querySelectorAll('tr[data-smi]').forEach(tr=> tr.addEventListener('click', e=>{
+    if(e.target.closest('.et-3d') || e.target.closest('.et-3dbox.is3d')) return;  // toggling/rotating 3D, not opening the read
+    q.value=tr.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run();
+  }));
+  // per-row 2D/3D toggle — lazy (a 3Dmol viewer mounts only when clicked, one row at a time)
+  $('enrichBody').querySelectorAll('.et-3d').forEach(btn=> btn.addEventListener('click', e=>{
+    e.stopPropagation();
+    const box=btn.closest('.et-structwrap').querySelector('.et-3dbox');
+    if(box._svg==null) box._svg=box.innerHTML;
+    cardToggle3D(btn, box, btn.dataset.smi, box._svg);
+  }));
   const from=tot?_enOffset+1:0, to=Math.min(_enOffset+EN_PAGE,tot);
   $('enrichCount').textContent = `${tot.toLocaleString()} molecules`;
   $('enrichPager').innerHTML = `<button class="pg" id="enPrev" ${_enOffset<=0?'disabled':''}>‹ prev</button><span>${from}–${to} of ${tot.toLocaleString()}</span><button class="pg" id="enNext" ${to>=tot?'disabled':''}>next ›</button>`;
