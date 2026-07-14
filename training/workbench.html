@@ -418,6 +418,7 @@
   .enrich-table .et-name{font-weight:600}
   .enrich-table .et-mut{color:var(--muted)}
   .et-gras{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;background:var(--aroma);color:#08121A}
+  .nb-gras{font-size:8.5px;font-weight:700;padding:1px 6px;border-radius:9px;background:var(--aroma);color:#08121A;margin-left:6px;vertical-align:middle;letter-spacing:.03em}
   .et-iso{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;background:rgba(217,171,116,.22);color:var(--cream);margin-left:5px}
   .et-tag{font-size:10px;padding:1px 7px;border-radius:20px;text-transform:capitalize}
   .enrich-table th.nosort{cursor:default}
@@ -1097,7 +1098,7 @@ function render(p, neighbors, svg, names){
           ${_has3D?`<button type="button" class="mini-3d nb-3d" data-i="${i}" data-m="2d">3D</button>`:''}
         </div>
         <div class="nb-info">
-          <div class="nb-name">${x.name||'—'}</div>
+          <div class="nb-name">${x.name||'—'}${x.gras?'<span class="nb-gras" title="On the FEMA/FDA food-safe (GRAS) reference — a flag, not a clearance">GRAS</span>':''}</div>
           ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
           <div class="s">${x.smiles}</div>
           <div class="kt">${x.known_tastes.length?x.known_tastes.map(t=>`<span class="tchip" style="background:${TASTE_COLORS[t]||'var(--muted)'}">${t}</span>`).join(''):'<span class="muted">no known taste</span>'}</div>
@@ -1440,17 +1441,18 @@ function setMapColor(c){ _mapColorBy=c;
 let _mapHi = new Set();  // classes highlighted from the legend (empty = show all evenly)
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
-  // Key over the canonical classes for the mode (6 taste heads / 24 aroma heads / both),
-  // showing every class that has at least one molecule — ordered by count, 'other' last. This
-  // keeps small-but-real classes (e.g. salty) from being dropped, without cluttering the key
-  // with heads that no molecule carries as its dominant label.
+  // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 24 aroma heads /
+  // both), plus 'other' last. Present classes are ordered by count; any with zero points still
+  // appear (dimmed) so the legend is a full reference — never hide a real head.
   const canon=legendClasses();
-  const labs=canon.filter(l=>counts[l]).sort((a,b)=>counts[b]-counts[a]); if(counts.other) labs.push('other');
+  const present=canon.filter(l=>counts[l]).sort((a,b)=>counts[b]-counts[a]);
+  const empty=canon.filter(l=>!counts[l]);
+  const labs=present.concat(empty); if(counts.other) labs.push('other');
   $('mapLegend').innerHTML=labs.map(l=>{
-    const n=counts[l]||0;
-    return `<span class="leg${_mapHi.has(l)?' on':''}" data-l="${l.replace(/"/g,'&quot;')}"><i style="background:${legendColor(l)}"></i>${l} (${n})</span>`;
+    const n=counts[l]||0, zero=n===0;
+    return `<span class="leg${_mapHi.has(l)?' on':''}${zero?' leg-zero':''}" data-l="${l.replace(/"/g,'&quot;')}"><i style="background:${legendColor(l)}"></i>${l} (${n})</span>`;
   }).join('');
-  $('mapLegend').querySelectorAll('.leg').forEach(s=> s.addEventListener('click', ()=>{
+  $('mapLegend').querySelectorAll('.leg:not(.leg-zero)').forEach(s=> s.addEventListener('click', ()=>{
     const l=s.dataset.l; if(_mapHi.has(l)) _mapHi.delete(l); else _mapHi.add(l); mapLegendRender(); drawMap();
   }));
 }
