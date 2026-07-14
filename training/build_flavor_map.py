@@ -139,15 +139,37 @@ if __name__ == "__main__":
     try:
         import predict as P
         if P._AROMA_MODELS:
+            heads = list(P._AROMA_MODELS.keys())
             # the aroma heads take fingerprint + physicochemical features (chemfeatures), not the
             # bare fp used for the Jaccard UMAP — build that feature matrix here
-            Xf = np.vstack([P._feat(Chem.MolFromSmiles(str(s)))[0] for s in smiles])
-            best, bp = ["other"] * len(out), [0.0] * len(out)
-            for name, clf in P._AROMA_MODELS.items():
-                probs = clf.predict_proba(Xf)[:, 1]
-                for i in range(len(out)):
-                    if probs[i] >= 0.5 and probs[i] > bp[i]:
-                        bp[i], best[i] = probs[i], name
+            mols = [Chem.MolFromSmiles(str(s)) for s in smiles]
+            Xf = np.vstack([P._feat(m)[0] for m in mols])
+            prob = {name: clf.predict_proba(Xf)[:, 1] for name, clf in P._AROMA_MODELS.items()}
+            # DOCUMENTED aroma positives per molecule (skeleton -> shipped heads it's labelled with),
+            # from the training set — so the molecules a head was TRAINED on surface as that head,
+            # instead of being outshone by a commoner predicted aroma (why rare heads had no dots).
+            doc = {}
+            try:
+                at = pd.read_parquet("aroma_train.parquet")
+                hc = [h for h in heads if h in at.columns]
+                for _, r in at.iterrows():
+                    ik = str(r.get("inchikey", "")).split("-")[0]
+                    pos = [h for h in hc if int(r.get(h, 0) or 0) == 1]
+                    if ik and pos:
+                        doc[ik] = pos
+            except Exception:  # noqa: BLE001 — no training labels; predicted-only
+                pass
+            best = ["other"] * len(out)
+            for i, m in enumerate(mols):
+                ik = Chem.MolToInchiKey(m).split("-")[0] if m is not None else ""
+                dp = doc.get(ik)
+                if dp:                                   # documented aroma wins (tie-break by model)
+                    best[i] = max(dp, key=lambda h: prob[h][i])
+                else:                                    # else the strongest predicted head >= 0.5
+                    bp = 0.5
+                    for name in heads:
+                        if prob[name][i] >= bp:
+                            bp, best[i] = prob[name][i], name
             out["aroma_label"] = best
     except Exception:  # noqa: BLE001 — no aroma models; taste-only map
         pass

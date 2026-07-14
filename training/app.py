@@ -236,11 +236,13 @@ def api_neighbors(q: Query):
     if not smi:
         return {"neighbors": []}
     res = P.substitute(smi, k=q.k)
-    for n in res.get("neighbors", []):  # enrich each candidate: structure + names + aroma tags
+    for n in res.get("neighbors", []):  # enrich each candidate: structure + names + aroma + GRAS
         n["svg"] = _svg(n["smiles"], 132, 96)
         nm = _names(n["smiles"])
         n["name"], n["iupac"] = nm[0], nm[1]
         n["aroma"] = _aroma_tags(n["smiles"])
+        _m = Chem.MolFromSmiles(n["smiles"])
+        n["gras"] = bool(_m is not None and Chem.MolToInchiKey(_m).split("-")[0] in P._GRAS)
     return res
 
 
