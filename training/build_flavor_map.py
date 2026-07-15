@@ -159,12 +159,18 @@ if __name__ == "__main__":
                         doc[ik] = pos
             except Exception:  # noqa: BLE001 — no training labels; predicted-only
                 pass
+            # rarity of each documented head (fewer molecules = more distinctive), so a molecule
+            # documented for several aromas is shown as its RAREST one — this keeps low-population
+            # heads (pine, rose, green…) from losing their molecules to a commoner co-documented
+            # aroma, so every head keeps ~all the molecules it was trained on.
+            from collections import Counter
+            docfreq = Counter(h for pos in doc.values() for h in pos)
             best = ["other"] * len(out)
             for i, m in enumerate(mols):
                 ik = Chem.MolToInchiKey(m).split("-")[0] if m is not None else ""
                 dp = doc.get(ik)
-                if dp:                                   # documented aroma wins (tie-break by model)
-                    best[i] = max(dp, key=lambda h: prob[h][i])
+                if dp:                                   # rarest documented aroma (tie-break by model)
+                    best[i] = min(dp, key=lambda h: (docfreq[h], -prob[h][i]))
                 else:                                    # else the strongest predicted head >= 0.5
                     bp = 0.5
                     for name in heads:
