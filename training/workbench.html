@@ -159,6 +159,8 @@
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
   .chip{font-family:var(--mono);font-size:12px;padding:5px 11px;border-radius:20px;
     border:1px solid var(--line);background:var(--surface)}
+  .tox-code{font-size:9.5px;opacity:.62;letter-spacing:.02em}
+  .chip[title]{cursor:help}
   .chip.on{color:#fff;border-color:transparent}
   .neighbor{display:flex;align-items:center;gap:12px;
     padding:11px 0;border-bottom:1px solid var(--line)}
@@ -424,10 +426,11 @@
   .enrich-scroll{overflow:auto;max-height:74vh;border:1px solid #6E5334;border-radius:10px;
     box-shadow:inset 0 0 0 1px rgba(235,203,146,.10)}  /* scrolls both ways */
   .enrich-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px}
-  .enrich-table th{position:sticky;top:0;text-align:left;padding:10px 11px;font-weight:700;
+  .enrich-table th{position:sticky;top:0;z-index:6;text-align:left;padding:10px 11px;font-weight:700;
     background:linear-gradient(180deg,#EEE1C6 0%,#E0D0AA 100%);color:#5A4326;
     border-bottom:2px solid #B79A63;cursor:pointer;white-space:nowrap;user-select:none;letter-spacing:.02em;
     text-shadow:0 1px 0 rgba(255,255,255,.35)}
+  .enrich-table td.et-struct,.et-structwrap,.mini-3d.et-3d{z-index:1}  /* keep structure cells under the sticky header */
   .enrich-table th:hover{color:#2E2010}
   .enrich-table th .th-ar{opacity:.75;font-size:10px;color:#7A5A2E}
   .enrich-table td{padding:8px 11px;border-bottom:1px solid #20272F;color:var(--ink);white-space:nowrap}
@@ -993,6 +996,22 @@ const AROMA_HELP = {
   grassy:'grassy — mown hay, cis-3-hexenol',
   putrid:'putrid — decay / rotten off-note'
 };
+// Tox21 in-vitro assay codes -> [friendly name, what it means]. Shown so a reader doesn't have to
+// look up "NR-AhR". NR = nuclear-receptor (hormone) signaling; SR = cellular stress response.
+const TOX_HELP = {
+  'NR-AR':['androgen receptor','the male-hormone (androgen) receptor pathway'],
+  'NR-AR-LBD':['androgen receptor (binding)','the androgen receptor ligand-binding domain'],
+  'NR-AhR':['aryl-hydrocarbon receptor','a dioxin-like / xenobiotic-sensing receptor'],
+  'NR-Aromatase':['aromatase','the enzyme that synthesizes estrogen'],
+  'NR-ER':['estrogen receptor','the female-hormone (estrogen) receptor pathway'],
+  'NR-ER-LBD':['estrogen receptor (binding)','the estrogen receptor ligand-binding domain'],
+  'NR-PPAR-gamma':['PPAR-γ','a fat- & glucose-metabolism receptor'],
+  'SR-ARE':['oxidative-stress response','the Nrf2 / antioxidant-response (ARE) pathway'],
+  'SR-ATAD5':['DNA-damage (ATAD5)','a genotoxicity / DNA-damage signal'],
+  'SR-HSE':['heat-shock response','the cellular heat-shock stress response'],
+  'SR-MMP':['mitochondrial toxicity','disruption of mitochondrial membrane potential'],
+  'SR-p53':['p53 DNA-damage','the p53 DNA-damage-response pathway'],
+};
 function meter(name, value, measured, auroc, note){
   const pct = Math.round(value*100);
   const tag = measured ? '<span class="tag measured">measured</span>'
@@ -1204,7 +1223,13 @@ function renderBehavior(p){
   const alerts=sf.structural_alerts||[];
   if(alerts.length) html += chips(alerts.map(a=>'⚠ '+a), WARN);
   const tox=sf.tox_screen||{};
-  if((p.applicability||{}).in_domain!==false && tox.available && (tox.flags||[]).length) html += chips(tox.flags.map(f=>'⚠ tox-assay: '+f), WARN);
+  if((p.applicability||{}).in_domain!==false && tox.available && (tox.flags||[]).length){
+    html += '<div class="chips">'+tox.flags.map(f=>{
+      const h=TOX_HELP[f], nm=h?h[0]:f, full=h?`${f} — ${h[1]}`:f;
+      return `<span class="chip" ${WARN} title="Tox21 in-vitro assay hit — ${full}. A signal for review, not a hazard determination.">⚠ ${nm} <span class="tox-code">${f}</span></span>`;
+    }).join('')+'</div>';
+    html += '<div class="empty" style="font-size:11px;margin-top:2px">These are <b>Tox21</b> in-vitro (cell-based) assay hits — the molecule was active at each named pathway. Caution signals to review, <b>not</b> a hazard or safety determination. Hover any tag for what it means.</div>';
+  }
   html += '<div class="empty" style="font-size:12px">'+(sf.disclaimer||'Defensive screen — flags for review, never a clearance.')+'</div>';
   $('behavior').innerHTML = html;
   const sb=$('stereoBtn'); if(sb) sb.addEventListener('click', ()=>exploreStereo(sb.dataset.smi));
@@ -1292,7 +1317,7 @@ function setView(mode){
   document.getElementById('structure3d').style.display = is3 ? 'block' : 'none';
   document.getElementById('btn2d').classList.toggle('on', !is3);
   document.getElementById('btn3d').classList.toggle('on', is3);
-  if(is3) show3D();
+  if(is3) show3D(); else if(_v3d) _v3d.spin(false);   // stop spinning while the 3D view is hidden
 }
 function show3D(){
   const el = document.getElementById('structure3d');
@@ -1378,7 +1403,7 @@ async function mount3D(el, smiles){
   el.innerHTML='';
   const v = $3Dmol.createViewer(el, {backgroundColor:'white'});
   v.addModel(s3.molblock,'sdf'); v.setStyle({},{stick:{radius:0.13},sphere:{scale:0.23}});
-  v.zoomTo(); v.render(); v.resize();
+  v.zoomTo(); v.render(); v.resize(); v.spin('y', 0.4);   // gentle auto-spin like the modal viewer
 }
 // per-card 2D/3D toggle: swaps a struct element between its 2D svg and an in-card 3D viewer
 function cardToggle3D(btn, structEl, smiles, svgHtml){
