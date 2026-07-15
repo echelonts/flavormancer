@@ -330,6 +330,15 @@
   .design-section{margin:14px 0 4px;border:1px solid #2C6E74;border-radius:12px;padding:15px 18px;background:linear-gradient(180deg,#15211F,#181D24)}
   .design-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-2);cursor:pointer}
   .design-head .mapsub{font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);opacity:.85}
+  /* --- gilded section headers (alchemy theme): Cinzel wordmark in a gold->teal->violet
+     gradient, with a small alembic glyph before the title. Subtitles keep their muted color. */
+  .design-head,.map-head,.browse-head,.toggle{font-family:'Cinzel Decorative','Cinzel',Georgia,serif;
+    font-size:14px;font-weight:700;text-transform:none;letter-spacing:.03em;
+    background:linear-gradient(95deg,#E8C48A 0%,#57D0CB 52%,#9B82E6 100%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .design-head .mapsub,.map-head .mapsub,.browse-head .mapsub{font-family:var(--ui);
+    -webkit-text-fill-color:var(--muted);background:none;font-size:12px}
+  .design-head>span,.map-head>span,.toggle>span{-webkit-text-fill-color:#57D0CB}  /* carets stay teal */
   .design-chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 10px}
   .dchip{font:inherit;font-size:12px;padding:4px 11px;border-radius:20px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;text-transform:capitalize}
   .dchip:hover{border-color:var(--brand-2)}
