@@ -171,7 +171,7 @@
   .rx-from{font-size:10px;color:var(--muted);line-height:1.3;margin-top:3px}
   .kt .tchip{font-size:10px;font-weight:600;padding:1px 8px;border-radius:20px;color:#10140F;text-transform:capitalize}
   .kt .muted{color:var(--muted);font-size:11px}
-  .browse{margin:14px 0 4px;border:1px solid #2C6E74;border-radius:12px;padding:15px 18px;background:linear-gradient(180deg,#15211F,#181D24)}
+  .browse{margin:22px 0 4px;border:1px solid #2C6E74;border-radius:12px;padding:15px 18px;background:linear-gradient(180deg,#15211F,#181D24)}
   .browse-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-2);margin:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
   .browse-toggle{display:inline-flex}
   .browse-toggle .st-tab{padding:3px 11px}
@@ -194,7 +194,7 @@
   .bcell .bstruct{height:68px}.bcell .bstruct svg{max-width:100%;height:68px}
   .bcell .bname{font-size:12px;font-weight:600;margin-top:5px;line-height:1.25;text-transform:capitalize;cursor:pointer}
   .bcell .bname:hover{color:var(--aroma)}
-  .map-section{margin:16px 0 8px;border-top:1px solid #EEF0EC;padding-top:12px}
+  .map-section{margin:22px 0 8px;border-top:1px solid #EEF0EC;padding-top:12px}
   .map-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);cursor:pointer}
   .map-head .mapsub{font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);opacity:.8}
   .map-legend{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px;font-size:12px}
@@ -288,7 +288,7 @@
   .s3-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
   .domain-banner{background:#FFF6E6;border:1px solid #E8D38A;color:#7A5A12;border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:14px;line-height:1.5}
   .hint code{font-family:var(--mono);background:var(--accent-soft);padding:1px 5px;border-radius:4px;color:var(--accent)}
-  .toggle{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-2);margin:18px 0 0;display:flex;align-items:center;gap:7px;cursor:pointer;padding:2px}
+  .toggle{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-2);margin:22px 0 0;display:flex;align-items:center;gap:7px;cursor:pointer;padding:2px}
   .toggle:hover{color:var(--ink)}
   .toggle input[type=checkbox]{display:none}  /* caret is the control, no raw checkbox */
   #mixPanel{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
@@ -327,7 +327,7 @@
   .cat.on{color:#fff}
   .sg-st svg{width:56px;height:42px}
   /* --- flavor designer --- */
-  .design-section{margin:14px 0 4px;border:1px solid #2C6E74;border-radius:12px;padding:15px 18px;background:linear-gradient(180deg,#15211F,#181D24)}
+  .design-section{margin:22px 0 4px;border:1px solid #2C6E74;border-radius:12px;padding:15px 18px;background:linear-gradient(180deg,#15211F,#181D24)}
   .design-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-2);cursor:pointer}
   .design-head .mapsub{font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);opacity:.85}
   /* --- gilded section headers (alchemy theme): Cinzel wordmark in a gold->teal->violet
@@ -415,12 +415,16 @@
   .enrich-search{flex:1;max-width:420px;font:inherit;font-size:13px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
   .enrich-search:focus{outline:none;border-color:var(--brand-2)}
   .enrich-count{font-size:12px;color:var(--muted)}
-  .enrich-scroll{overflow:auto;max-height:74vh;border:1px solid var(--line);border-radius:10px}  /* scrolls both ways, themed like the site */
+  /* parchment accent: aged-paper header + bronze frame; data rows stay dark & crisp */
+  .enrich-scroll{overflow:auto;max-height:74vh;border:1px solid #6E5334;border-radius:10px;
+    box-shadow:inset 0 0 0 1px rgba(235,203,146,.10)}  /* scrolls both ways */
   .enrich-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px}
-  .enrich-table th{position:sticky;top:0;background:var(--panel);text-align:left;padding:9px 11px;font-weight:650;
-    color:var(--brand-2);border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none}
-  .enrich-table th:hover{color:var(--ink)}
-  .enrich-table th .th-ar{opacity:.6;font-size:10px}
+  .enrich-table th{position:sticky;top:0;text-align:left;padding:10px 11px;font-weight:700;
+    background:linear-gradient(180deg,#EEE1C6 0%,#E0D0AA 100%);color:#5A4326;
+    border-bottom:2px solid #B79A63;cursor:pointer;white-space:nowrap;user-select:none;letter-spacing:.02em;
+    text-shadow:0 1px 0 rgba(255,255,255,.35)}
+  .enrich-table th:hover{color:#2E2010}
+  .enrich-table th .th-ar{opacity:.75;font-size:10px;color:#7A5A2E}
   .enrich-table td{padding:8px 11px;border-bottom:1px solid #20272F;color:var(--ink);white-space:nowrap}
   .enrich-table tbody tr{cursor:pointer}
   .enrich-table tbody tr:hover{background:rgba(43,196,196,.06)}
