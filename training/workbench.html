@@ -43,6 +43,10 @@
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
+  /* never let the page scroll/zoom horizontally — inner scroll containers (e.g. the enrichment
+     table) keep their own overflow:auto, so this only kills phantom document-level overflow that
+     was zooming mobile out to ~5/6 width. */
+  html,body{overflow-x:hidden;max-width:100%}
   /* ambient alchemical aura — faint colored light pooling in the viewport corners (fixed, so it
      stays put as you scroll), layered over the base surface color */
   body{margin:0;color:var(--ink);font-family:var(--ui);
@@ -116,6 +120,7 @@
     background:var(--panel);color:var(--ink);cursor:pointer;transition:all .14s}
   .tour-chip:hover{border-color:transparent;background:var(--brand-grad);color:#08121A;transform:translateY(-1px)}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}
+  .grid>.card{min-width:0}  /* let cards shrink to the track so their content wraps, not overflow */
   @media(max-width:760px){.grid{grid-template-columns:1fr}}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
   .card h2{margin:0 0 4px;font-size:12px;font-weight:650;text-transform:uppercase;
@@ -483,7 +488,7 @@
   }
   /* --- molecule modal + logo-matched loader --- */
   .mol-modal{position:fixed;inset:0;z-index:200;background:rgba(6,10,14,.72);backdrop-filter:blur(4px);
-    display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:34px 16px}
+    display:flex;align-items:center;justify-content:center;overflow:hidden auto;padding:34px 16px}  /* clip x so the scroll rods never overflow the viewport (was zooming mobile out) */
   .mol-modal-inner{position:relative;width:100%;max-width:1000px;margin:auto;background:var(--surface);
     border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.55);padding:20px 22px 26px;
     animation:modalIn .22s cubic-bezier(.2,.9,.3,1)}
@@ -501,6 +506,7 @@
     background:radial-gradient(circle at 40% 38%,#EBCB92,#6B4A2A 72%,#4E351F);box-shadow:0 2px 6px rgba(0,0,0,.5)}
   .scroll-rod::before{left:-7px}.scroll-rod::after{right:-7px}
   .scroll-rod-top{top:-11px}.scroll-rod-bottom{bottom:-11px}
+  @media(max-width:640px){.scroll-rod{left:3px;right:3px}.scroll-rod::before{left:-4px}.scroll-rod::after{right:-4px}}
   /* wax-seal close */
   .mol-close{position:absolute;top:14px;right:16px;z-index:4;width:38px;height:38px;border-radius:50%;
     border:1px solid #8A2A38;background:radial-gradient(circle at 38% 34%,#C0455A,#7A1F2E 68%,#571623);
@@ -1516,8 +1522,9 @@ function drawClusterLabels(){
   if(!_mapProj) return;
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), groups={};
   for(const p of _mapPts){ const l=mapLabel(p); if(!l||l==='other') continue; (groups[l]=groups[l]||[]).push(p); }
-  ctx.save(); ctx.font='700 15px "Cinzel Decorative",Georgia,serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  for(const l in groups){ const pts=groups[l]; if(pts.length<15) continue;
+  ctx.save(); ctx.font='700 14px "Cinzel Decorative",Georgia,serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  // label EVERY class that has points (all 24 aroma / 6 taste heads), not just the big ones
+  for(const l in groups){ const pts=groups[l]; if(pts.length<3) continue;
     let sx=0,sy=0,n=0; for(const p of pts){ const x=_mapProj.px(p),y=_mapProj.py(p); if(x<-9000||!isFinite(x)) continue; sx+=x; sy+=y; n++; }
     if(!n) continue; sx/=n; sy/=n;
     ctx.globalAlpha=.95; ctx.lineWidth=4; ctx.strokeStyle='rgba(6,10,14,.92)'; ctx.strokeText(l, sx, sy);
