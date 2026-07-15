@@ -487,9 +487,22 @@
     background:linear-gradient(135deg,rgba(124,92,191,.5),rgba(43,196,196,.5));
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.6}
   @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
-  .mol-close{position:absolute;top:12px;right:12px;z-index:3;width:34px;height:34px;border-radius:9px;
-    border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:16px;cursor:pointer;line-height:1}
-  .mol-close:hover{border-color:var(--brand-2);color:var(--ink)}
+  /* --- scroll frame: bronze/gilded rolled rods at the top & bottom of the modal (an unrolled
+     scroll), with knobbed end-caps — a parchment/scroll flourish kept dark-theme-friendly --- */
+  .scroll-rod{position:absolute;left:-13px;right:-13px;height:19px;pointer-events:none;z-index:2;border-radius:10px;
+    background:linear-gradient(180deg,#5A3E24 0%,#B98A54 20%,#EBCB92 44%,#B98A54 68%,#4E351F 100%);
+    box-shadow:0 3px 11px rgba(0,0,0,.5)}
+  .scroll-rod::before,.scroll-rod::after{content:'';position:absolute;top:50%;transform:translateY(-50%);
+    width:15px;height:25px;border-radius:50%;
+    background:radial-gradient(circle at 40% 38%,#EBCB92,#6B4A2A 72%,#4E351F);box-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .scroll-rod::before{left:-7px}.scroll-rod::after{right:-7px}
+  .scroll-rod-top{top:-11px}.scroll-rod-bottom{bottom:-11px}
+  /* wax-seal close */
+  .mol-close{position:absolute;top:14px;right:16px;z-index:4;width:38px;height:38px;border-radius:50%;
+    border:1px solid #8A2A38;background:radial-gradient(circle at 38% 34%,#C0455A,#7A1F2E 68%,#571623);
+    color:#F0D9A8;font-size:15px;cursor:pointer;line-height:1;
+    box-shadow:0 3px 9px rgba(0,0,0,.5),inset 0 1px 2px rgba(255,255,255,.18),inset 0 -2px 5px rgba(0,0,0,.45)}
+  .mol-close:hover{filter:brightness(1.12);color:#FBEFCF}
   .mol-loader{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 16px 40px}
   .loader-flask{width:150px;height:150px}
   .loader-ring{transform-origin:70px 70px;animation:ringspin 1.15s linear infinite}
@@ -730,6 +743,8 @@
 
   <div id="molModal" class="mol-modal" style="display:none">
    <div class="mol-modal-inner">
+    <div class="scroll-rod scroll-rod-top" aria-hidden="true"></div>
+    <div class="scroll-rod scroll-rod-bottom" aria-hidden="true"></div>
     <button type="button" id="molClose" class="mol-close" aria-label="Close">✕</button>
     <div id="molLoader" class="mol-loader">
       <svg class="loader-flask" viewBox="0 0 140 140" aria-hidden="true">
