@@ -7,6 +7,17 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 > status, and the acquisition steps. Loaders **skip cleanly** when a file is absent,
 > so adding a source is just dropping its file in and re-running the pipeline.
 
+> **Commercial-clean attestation (re-verified 2026-07-15).** Every dataset feeding the
+> **shipped** models is public-domain or permissive-with-attribution: **ChemTastesDB
+> CC-BY-4.0** (confirmed on the Zenodo dataset deposit) and **SweetenersDB MIT**
+> (confirmed on `github.com/chemosim-lab/SweetenersDB`) for taste + sweetness; **PubChem
+> / HSDB / CAMEO / Haz-Map / Tox21 / FDA-SAF** are US-government public domain for
+> odor text, properties, tox assays, and GRAS. **No NonCommercial data is in the
+> commercial edition** — FlavorDB (CC-BY-NC-SA), the Leffingwell/GoodScents **GS-LF**
+> aroma set (NonCommercial), the FartDB composite, and PlantMolecularTasteDB are
+> **excluded** and reserved for the **academic edition** (or a licensed source such as
+> PMP 2001). Attribution is given for CC-BY/MIT sources here and in [`SOURCES.md`](SOURCES.md).
+
 ## Status
 
 | Source | Unlocks | License | Status | How to get |

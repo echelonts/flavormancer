@@ -1,9 +1,23 @@
 # Flavormancer
 
+<p align="center">
+  <img src="docs/assets/hero.png" alt="Flavormancer — taste &amp; aroma prediction from chemical structure" width="860">
+</p>
+
 On-prem flavor prediction from chemical structure — **taste _and_ aroma, physicochemical
 behavior, formulation notes, and safety flags** for any molecule, plus substitution search.
 Enter a **common or IUPAC name** (or a SMILES) and get a single, honest flavor read,
 running entirely on hardware you own.
+
+<p align="center">
+  <img src="docs/assets/molecule-read.png" alt="A full, confidence-tagged molecule flavor read" width="640">
+</p>
+<p align="center"><sub>A single, confidence-tagged flavor read — taste, aroma, behavior, safety, and drop-in substitutions.</sub></p>
+
+<p align="center">
+  <img src="docs/assets/flavor-map.png" alt="Flavor-space map in 3D on MW × logP × TPSA axes, colored by taste and aroma" width="900">
+</p>
+<p align="center"><sub>The interactive flavor-space map in 3D on real <b>MW × logP × TPSA</b> axes, colored by <b>taste &amp; aroma</b> — every one of the 24 aroma + 6 taste classes labelled.</sub></p>
 
 > **8,393 unique molecules** across the open datasets · **taste + aroma** prediction from
 > structure · a **flavor library** (start from a flavor → its character-impact molecule) and
