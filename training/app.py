@@ -324,6 +324,128 @@ def _static(fname: str):
     raise HTTPException(status_code=404)
 
 
+_TASTE_RGB = {"sweet": (232, 169, 74), "bitter": (168, 138, 224), "umami": (224, 128, 94),
+              "sour": (191, 210, 78), "salty": (99, 166, 224), "tasteless": (184, 192, 198)}
+
+
+@app.get("/api/card")
+def api_card(q: str = "", dl: int = 0):
+    """A branded, shareable 'flavor card' PNG for a molecule — structure + the read + the
+    share URL. Self-contained (RDKit draws the structure, Pillow composes)."""
+    from fastapi import HTTPException
+    from fastapi.responses import Response
+    smi = _resolve(q)
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is None:
+        raise HTTPException(status_code=404)
+    out = P.predict(smi, include_aroma=False)
+    tags = _read_tags(smi, out)
+    common, iupac = _names(smi)
+    name = common or (q[:1].upper() + q[1:] if q else smi)
+
+    import io
+    from PIL import Image, ImageDraw, ImageFont
+    from rdkit.Chem.Draw import rdMolDraw2D
+
+    def font(path, size):
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:  # noqa: BLE001
+            return ImageFont.load_default()
+    DJ = "/usr/share/fonts/truetype/dejavu/"
+    f_title = font("static/headerfont.ttf", 46)
+    f_tag = font("static/wordmark.ttf", 17)
+    f_name = font(DJ + "DejaVuSans-Bold.ttf", 34)
+    f_body = font(DJ + "DejaVuSans.ttf", 17)
+    f_mono = font(DJ + "DejaVuSansMono.ttf", 15)
+    f_pill = font(DJ + "DejaVuSans-Bold.ttf", 16)
+    f_lab = font(DJ + "DejaVuSans-Bold.ttf", 15)
+
+    W, H = 1200, 630
+    ink, muted, cream, teal = (231, 237, 234), (148, 162, 169), (217, 171, 116), (43, 196, 196)
+    img = Image.new("RGB", (W, H), (15, 19, 25))
+    dr = ImageDraw.Draw(img)
+    # corner aura
+    for cx, cy, col in [(0, 0, (138, 107, 224)), (W, H, (43, 196, 196))]:
+        glow = Image.new("RGB", (W, H), (15, 19, 25))
+        gd = ImageDraw.Draw(glow)
+        gd.ellipse([cx - 380, cy - 320, cx + 380, cy + 320], fill=col)
+        img = Image.blend(img, glow, 0.06)
+        dr = ImageDraw.Draw(img)
+
+    # header
+    try:
+        emblem = Image.open("static/logo.png").convert("RGBA").resize((58, 58))
+        img.paste(emblem, (40, 30), emblem)
+    except Exception:  # noqa: BLE001
+        pass
+    dr.text((110, 30), "Flavormancer", font=f_title, fill=ink)
+    dr.text((112, 82), "taste & aroma from chemical structure", font=f_tag, fill=cream)
+    dr.line([40, 122, W - 40, 122], fill=(42, 50, 60), width=1)
+
+    # structure panel (white)
+    dr.rounded_rectangle([40, 150, 470, 520], radius=14, fill=(245, 247, 245))
+    d2 = rdMolDraw2D.MolDraw2DCairo(410, 350)
+    d2.drawOptions().padding = 0.12
+    d2.DrawMolecule(mol)
+    d2.FinishDrawing()
+    struct = Image.open(io.BytesIO(d2.GetDrawingText())).convert("RGBA")
+    img.paste(struct, (50, 160), struct)
+
+    # right column
+    x = 508
+    dr.text((x, 158), name[:34], font=f_name, fill=ink)
+    if iupac and iupac.lower() != name.lower():
+        dr.text((x, 206), ("IUPAC  " + iupac)[:64], font=f_body, fill=muted)
+    dr.text((x, 232), smi[:58], font=f_mono, fill=muted)
+
+    # "reads as" pills
+    dr.text((x, 280), "READS AS", font=f_lab, fill=muted)
+    px, py = x, 306
+    def pill(px, py, text, fg, border):
+        w = dr.textlength(text, font=f_pill)
+        if px + w + 22 > W - 40:
+            px, py = x, py + 40
+        dr.rounded_rectangle([px, py, px + w + 22, py + 30], radius=15, outline=border, width=2)
+        dr.text((px + 11, py + 6), text, font=f_pill, fill=fg)
+        return px + w + 30, py
+    for fl in tags.get("flavors", [])[:4]:
+        px, py = pill(px, py, fl, cream, cream)
+    for t in tags.get("tastes", [])[:4]:
+        c = _TASTE_RGB.get(t, teal)
+        px, py = pill(px, py, t, c, c)
+    for a in tags.get("aromas", [])[:5]:
+        px, py = pill(px, py, a, teal, teal)
+
+    # taste-probability bars (the numeric heads)
+    by = py + 58
+    dr.text((x, by - 26), "TASTE MODEL", font=f_lab, fill=muted)
+    bars = [(t, out.get(t)) for t in ("sweet", "bitter", "umami", "tasteless") if isinstance(out.get(t), (int, float))]
+    bars.sort(key=lambda kv: -kv[1])
+    for t, v in bars[:4]:
+        c = _TASTE_RGB.get(t, teal)
+        pct = int(round(v * 100))
+        dr.text((x, by), t, font=f_body, fill=ink)
+        dr.rounded_rectangle([x + 120, by + 4, x + 120 + 320, by + 16], radius=6, fill=(36, 44, 53))
+        dr.rounded_rectangle([x + 120, by + 4, x + 120 + int(320 * v), by + 16], radius=6, fill=c)
+        dr.text((x + 452, by), f"{pct}%", font=f_body, fill=muted)
+        by += 30
+
+    # footer
+    dr.line([40, 576, W - 40, 576], fill=(42, 50, 60), width=1)
+    share = "flavormancer.echelonts.net/?q=" + (common or q or smi)
+    dr.text((40, 590), share, font=f_mono, fill=teal)
+    tw = dr.textlength("before you pour", font=f_tag)
+    dr.text((W - 40 - tw, 588), "before you pour", font=f_tag, fill=cream)
+
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    data = buf.getvalue()
+    fn = "".join(ch for ch in (common or "molecule") if ch.isalnum() or ch in "-_") or "molecule"
+    headers = {"Content-Disposition": f'attachment; filename="flavormancer-{fn}.png"'} if dl else {}
+    return Response(content=data, media_type="image/png", headers=headers)
+
+
 class MixtureQuery(BaseModel):
     ingredients: list[str]
     processes: list[str] = []

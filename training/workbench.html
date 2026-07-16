@@ -519,7 +519,8 @@
   .mol-share{position:absolute;top:19px;right:64px;z-index:4;font:inherit;font-size:11px;font-weight:600;
     padding:5px 11px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer}
   .mol-share:hover{border-color:var(--brand-2);color:var(--ink)}
-  @media(max-width:640px){.mol-share{right:60px;top:20px;padding:4px 9px;font-size:10px}}
+  .mol-export{right:150px}
+  @media(max-width:640px){.mol-share{right:56px;top:20px;padding:4px 9px;font-size:10px}.mol-export{right:132px}}
   .mol-loader{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 16px 40px}
   .loader-flask{width:150px;height:150px}
   .loader-ring{transform-origin:70px 70px;animation:ringspin 1.15s linear infinite}
@@ -762,6 +763,7 @@
    <div class="mol-modal-inner">
     <div class="scroll-rod scroll-rod-top" aria-hidden="true"></div>
     <div class="scroll-rod scroll-rod-bottom" aria-hidden="true"></div>
+    <button type="button" id="molExport" class="mol-share mol-export" title="Download a shareable flavor card (PNG)">Export</button>
     <button type="button" id="molShare" class="mol-share" title="Copy a shareable link to this read">Copy link</button>
     <button type="button" id="molClose" class="mol-close" aria-label="Close">✕</button>
     <div id="molLoader" class="mol-loader">
@@ -1045,6 +1047,10 @@ $('molShare').addEventListener('click', ()=>{
   const done=()=>{ const b=$('molShare'); const t=b.textContent; b.textContent='Copied!'; setTimeout(()=>b.textContent=t,1400); };
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,done); }
   else { const ta=document.createElement('textarea'); ta.value=url; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(_){}; ta.remove(); done(); }
+});
+$('molExport').addEventListener('click', ()=>{
+  const a=document.createElement('a'); a.href='/api/card?q='+encodeURIComponent(_shareQ||q.value.trim())+'&dl=1';
+  a.download=''; document.body.appendChild(a); a.click(); a.remove();
 });
 
 async function run(){
