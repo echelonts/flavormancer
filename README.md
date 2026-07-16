@@ -204,6 +204,24 @@ See [training/SETUP.md](training/SETUP.md) for the clean-machine setup. Datasets
 trained models are **not** committed — the training scripts pull their sources and
 `.gitignore` keeps artifacts out of the repo.
 
+## Team
+
+Built by **[Echelon Technology Solutions](https://echelonts.net)** — a small team where
+everyone is cross-training toward full-stack.
+
+| | Role |
+|---|---|
+| **Austin** · [@rvnminers-A-and-N](https://github.com/rvnminers-A-and-N) | Founder & lead — training pipeline, backend, architecture, models, and roadmap; mentors the team across their areas |
+| **Jamie** | Front-end lead — owns the UI/UX |
+| **Aaron** · [@Jabbacado](https://github.com/Jabbacado) | Full-stack (in training) — backend, infrastructure, AI, UI/UX |
+| **Ty** · [@Frostfire0101](https://github.com/Frostfire0101) | Full-stack (in training) — backend, infrastructure, networking, AI, UI/UX |
+
+**Austin** — B.S. Chemistry (ACS-certified) & B.S. Physics, *magna cum laude*, Western
+Kentucky University (minors in Mathematics & Astronomy), plus graduate coursework in a
+computational-chemistry M.S. program. Background in **molecular-dynamics simulation** —
+protein conformational states and SO₂ at the air–water interface — on the WKU HPC
+cluster: the structure-to-property grounding behind Flavormancer.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branching, commit conventions, and the

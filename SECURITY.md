@@ -27,5 +27,5 @@ Flavormancer predicts *flavor properties only* and is **not** a safety, toxicity
 regulatory, or stability determination — a prediction is never a clearance to consume.
 
 For security issues in the code (not model outputs), please open a private report via
-GitHub Security Advisories, or email **security@echelonts.net**. Please do not file
+GitHub Security Advisories, or email **admin@echelonts.net**. Please do not file
 public issues for suspected vulnerabilities.
