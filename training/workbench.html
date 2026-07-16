@@ -516,6 +516,10 @@
     color:#F0D9A8;font-size:15px;cursor:pointer;line-height:1;
     box-shadow:0 3px 9px rgba(0,0,0,.5),inset 0 1px 2px rgba(255,255,255,.18),inset 0 -2px 5px rgba(0,0,0,.45)}
   .mol-close:hover{filter:brightness(1.12);color:#FBEFCF}
+  .mol-share{position:absolute;top:19px;right:64px;z-index:4;font:inherit;font-size:11px;font-weight:600;
+    padding:5px 11px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer}
+  .mol-share:hover{border-color:var(--brand-2);color:var(--ink)}
+  @media(max-width:640px){.mol-share{right:60px;top:20px;padding:4px 9px;font-size:10px}}
   .mol-loader{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 16px 40px}
   .loader-flask{width:150px;height:150px}
   .loader-ring{transform-origin:70px 70px;animation:ringspin 1.15s linear infinite}
@@ -758,6 +762,7 @@
    <div class="mol-modal-inner">
     <div class="scroll-rod scroll-rod-top" aria-hidden="true"></div>
     <div class="scroll-rod scroll-rod-bottom" aria-hidden="true"></div>
+    <button type="button" id="molShare" class="mol-share" title="Copy a shareable link to this read">Copy link</button>
     <button type="button" id="molClose" class="mol-close" aria-label="Close">✕</button>
     <div id="molLoader" class="mol-loader">
       <svg class="loader-flask" viewBox="0 0 140 140" aria-hidden="true">
@@ -1029,14 +1034,23 @@ function meter(name, value, measured, auroc, note){
 
 function stepDone(name){ const li=document.querySelector('#loaderSteps li[data-step="'+name+'"]'); if(li){ li.classList.remove('active'); li.classList.add('done'); } }
 function openModal(){ $('molModal').style.display='flex'; $('molModal').scrollTop=0; document.body.style.overflow='hidden'; }
-function closeModal(){ $('molModal').style.display='none'; document.body.style.overflow=''; }
+function closeModal(){ $('molModal').style.display='none'; document.body.style.overflow=''; history.replaceState(null,'',location.pathname); }
 $('molClose').addEventListener('click', closeModal);
 $('molModal').addEventListener('click', e=>{ if(e.target===$('molModal')) closeModal(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && $('molModal').style.display==='flex') closeModal(); });
+// shareable deep link: a read updates the URL to ?q=<molecule>, and "Copy link" copies it
+let _shareQ = '';
+$('molShare').addEventListener('click', ()=>{
+  const url = location.origin+location.pathname+'?q='+encodeURIComponent(_shareQ||q.value.trim());
+  const done=()=>{ const b=$('molShare'); const t=b.textContent; b.textContent='Copied!'; setTimeout(()=>b.textContent=t,1400); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,done); }
+  else { const ta=document.createElement('textarea'); ta.value=url; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(_){}; ta.remove(); done(); }
+});
 
 async function run(){
   const text = q.value.trim();
   if(!text) return;
+  _shareQ = text; history.replaceState(null,'',location.pathname+'?q='+encodeURIComponent(text));  // shareable URL
   go.disabled = true; go.textContent = 'Reading…';
   $('err').style.display='none';
   openModal();
@@ -1375,6 +1389,8 @@ function attachRichSuggest(input, onPick){
   window.addEventListener('scroll', ()=>{ if(dd.style.display!=='none') place(); }, true);
 }
 attachRichSuggest(q, ()=>run());
+// deep link: open ?q=<molecule> straight into its read (shareable snapshot)
+(()=>{ const sq=new URLSearchParams(location.search).get('q'); if(sq){ q.value=sq; run(); } })();
 
 // --- landing browse: model-ranked taste lists + documented aroma lists ---
 async function getJSON(url){ const r = await fetch(url); return r.json(); }
