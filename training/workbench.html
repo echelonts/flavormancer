@@ -312,6 +312,17 @@
   .mix-btn{font-family:var(--ui);font-weight:600;font-size:14px;padding:9px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
   .mix-btn:disabled{opacity:.5}
   #mixResults{margin-top:14px}
+  /* compare molecules */
+  .cmp-inputs{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 12px}
+  .cmp-in{flex:1;min-width:200px;font:inherit;font-size:13.5px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+  .cmp-in:focus{outline:none;border-color:var(--brand-2)}
+  .cmp-vs{font-family:'Cinzel Decorative',Georgia,serif;color:var(--cream);font-size:13px}
+  .cmp-results{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:760px){.cmp-results{grid-template-columns:1fr}}
+  .cmp-card{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0F1319;min-height:120px;cursor:pointer;transition:border-color .14s}
+  .cmp-card:hover{border-color:var(--brand-2)}
+  .cmp-card img{display:block;width:100%;height:auto}
+  .cmp-card .empty{padding:20px}
   .mix-ings{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
   .mix-ing{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
   .mix-ing:hover{background:var(--accent-soft)}
@@ -678,6 +689,24 @@
     </div>
     <button class="mix-btn" id="mixCheck">Check mixture</button>
     <div id="mixResults"></div>
+  </div>
+
+  <label class="toggle"><input type="checkbox" id="cmpToggle"> <span id="cmpCaret">▸</span> Compare molecules — two reads side by side</label>
+  <div id="cmpPanel" style="display:none">
+    <p class="mix-explain">Enter two molecules to see their <b>flavor cards side by side</b> — compare
+      taste, aroma, and structure at a glance (great for a reformulation or a chirality pair).</p>
+    <div class="cmp-inputs">
+      <input id="cmpA" class="cmp-in" autocomplete="off" placeholder="name or SMILES — e.g. vanillin">
+      <span class="cmp-vs">vs</span>
+      <input id="cmpB" class="cmp-in" autocomplete="off" placeholder="name or SMILES — e.g. ethylvanillin">
+      <button class="mix-btn" id="cmpGo">Compare</button>
+    </div>
+    <div class="mix-examples"><span>Try:</span>
+      <button type="button" class="mix-ex cmp-ex" data-a="vanillin" data-b="ethylvanillin">vanillin vs ethyl&nbsp;vanillin</button>
+      <button type="button" class="mix-ex cmp-ex" data-a="(R)-carvone" data-b="(S)-carvone">R- vs S-carvone</button>
+      <button type="button" class="mix-ex cmp-ex" data-a="limonene" data-b="menthol">limonene vs menthol</button>
+    </div>
+    <div id="cmpResults" class="cmp-results"></div>
   </div>
 
   <div id="browse" class="browse">
@@ -1924,7 +1953,7 @@ $('mixToggle').addEventListener('change', e=>{
 });
 if($('mixToggle').checked && !$('mixRows').children.length){ mixAddRow(); mixAddRow(); }  // open by default
 // click a bad-combo example -> load its ingredients + process and run the screen
-document.querySelectorAll('.mix-ex').forEach(b=> b.addEventListener('click', ()=>{
+document.querySelectorAll('.mix-ex:not(.cmp-ex)').forEach(b=> b.addEventListener('click', ()=>{
   $('mixRows').innerHTML='';
   b.dataset.ings.split('|').forEach(s=>mixAddRow(s));
   document.querySelectorAll('.proc').forEach(c=>{ c.checked = (b.dataset.proc||'').split(',').includes(c.value); });
@@ -1934,6 +1963,22 @@ $('mixResults').addEventListener('click', e=>{
   const card=e.target.closest('.mix-ing[data-smi]');
   if(card && card.dataset.smi){ $('mixToggle').checked=false; $('mixToggle').dispatchEvent(new Event('change')); q.value=card.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
 });
+
+// --- compare two molecules: side-by-side flavor cards (reuses /api/card) ---
+$('cmpToggle').addEventListener('change', e=>{ $('cmpPanel').style.display=e.target.checked?'block':'none'; $('cmpCaret').textContent=e.target.checked?'▾':'▸'; });
+attachRichSuggest($('cmpA')); attachRichSuggest($('cmpB'));
+function cmpRun(){
+  const a=$('cmpA').value.trim(), b=$('cmpB').value.trim();
+  if(!a||!b){ $('cmpResults').innerHTML='<div class="empty">Enter two molecules to compare.</div>'; return; }
+  $('cmpResults').innerHTML=[a,b].map(m=>{ const e=m.replace(/"/g,'&quot;');
+    return `<div class="cmp-card" data-q="${e}" title="Open the full read"><img loading="lazy" src="/api/card?q=${encodeURIComponent(m)}" alt="flavor card for ${e}" onerror="this.parentElement.textContent='No read for that molecule'"></div>`;
+  }).join('');
+}
+$('cmpGo').addEventListener('click', cmpRun);
+$('cmpA').addEventListener('keydown', e=>{ if(e.key==='Enter') cmpRun(); });
+$('cmpB').addEventListener('keydown', e=>{ if(e.key==='Enter') cmpRun(); });
+$('cmpResults').addEventListener('click', e=>{ const c=e.target.closest('.cmp-card[data-q]'); if(c){ q.value=c.dataset.q; window.scrollTo({top:0,behavior:'smooth'}); run(); } });
+document.querySelectorAll('.cmp-ex').forEach(b=> b.addEventListener('click', ()=>{ $('cmpA').value=b.dataset.a; $('cmpB').value=b.dataset.b; cmpRun(); }));
 $('mixCheck').addEventListener('click', async ()=>{
   const ings=[...$('mixRows').querySelectorAll('input')].map(i=>i.value.trim()).filter(Boolean);
   const procs=[...document.querySelectorAll('.proc:checked')].map(c=>c.value);
