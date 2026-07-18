@@ -201,7 +201,7 @@
   .bcell .bstruct{height:68px}.bcell .bstruct svg{max-width:100%;height:68px}
   .bcell .bname{font-size:12px;font-weight:600;margin-top:5px;line-height:1.25;text-transform:capitalize;cursor:pointer}
   .bcell .bname:hover{color:var(--aroma)}
-  .map-section{margin:22px 0 8px;border-top:1px solid #EEF0EC;padding-top:12px}
+  .map-section{margin:22px 0 8px}
   .map-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);cursor:pointer}
   .map-head .mapsub{font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);opacity:.8}
   .map-legend{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px;font-size:12px}
@@ -373,6 +373,12 @@
   .cmp-card:hover{border-color:var(--brand-2)}
   .cmp-card img{display:block;width:100%;height:auto}
   .cmp-card .empty{padding:20px}
+  .cmp-card.loading{display:flex;align-items:center;justify-content:center;min-height:300px}
+  .cmp-card.loading img{display:none}
+  .cmp-load{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .cmp-load .loader-flask{width:96px;height:96px}
+  .cmp-load-cap{font-family:'Cinzel',Georgia,serif;font-size:12.5px;letter-spacing:.04em;color:var(--cream)}
+  .cmp-err{padding:26px 20px;color:var(--muted);font-size:13px;text-align:center}
   .mix-ings{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
   .mix-ing{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
   .mix-ing:hover{background:var(--accent-soft)}
@@ -784,8 +790,8 @@
     <div id="mixResults"></div>
   </div>
 
-  <label class="toggle"><input type="checkbox" id="cmpToggle"> <span id="cmpCaret">▸</span> Compare molecules — two reads side by side</label>
-  <div id="cmpPanel" style="display:none">
+  <label class="toggle"><input type="checkbox" id="cmpToggle" checked> <span id="cmpCaret">▾</span> Compare molecules — two reads side by side</label>
+  <div id="cmpPanel">
     <p class="mix-explain">Enter two molecules to see their <b>flavor cards side by side</b> — compare
       taste, aroma, and structure at a glance (great for a reformulation or a chirality pair).</p>
     <div class="cmp-inputs">
@@ -2060,11 +2066,28 @@ $('mixResults').addEventListener('click', e=>{
 // --- compare two molecules: side-by-side flavor cards (reuses /api/card) ---
 $('cmpToggle').addEventListener('change', e=>{ $('cmpPanel').style.display=e.target.checked?'block':'none'; $('cmpCaret').textContent=e.target.checked?'▾':'▸'; });
 attachRichSuggest($('cmpA')); attachRichSuggest($('cmpB'));
+// compact flask loader (same spirit as the read modal) shown inside each box while the card renders
+function cmpLoader(label){
+  return `<div class="cmp-load"><svg class="loader-flask" viewBox="0 0 140 140" aria-hidden="true">
+    <defs><linearGradient id="lg-cmp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CBF"/><stop offset="1" stop-color="#2BC4C4"/></linearGradient></defs>
+    <circle cx="70" cy="70" r="62" fill="none" stroke="url(#lg-cmp)" stroke-width="3" opacity=".55"/>
+    <circle class="loader-ring" cx="70" cy="70" r="62" fill="none" stroke="url(#lg-cmp)" stroke-width="3" stroke-linecap="round" stroke-dasharray="80 320"/>
+    <path d="M58 44 h24 v14 l16 34 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 l16 -34 z" fill="rgba(43,196,196,.10)" stroke="url(#lg-cmp)" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M56 44 h28" stroke="url(#lg-cmp)" stroke-width="3.4" stroke-linecap="round"/>
+    <path d="M50.5 74 L89.5 74 L98 92 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 Z" fill="url(#lg-cmp)" opacity=".72"/>
+    <circle class="bub b1" cx="64" cy="90" r="2.4" fill="#EAF6F4"/><circle class="bub b2" cx="73" cy="93" r="1.8" fill="#EAF6F4"/>
+    <circle class="bub b3" cx="77" cy="87" r="2.1" fill="#EAF6F4"/><circle class="bub b4" cx="68" cy="95" r="1.5" fill="#EAF6F4"/>
+    <g class="wisps" fill="none" stroke-linecap="round">
+      <path class="wisp w1" d="M69 72 C63 64 75 58 69 50 C63 43 77 36 70 28 C65 22 73 16 69 9" stroke="#D9AB74" stroke-width="2.4"/>
+      <path class="wisp w2" d="M63 71 C57 64 69 59 62 52 C56 46 66 40 62 33 C59 28 64 24 62 19" stroke="#2BC4C4" stroke-width="2"/>
+      <path class="wisp w3" d="M76 71 C82 64 70 59 77 52 C83 46 73 41 77 34 C79 30 75 26 77 22" stroke="#8A6BE0" stroke-width="2"/>
+    </g></svg><div class="cmp-load-cap">reading ${label}…</div></div>`;
+}
 function cmpRun(){
   const a=$('cmpA').value.trim(), b=$('cmpB').value.trim();
   if(!a||!b){ $('cmpResults').innerHTML='<div class="empty">Enter two molecules to compare.</div>'; return; }
   $('cmpResults').innerHTML=[a,b].map(m=>{ const e=m.replace(/"/g,'&quot;');
-    return `<div class="cmp-card" data-q="${e}" title="Open the full read"><img loading="lazy" src="/api/card?q=${encodeURIComponent(m)}" alt="flavor card for ${e}" onerror="this.parentElement.textContent='No read for that molecule'"></div>`;
+    return `<div class="cmp-card loading" data-q="${e}" title="Open the full read">${cmpLoader(e)}<img src="/api/card?q=${encodeURIComponent(m)}" alt="flavor card for ${e}" onload="this.closest('.cmp-card').classList.remove('loading')" onerror="var c=this.closest('.cmp-card');c.classList.remove('loading');c.innerHTML='&lt;div class=cmp-err&gt;No read for that molecule&lt;/div&gt;'"></div>`;
   }).join('');
 }
 $('cmpGo').addEventListener('click', cmpRun);
