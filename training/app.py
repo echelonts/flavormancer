@@ -285,7 +285,9 @@ def api_neighbors(q: Query):
         n["svg"] = _svg(n["smiles"], 132, 96)
         nm = _names(n["smiles"])
         n["name"], n["iupac"] = nm[0], nm[1]
-        n["aroma"] = _aroma_tags(n["smiles"])
+        # aromas were precomputed in the substitution index — format for the UI without re-running
+        # the aroma heads (was ~1.3s x k; now free). These are confident model predictions.
+        n["aroma"] = [{"odor": a, "source": "predicted"} for a in n.pop("aromas", [])]
         _m = Chem.MolFromSmiles(n["smiles"])
         n["gras"] = bool(_m is not None and Chem.MolToInchiKey(_m).split("-")[0] in P._GRAS)
     return res
@@ -793,6 +795,12 @@ def _prewarm_formulation():
                 P.predict_aroma(Chem.MolToSmiles(m))
         except Exception:  # noqa: BLE001 — best-effort warmup; a miss just means a cold first hit
             pass
+    # Build the substitution index now (the ~8k-row aroma batch) so the first neighbor
+    # search is instant instead of paying the one-time build. Uses all cores briefly.
+    try:
+        P.substitute("CCO")
+    except Exception:  # noqa: BLE001 — best-effort
+        pass
 
 
 threading.Thread(target=_prewarm_formulation, daemon=True).start()

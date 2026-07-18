@@ -831,11 +831,20 @@ def _build_sub_index():
         aromas = [[] for _ in smis]
         if _AROMA_MODELS and feats:
             X = np.vstack(feats)
-            for name, clf in _AROMA_MODELS.items():
-                col = clf.predict_proba(X)[:, 1]
-                for i in range(len(smis)):
-                    if col[i] >= 0.5:
-                        aromas[i].append(name)
+            # ONE-TIME batch over the whole labeled set (~8k rows x 24 heads) — this is the rare
+            # case where n_jobs=-1 genuinely helps (a big batch, not single-sample), so let it use
+            # every core, then restore n_jobs=1 (single-molecule reads elsewhere must stay serial).
+            for clf in _AROMA_MODELS.values():
+                clf.n_jobs = -1
+            try:
+                for name, clf in _AROMA_MODELS.items():
+                    col = clf.predict_proba(X)[:, 1]
+                    for i in range(len(smis)):
+                        if col[i] >= 0.5:
+                            aromas[i].append(name)
+            finally:
+                for clf in _AROMA_MODELS.values():
+                    clf.n_jobs = 1
     else:
         aromas = []
     _SUB_INDEX = (fps, smis, tastes, aromas)
@@ -871,7 +880,10 @@ def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
         if ni is None or Chem.MolToInchiKey(ni).split("-")[0] == self_skel:
             continue
         neighbors.append({"smiles": smis[i], "similarity": round(float(sims[i]), 3),
-                          "known_tastes": tastes[i]})
+                          "known_tastes": tastes[i],
+                          # confident aromas precomputed once in the index — reused so the
+                          # endpoint never re-runs the 24 aroma heads per neighbor (8x ~1.3s saved)
+                          "aromas": _aromas[i] if i < len(_aromas) else []})
         if len(neighbors) >= k:
             break
     return {"query": self_smi, "neighbors": neighbors,
