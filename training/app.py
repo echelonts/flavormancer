@@ -19,6 +19,7 @@ prediction core doesn't change.
 """
 
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 
@@ -32,11 +33,44 @@ import predict as P  # the unified flavor read + substitution search
 app = FastAPI(title="Flavor Workbench (demo)")
 
 
+def _load_name2smiles():
+    """Local name -> SMILES index (instant, offline) so library/demo ingredients resolve without a
+    PubChem round-trip. Built from master_enrichment.parquet (~8k named molecules) + the suggest
+    CSV. Only genuinely-unknown names fall through to live PubChem in _resolve()."""
+    idx = {}
+    try:
+        import pandas as pd
+        df = pd.read_parquet("master_enrichment.parquet")
+        for nm, smi in zip(df["name"], df["smiles"]):
+            if isinstance(nm, str) and isinstance(smi, str) and nm.strip() and smi.strip():
+                idx.setdefault(nm.strip().lower(), smi)
+    except Exception:  # noqa: BLE001 — table absent / no pandas; live lookup still covers it
+        pass
+    try:
+        import csv
+        with open("flavor_volatiles.csv", encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                if r.get("name") and r.get("smiles"):
+                    idx.setdefault(r["name"].strip().lower(), r["smiles"])
+    except Exception:  # noqa: BLE001 — no suggest file; fine
+        pass
+    return idx
+
+
+_NAME2SMILES = _load_name2smiles()
+
+
+@lru_cache(maxsize=8192)
 def _resolve(text: str):
-    """Accept a SMILES or a compound name; return canonical SMILES or None."""
+    """Accept a SMILES or a compound name; return canonical SMILES or None. Memoized. Tries a
+    local name index first (instant, offline) so library/demo molecules never touch the network;
+    only unknown names hit PubChem live (~1-2 s), which is why caching + the index matter."""
     text = (text or "").strip()
     if Chem.MolFromSmiles(text):
         return text
+    hit = _NAME2SMILES.get(text.lower())
+    if hit and Chem.MolFromSmiles(hit):
+        return hit
     try:
         import pubchempy as pcp
         hits = pcp.get_compounds(text, "name")
@@ -118,6 +152,17 @@ def _names(smi):
         return p.get("Title"), p.get("IUPACName")
     except Exception:  # noqa: BLE001 — not found / timeout / throttled
         return None, None
+
+
+def _name_local(smi):
+    """Common name from the precomputed table ONLY (instant, no network) — for hot loops like
+    the Formulation Studio's candidate ranking, where a live PubChem call per candidate would
+    stall the request. Returns None for molecules not in the table (they're simply skipped)."""
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is None:
+        return None
+    hit = _NAME_TABLE.get(Chem.MolToInchiKey(mol).split("-")[0])
+    return hit[0] if hit else None
 
 
 class Query(BaseModel):
@@ -500,6 +545,171 @@ def api_mixture(m: MixtureQuery):
     return out
 
 
+# ── Formulation Studio ──────────────────────────────────────────────────────
+# A recipe (ingredients + optional ppm) -> blended note-profile, dosing-balance /
+# overpowering-component flag, hazard screen, and (with a target) a gap analysis.
+# The whole point: read a formulation "before you pour" and save bench runs.
+_VOL_W = {"high": 3.0, "moderate": 2.0, "low": 1.0}
+_PROFILE_FLOOR = 0.35  # ignore each molecule's faint (<0.35 prob) heads so noise can't stack
+
+
+class FormulationQuery(BaseModel):
+    ingredients: list[dict] = []   # [{name|smiles, ppm?}]
+    processes: list[str] = []      # high_heat / refining / fermentation
+    target: list[str] = []         # desired aroma notes for the gap analysis
+
+
+@app.post("/api/formulation")
+def api_formulation(f: FormulationQuery):
+    """Formulation Studio engine — reads a full recipe before it is poured.
+
+    Returns the blended note-profile (which aromas the mix reads as, and which
+    ingredient drives each), the dosing balance / overpowering-component flag, a
+    documented-hazard screen, and — when a target profile is supplied — a gap
+    analysis with concrete add/cut moves.
+
+    HONEST SCOPE (surfaced in `data_gates`): the profile is DIRECTIONAL. Each
+    molecule's predicted notes are weighted by OAV where odor thresholds are
+    loaded, else by mass x volatility. It is NOT a calibrated finished-blend
+    intensity map — suppression/synergy and true intensity need the customer's
+    odor-threshold / panel data (a learned mixture model)."""
+    # Resolve every ingredient concurrently — a name is a live PubChem lookup (~1-2 s each), so
+    # a serial loop makes a big formula crawl. HTTP + name lookups release the GIL; memoized.
+    def _resolve_one(it):
+        raw = (it.get("smiles") or it.get("name") or "").strip()
+        if not raw:
+            return None
+        smi = _resolve(raw)
+        m = Chem.MolFromSmiles(smi) if smi else None
+        if m is None:
+            return {"raw": raw, "unresolved": True}
+        smi = Chem.MolToSmiles(m)  # canonical, so it keys against analyze_balance's rows
+        ppm = it.get("ppm")
+        try:
+            ppm = float(ppm) if ppm not in (None, "") else None
+        except (TypeError, ValueError):
+            ppm = None
+        # local-table name (instant) or the user's own input — avoids a SECOND live PubChem
+        # round-trip per ingredient (_resolve already paid one); "decanal" reads fine as-is.
+        return {"raw": raw, "smiles": smi, "ppm": ppm, "name": _name_local(smi) or raw}
+
+    resolved, unresolved = [], []
+    ings = [it for it in f.ingredients if (it.get("smiles") or it.get("name") or "").strip()]
+    if ings:
+        with ThreadPoolExecutor(max_workers=min(8, len(ings))) as ex:
+            for out in ex.map(_resolve_one, ings):
+                if out is None:
+                    continue
+                (unresolved.append(out["raw"]) if out.get("unresolved") else resolved.append(out))
+    if not resolved:
+        return {"error": "no resolvable ingredients", "unresolved": unresolved, "profile": []}
+
+    # dosing balance — OAV ranking where thresholds are loaded, else volatility tier
+    bal = P.analyze_balance([{"smiles": r["smiles"], "ppm": r["ppm"], "name": r["name"]}
+                            for r in resolved])
+    per = {row["smiles"]: row for row in bal.get("per_ingredient", []) if row.get("smiles")}
+
+    # per-ingredient odor-impact weight (cheap, serial)
+    for r in resolved:
+        row = per.get(r["smiles"], {})
+        oav = row.get("OAV")
+        if oav:
+            w = float(oav)                                    # quantitative: odor activity value
+        else:
+            vt = (row.get("volatility") or "moderate").split()[0]
+            w = (r["ppm"] or 1.0) * _VOL_W.get(vt, 2.0)       # directional: mass x volatility tier
+        r["weight"] = round(w, 3)
+
+    # aroma prediction is the per-molecule cost (24 RF heads). It's CPU-bound and does NOT
+    # release the GIL cleanly, so threading it hurts (contention) — keep it serial. Speed comes
+    # from memoization (repeats/re-analyses are instant) and the startup pre-warm of demo mols.
+    aromas = [P.predict_aroma(r["smiles"]) for r in resolved]
+
+    # weighted aggregate note-profile: sum (weight x per-molecule note score) across ingredients
+    profile, contrib = {}, {}
+    for r, pa in zip(resolved, aromas):
+        r["aromas"] = [d["odor"] for d in pa.get("top", [])][:5]
+        for d in pa.get("descriptors", []):
+            if d["score"] < _PROFILE_FLOOR:
+                continue
+            c = r["weight"] * d["score"]
+            profile[d["odor"]] = profile.get(d["odor"], 0.0) + c
+            contrib.setdefault(d["odor"], []).append((r["name"], c))
+    total = sum(profile.values()) or 1.0
+    prof = sorted(
+        ({"note": n, "pct": round(100 * v / total, 1),
+          "drivers": [nm for nm, _ in sorted(contrib[n], key=lambda t: -t[1])[:2]]}
+         for n, v in profile.items()),
+        key=lambda d: -d["pct"])
+
+    # overpowering-component flag — the "too heavy in one item" read. Works in BOTH bases
+    # because it uses the blend weights we just computed, not only the quantitative OAV branch.
+    overpowering = None
+    wsum = sum(r["weight"] for r in resolved) or 1.0
+    if len(resolved) > 1:
+        top = max(resolved, key=lambda r: r["weight"])
+        share = top["weight"] / wsum
+        if share > 0.55:
+            overpowering = {"name": top["name"], "share": round(100 * share),
+                            "drives": [p["note"] for p in prof if top["name"] in p.get("drivers", [])][:3]}
+
+    # target gap analysis — what the brief asks for vs what the blend reads as
+    gap = None
+    if [t for t in f.target if t.strip()]:
+        tset = [t.strip().lower() for t in f.target if t.strip()]
+        pmap = {p["note"]: p for p in prof}
+        under, over, on_target = [], [], []
+        for t in tset:
+            hit = pmap.get(t)
+            pct = hit["pct"] if hit else 0.0
+            if pct < 8:                                        # target note missing / too faint
+                sug = P.palette_match([], [t], k=8)
+                gras_adds, other_adds = [], []                 # prefer food-safe (GRAS) carriers
+                for mt in sug.get("matches", []):
+                    nm = _name_local(mt["smiles"])             # local-only (no network) — named carriers, fast
+                    if not nm or nm in gras_adds or nm in other_adds:
+                        continue
+                    cmol = Chem.MolFromSmiles(mt["smiles"])     # cheap GRAS lookup — no full predict() pipeline
+                    is_gras = cmol is not None and P._gras_status(cmol).startswith("in GRAS")
+                    (gras_adds if is_gras else other_adds).append(nm)
+                    if len(gras_adds) >= 2:
+                        break
+                under.append({"note": t, "pct": pct, "add": (gras_adds + other_adds)[:2]})
+            else:
+                on_target.append({"note": t, "pct": pct})
+        for p in prof:                                         # loud notes nobody asked for
+            if p["note"] not in tset and p["pct"] >= 15:
+                over.append({"note": p["note"], "pct": p["pct"], "cut": p["drivers"][:1]})
+        gap = {"under": under, "over": over[:4], "on_target": on_target}
+
+    haz = P.check_mixture([r["smiles"] for r in resolved], f.processes)
+    quant = (bal.get("basis") or "").startswith("quantitative")
+    return {
+        "ingredients": [{"name": r["name"], "smiles": r["smiles"], "ppm": r["ppm"],
+                         "weight": r["weight"], "aromas": r["aromas"],
+                         "svg": _svg(r["smiles"], 110, 80)} for r in resolved],
+        "unresolved": unresolved,
+        "profile": prof,
+        "weighting": bal.get("basis"),
+        "overpowering": overpowering,
+        "balance_warnings": bal.get("balance_warnings", []),
+        "impact_ranking": bal.get("impact_ranking", []),
+        "gap": gap,
+        "active_hazards": haz.get("active_hazards", []),
+        "conditional_hazards": haz.get("conditional_hazards", []),
+        "data_gates": {
+            "intensity": ("Directional note profile — contributions weighted by "
+                          + ("OAV (odor thresholds are loaded)." if quant else
+                             "mass x volatility. Load odor thresholds for quantitative OAV / calibrated intensity — comes with your data.")),
+            "synergy": ("Notes are assumed to add independently. Real blends show suppression / "
+                        "synergy (1+1 != 2); a learned mixture model needs formulation->panel "
+                        "data (your data) or a licensed set."),
+        },
+        "scope_note": bal.get("scope_note"),
+        "disclaimer": bal.get("disclaimer"),
+    }
+
+
 def _load_suggest():
     import csv
     try:
@@ -520,6 +730,29 @@ def _precompute_iupac():
 
 if _SUGGEST:
     threading.Thread(target=_precompute_iupac, daemon=True).start()
+
+
+# Pre-warm the Formulation Studio's demo molecules (starter formulas) at startup, in the
+# background, so the first click on an example is instant. predict_aroma is CPU-bound (~1.3 s
+# cold per molecule) but memoized — warming these fills the cache before anyone reaches them.
+_FORMULATION_WARM = [
+    "vanillin", "ethyl vanillin", "ethyl maltol", "limonene", "citral", "linalool",
+    "ethyl butyrate", "menthol", "eucalyptol", "methyl salicylate", "benzaldehyde",
+]
+
+
+def _prewarm_formulation():
+    for n in _FORMULATION_WARM:
+        try:
+            smi = _resolve(n)
+            m = Chem.MolFromSmiles(smi) if smi else None
+            if m is not None:
+                P.predict_aroma(Chem.MolToSmiles(m))
+        except Exception:  # noqa: BLE001 — best-effort warmup; a miss just means a cold first hit
+            pass
+
+
+threading.Thread(target=_prewarm_formulation, daemon=True).start()
 
 
 @app.get("/api/suggest")
