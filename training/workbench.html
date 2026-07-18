@@ -322,6 +322,8 @@
   .how-card p b{color:var(--ink)}
   .how-foot{font-size:11.5px;color:var(--muted);margin:11px 2px 0;line-height:1.5}
   .how-foot b{color:var(--cream)}
+  .how-foot a{color:var(--cream);text-decoration:none;border-bottom:1px dotted var(--cream)}
+  .how-foot a:hover{color:var(--ink);border-bottom-color:var(--ink)}
   /* formulation studio */
   .form-ex{font:inherit;font-size:11.5px;padding:3px 10px;border:1px solid var(--line);border-radius:16px;background:transparent;color:var(--brand-2);cursor:pointer}
   .form-ex:hover{border-color:var(--brand-2)}
@@ -692,9 +694,9 @@
   </div>
 
   <div class="design-section" id="howStudio">
-    <div class="design-head" id="howToggle"><span id="howCaret">▸</span> How it works
+    <div class="design-head" id="howToggle"><span id="howCaret">▾</span> How it works
       <span class="mapsub">— what's real, what's predicted, and where it gets sharper. Honest by design; a read runs 100% on-prem.</span></div>
-    <div id="howWrap" style="display:none">
+    <div id="howWrap">
       <div class="how-grid">
         <div class="how-card"><h4>1 · Structure → numbers</h4><p>Every molecule becomes a <b>2,048-bit Morgan fingerprint</b> (which substructures it contains) plus a block of <b>physicochemical descriptors</b> (logP, MW, TPSA, H-bonding…). That one shared vector feeds every model — the same structure-to-property representation QSAR has leaned on for decades.</p></div>
         <div class="how-card"><h4>2 · Taste — 6 trained heads + 2 rules</h4><p>Six <b>random-forest</b> classifiers (sweet, bitter, umami…) each return a probability, scored by an honest held-out <b>CV-AUROC</b>. Sour and salty are solution / ionic effects, not molecule-shape ones, so they're transparent <b>rules</b> — not faked models. A sweetness-intensity regressor estimates relative-to-sucrose potency.</p></div>
@@ -703,7 +705,7 @@
         <div class="how-card"><h4>5 · Formulation, not just molecules</h4><p>The <b>Formulation Studio</b> reads a whole recipe before you pour — weighting each ingredient by odor impact, aggregating the blend's note-profile, flagging the overpowering component, and closing the gap to your target. That's single-molecule ML turned into a bench tool.</p></div>
         <div class="how-card"><h4>6 · On-prem &amp; commercial-clean</h4><p>Nothing leaves the box — a read makes <b>no cloud calls</b>. The shipped models train only on <b>public-domain or permissively-licensed</b> data, so the commercial edition stays clean (provenance tracked in the repo).</p></div>
       </div>
-      <p class="how-foot">Deeper dives in the repo: <b>docs/HOW-IT-WORKS.md</b> (the full method) · <b>docs/DATA-SOURCES.md</b> (every source + license) · <b>docs/AROMA.md</b> (the odor heads).</p>
+      <p class="how-foot">Deeper dives in the repo: <a href="https://github.com/echelonts/flavormancer/blob/main/docs/HOW-IT-WORKS.md" target="_blank" rel="noopener">docs/HOW-IT-WORKS.md</a> (the full method) · <a href="https://github.com/echelonts/flavormancer/blob/main/docs/DATA-SOURCES.md" target="_blank" rel="noopener">docs/DATA-SOURCES.md</a> (every source + license) · <a href="https://github.com/echelonts/flavormancer/blob/main/docs/AROMA.md" target="_blank" rel="noopener">docs/AROMA.md</a> (the odor heads).</p>
     </div>
   </div>
 
