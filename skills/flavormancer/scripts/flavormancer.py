@@ -123,8 +123,16 @@ def cmd_stereoisomers(a):
     return _req("/api/stereoisomers", "POST", {"smiles": a.molecule})
 
 
+def cmd_interpret(a):
+    return _req("/api/nl", params={"q": a.text})
+
+
 def cmd_categories(_a):
     return _req("/api/categories")
+
+
+def cmd_browse(a):
+    return _req("/api/top", params={"category": a.category, "limit": a.limit})
 
 
 def cmd_map(a):
@@ -183,7 +191,16 @@ def main():
     s.add_argument("flavor")
     s.set_defaults(fn=cmd_flavor)
 
+    s = sub.add_parser("interpret")
+    s.add_argument("text", help="a free-text brief, e.g. 'food-safe cherry with fruity notes'")
+    s.set_defaults(fn=cmd_interpret)
+
     sub.add_parser("categories").set_defaults(fn=cmd_categories)
+
+    s = sub.add_parser("browse")
+    s.add_argument("category", help="a category key from `categories`, e.g. aroma:citrus")
+    s.add_argument("--limit", type=int, default=24)
+    s.set_defaults(fn=cmd_browse)
 
     s = sub.add_parser("map")
     s.add_argument("--label", default="")

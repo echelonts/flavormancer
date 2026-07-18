@@ -269,6 +269,7 @@
   .fnote{font-size:13px;color:var(--ink);line-height:1.5}
   .chiral-note{font-size:12px;color:var(--cream);background:rgba(217,171,116,.09);border:1px solid rgba(217,171,116,.32);border-radius:8px;padding:9px 12px;margin-top:13px;line-height:1.5}
   .chiral-note b{color:var(--cream)}
+  .gate-tag{display:block;margin-top:6px;font-size:11px;color:var(--muted);font-style:italic;border-left:2px solid var(--brand-2);padding-left:8px}
   .stereo-btn{display:inline-block;margin-top:9px;font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border:1px solid rgba(217,171,116,.5);border-radius:7px;background:rgba(217,171,116,.12);color:var(--cream);cursor:pointer}
   .stereo-btn:hover{background:rgba(217,171,116,.22)}
   .stereo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px;margin-top:12px}
@@ -1354,6 +1355,7 @@ function renderBehavior(p){
     html += `<div class="chiral-note">⚗ <b>Chiral molecule</b> — ${chir.n_centers} stereocenter${chir.n_centers>1?'s':''}.
       Enantiomers can taste/smell different (R-carvone spearmint vs S caraway). The models read structure and are
       <b>achiral</b>, so the read is the same for every mirror image — but the <i>documented</i> odor/taste can differ.
+      <span class="gate-tag">Data-gate: a chirality-aware model unlocks with stereo-resolved sensory data — until then, differences shown here are documented, not predicted.</span>
       <button type="button" class="stereo-btn" id="stereoBtn" data-smi="${(p.smiles||'').replace(/"/g,'&quot;')}">⚗ Explore every stereoisomer →</button></div>
       <div id="stereoGrid" class="stereo-grid"></div>`;
   }

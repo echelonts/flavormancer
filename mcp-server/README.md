@@ -78,6 +78,19 @@ Then ask Claude things like *"read the flavor of ethyl maltol,"* *"analyze this 
 limonene 250 ppm, citral 40, linalool 25 — I'm aiming for citrus and fresh,"* or *"screen
 sodium benzoate with ascorbic acid for hazards."*
 
+## Add to Claude Code (CLI)
+
+Claude Code speaks MCP too — no Desktop required:
+
+```sh
+claude mcp add flavormancer \
+  --env FLAVORMANCER_URL=http://127.0.0.1:8000 \
+  -- /absolute/path/to/mcp-server/.venv/bin/python /absolute/path/to/mcp-server/server.py
+```
+
+Then `claude mcp list` shows it, and the tools are available in your Claude Code session. Any
+MCP-speaking client works the same way — the server is client-agnostic.
+
 ## Config
 
 | Env var | Default | Meaning |
