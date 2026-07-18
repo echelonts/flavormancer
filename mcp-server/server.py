@@ -190,11 +190,16 @@ def _browse_category(category: str, limit: int) -> dict:
     return _strip(r.json())
 
 
-def _flavor_map(label: str, limit: int) -> dict:
+def _flavor_map(label: str, limit: int, full: bool) -> dict:
     r = _get("/api/map")
     if r.status_code != 200:
         return {"error": f"map fetch failed (HTTP {r.status_code})"}
     pts = r.json().get("points", [])
+    axes_note = ("x/y are a 2D UMAP embedding by structure; x3/y3/z3 the 3D one. "
+                 "label = taste class, aroma = odor class; mw/logp/tpsa are descriptors.")
+    # full dump: EVERY point with all its fields (data-rich; can be large — ~8k rows)
+    if full:
+        return {"total_molecules": len(pts), "axes_note": axes_note, "points": pts}
     taste_counts, aroma_counts = {}, {}
     for p in pts:
         taste_counts[p.get("label")] = taste_counts.get(p.get("label"), 0) + 1
@@ -203,17 +208,15 @@ def _flavor_map(label: str, limit: int) -> dict:
         "total_molecules": len(pts),
         "taste_label_counts": dict(sorted(taste_counts.items(), key=lambda kv: -kv[1])),
         "aroma_label_counts": dict(sorted(aroma_counts.items(), key=lambda kv: -kv[1])),
-        "axes_note": "x/y are a 2D UMAP embedding by structure; x3/y3/z3 the 3D one. "
-                     "mw/logp/tpsa are physicochemical descriptors.",
+        "axes_note": axes_note,
+        "hint": "Pass full=true for every point, or a label to get the molecules carrying it.",
     }
     if label:
         lab = label.lower()
-        match = [{"name": p.get("name"), "smiles": p.get("smiles"), "taste": p.get("label"),
-                  "aroma": p.get("aroma"), "mw": p.get("mw"), "logp": p.get("logp")}
-                 for p in pts if lab in (str(p.get("label")).lower(), str(p.get("aroma")).lower())]
+        match = [p for p in pts if lab in (str(p.get("label")).lower(), str(p.get("aroma")).lower())]
         out["filtered_label"] = label
         out["n_matching"] = len(match)
-        out["molecules"] = match[:limit]
+        out["molecules"] = match[:limit]  # full point objects (coords + descriptors), not a summary
     return out
 
 
@@ -329,12 +332,16 @@ def browse_category(category: str, limit: int = 24) -> dict:
 
 
 @mcp.tool()
-def flavor_map(label: str = "", limit: int = 40) -> dict:
-    """Query the flavor-space map (every labeled molecule embedded by structure). With no
-    label, returns the taste/aroma label distribution across the whole map. With a label
-    (a taste like "sweet" or an aroma like "citrus"), returns the molecules carrying it.
+def flavor_map(label: str = "", limit: int = 200, full: bool = False) -> dict:
+    """Query the flavor-space map (every labeled molecule embedded by structure).
+
+    full=True dumps EVERY point with all its fields (name, smiles, taste label, aroma label,
+    mw, logp, tpsa, 2D x/y and 3D x3/y3/z3 coords) — the complete ~8k-molecule dataset, data-rich
+    but large. With a label (a taste like "sweet" or an aroma like "citrus"), returns the full
+    point objects for the molecules carrying it (up to limit). With neither, returns the taste/
+    aroma label distribution across the whole map.
     """
-    return _flavor_map(label, limit)
+    return _flavor_map(label, limit, full)
 
 
 if __name__ == "__main__":

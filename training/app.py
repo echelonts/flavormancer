@@ -275,6 +275,24 @@ def _aroma_tags(smi, k=3):
             for d in pa.get("descriptors", []) if d.get("confident")][:k]
 
 
+def _aroma_tags_cheap(smi, precomputed, k=3):
+    """Same as _aroma_tags — documented HSDB odor first ('found') — but for the PREDICTED
+    fallback it reuses aromas already computed in the substitution index instead of re-running
+    the 24 heads. Identical result to _aroma_tags, without the per-molecule model cost."""
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is not None:
+        rec = _ODOR_TABLE.get(Chem.MolToInchiKey(mol).split("-")[0])
+        if rec and rec.get("odor"):
+            try:
+                from build_aroma_dataset import tag as _odor_tag
+                found = sorted(_odor_tag(rec["odor"]))[:k]
+                if found:
+                    return [{"odor": t, "source": "found"} for t in found]
+            except Exception:  # noqa: BLE001 — vocab module missing; fall through to predicted
+                pass
+    return [{"odor": a, "source": "predicted"} for a in (precomputed or [])][:k]
+
+
 @app.post("/api/neighbors")
 def api_neighbors(q: Query):
     smi = _resolve(q.smiles)
@@ -285,9 +303,9 @@ def api_neighbors(q: Query):
         n["svg"] = _svg(n["smiles"], 132, 96)
         nm = _names(n["smiles"])
         n["name"], n["iupac"] = nm[0], nm[1]
-        # aromas were precomputed in the substitution index — format for the UI without re-running
-        # the aroma heads (was ~1.3s x k; now free). These are confident model predictions.
-        n["aroma"] = [{"odor": a, "source": "predicted"} for a in n.pop("aromas", [])]
+        # documented odor first (fast lookup); predicted fallback reuses the index's precomputed
+        # aromas so the heads never re-run (was ~1.3s x k). Same result as _aroma_tags.
+        n["aroma"] = _aroma_tags_cheap(n["smiles"], n.pop("aromas", []))
         _m = Chem.MolFromSmiles(n["smiles"])
         n["gras"] = bool(_m is not None and Chem.MolToInchiKey(_m).split("-")[0] in P._GRAS)
     return res
@@ -787,6 +805,12 @@ _FORMULATION_WARM = [
 
 
 def _prewarm_formulation():
+    # Build the substitution index FIRST (the ~8k-row aroma batch) so the first neighbor search
+    # never pays the one-time build; the lock in substitute() makes a concurrent request wait.
+    try:
+        P.substitute("CCO")
+    except Exception:  # noqa: BLE001 — best-effort
+        pass
     for n in _FORMULATION_WARM:
         try:
             smi = _resolve(n)
@@ -795,12 +819,6 @@ def _prewarm_formulation():
                 P.predict_aroma(Chem.MolToSmiles(m))
         except Exception:  # noqa: BLE001 — best-effort warmup; a miss just means a cold first hit
             pass
-    # Build the substitution index now (the ~8k-row aroma batch) so the first neighbor
-    # search is instant instead of paying the one-time build. Uses all cores briefly.
-    try:
-        P.substitute("CCO")
-    except Exception:  # noqa: BLE001 — best-effort
-        pass
 
 
 threading.Thread(target=_prewarm_formulation, daemon=True).start()

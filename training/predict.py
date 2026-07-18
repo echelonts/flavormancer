@@ -43,6 +43,7 @@ Hard ceiling: it nails simple salts and honestly can't reach salt-enhancer
 peptides or non-ionic salty compounds (little data, weak structure-activity).
 """
 
+import threading as _threading
 from functools import lru_cache
 from pathlib import Path
 
@@ -808,6 +809,7 @@ def _taste_profile(out):
 # with its known tastes shown). This is the clean Track-A core; the product
 # (Track B, #22) mirrors it as a pgvector ANN query over the same fingerprints.
 _SUB_INDEX = None  # lazily built: (fps, smiles, known_tastes, predicted_aromas)
+_SUB_LOCK = _threading.Lock()  # guards the one-time index build against concurrent callers
 
 
 def _build_sub_index():
@@ -831,20 +833,14 @@ def _build_sub_index():
         aromas = [[] for _ in smis]
         if _AROMA_MODELS and feats:
             X = np.vstack(feats)
-            # ONE-TIME batch over the whole labeled set (~8k rows x 24 heads) — this is the rare
-            # case where n_jobs=-1 genuinely helps (a big batch, not single-sample), so let it use
-            # every core, then restore n_jobs=1 (single-molecule reads elsewhere must stay serial).
-            for clf in _AROMA_MODELS.values():
-                clf.n_jobs = -1
-            try:
-                for name, clf in _AROMA_MODELS.items():
-                    col = clf.predict_proba(X)[:, 1]
-                    for i in range(len(smis)):
-                        if col[i] >= 0.5:
-                            aromas[i].append(name)
-            finally:
-                for clf in _AROMA_MODELS.values():
-                    clf.n_jobs = 1
+            # One-time batch over the whole labeled set (~8k rows x 24 heads). Kept at n_jobs=1:
+            # a single big predict_proba is already vectorized C, and joblib fan-out here just
+            # thrashed under concurrency. Reusing these aromas is what makes the endpoint fast.
+            for name, clf in _AROMA_MODELS.items():
+                col = clf.predict_proba(X)[:, 1]
+                for i in range(len(smis)):
+                    if col[i] >= 0.5:
+                        aromas[i].append(name)
     else:
         aromas = []
     _SUB_INDEX = (fps, smis, tastes, aromas)
@@ -858,8 +854,10 @@ def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return {"error": f"unparseable SMILES: {smiles}"}
-    if _SUB_INDEX is None:
-        _build_sub_index()
+    if _SUB_INDEX is None:  # double-checked lock: a request during the startup build waits for
+        with _SUB_LOCK:      # that one build instead of kicking off a second (which would thrash cores)
+            if _SUB_INDEX is None:
+                _build_sub_index()
     fps, smis, tastes, _aromas = _SUB_INDEX
     if not fps:
         return {"neighbors": [], "note": "no reference set loaded (taste_master.parquet absent)"}
