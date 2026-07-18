@@ -14,14 +14,37 @@ MCP client ──stdio──▶ flavormancer-mcp ──HTTP──▶ Flavormance
 
 ## Tools
 
+Full coverage of Flavormancer's capabilities — 13 tools.
+
+**Single molecule**
+
 | Tool | What it does |
 |------|--------------|
-| **`read_flavor(molecule)`** | Predict a single molecule's taste (6 heads) + aroma, with GRAS status, structural alerts, and applicability-domain flag. Name or SMILES. |
-| **`analyze_formulation(ingredients, target?, processes?)`** | Read a whole recipe *before you pour*: blended note-profile (weighted by odor impact), the overpowering-component flag, a target gap analysis with food-safe add/cut suggestions, a hazard screen, and honest data-gate notes. |
-| **`screen_mixture(ingredients, processes?)`** | Flag **documented** food hazards when ingredients combine (e.g. benzoate + ascorbate → benzene), gated on process (heat/refining/fermentation). Curated screen, not a reaction predictor. |
-| **`find_molecules(notes, food_safe?)`** | Find molecules that carry a set of taste/aroma notes (e.g. `["citrus","fresh","sweet"]`), ranked, food-safe by default. |
+| **`read_flavor(molecule)`** | Taste (6 heads) + aroma (confident + all 24 scores), GRAS, structural alerts, applicability-domain flag. Name or SMILES. |
+| **`read_full(molecule)`** | The complete read — everything above *plus* physicochemical properties, stability flags, chemesthesis (cooling/pungent/astringent), chirality, analytical (retention index), EU-allergen labeling, spectra/reference links, full safety block. |
+| **`find_substitutes(molecule, k?)`** | The k structurally-nearest molecules (drop-in swaps), with similarity + known tastes. |
+| **`list_stereoisomers(molecule)`** | Every stereoisomer with any documented isomer-specific odor/taste (e.g. R-carvone spearmint vs S-carvone caraway). |
 
-Every tool returns model **predictions only** — never a safety, GRAS, or regulatory determination.
+**Formulation & mixtures**
+
+| Tool | What it does |
+|------|--------------|
+| **`analyze_formulation(ingredients, target?, processes?)`** | Read a whole recipe *before you pour*: blended note-profile (weighted by odor impact), overpowering-component flag, target gap analysis with food-safe add/cut, hazard screen, data-gate notes. |
+| **`screen_mixture(ingredients, processes?)`** | Documented combination hazards (e.g. benzoate + ascorbate → benzene), gated on process, plus per-ingredient reads and a palette match. |
+| **`predict_reactions(ingredients, processes?)`** | Indicative reaction-template products (with each product's own taste + aroma). Template-based, not a claim the reaction proceeds. |
+
+**Search, discovery & the map**
+
+| Tool | What it does |
+|------|--------------|
+| **`find_molecules_by_notes(notes, food_safe?)`** | Molecules carrying a set of notes (`["citrus","fresh"]`), ranked, food-safe by default. |
+| **`find_molecules_by_flavor(flavor)`** | The molecule(s) that MAKE a named flavor (`"banana"` → isoamyl acetate). |
+| **`interpret_request(text)`** | Parse a free-text brief into structured Studio picks (flavor + notes + food-safe). |
+| **`list_flavor_categories()`** | The browsable taste/aroma categories (key + count). |
+| **`browse_category(category, limit?)`** | Model-ranked top molecules for a category key. |
+| **`flavor_map(label?, limit?)`** | Flavor-space map: label distribution across all ~8k molecules, or the molecules carrying a given taste/aroma label. |
+
+Every tool returns model **predictions only** — never a safety, GRAS, or regulatory determination. Heavy render blobs (SVG/PNG) are stripped so responses stay token-lean.
 
 ## Run it
 
