@@ -406,30 +406,26 @@ def api_card(q: str = "", dl: int = 0):
     f_pill = font(DJ + "DejaVuSans-Bold.ttf", 16)
     f_lab = font(DJ + "DejaVuSans-Bold.ttf", 15)
 
+    f_cell = font(DJ + "DejaVuSans.ttf", 12)
     W = 1200
-    x = 508  # right column
+    x = 508  # right column (upper band)
     ink, muted, cream, teal = (231, 237, 234), (148, 162, 169), (217, 171, 116), (43, 196, 196)
 
-    # ---- the full read: ALL SIX taste heads + every confident aroma head ----
+    # ---- the FULL readout: all 6 taste heads + all 24 aroma heads (nothing truncated) ----
     taste_src = {"sweet": out.get("sweet"), "bitter": out.get("bitter"), "umami": out.get("umami"),
                  "sour": out.get("sour_predicted"), "salty": out.get("salty_predicted"),
                  "tasteless": out.get("tasteless")}
-    taste_bars = sorted(((t, float(v)) for t, v in taste_src.items() if isinstance(v, (int, float))),
-                        key=lambda kv: -kv[1])
+    taste_cells = sorted(((t, float(v) if isinstance(v, (int, float)) else 0.0)
+                          for t, v in taste_src.items()), key=lambda kv: -kv[1])
     pa = P.predict_aroma(smi)
-    aroma_conf = [(d["odor"], d["score"]) for d in pa.get("descriptors", []) if d.get("confident")]
-    if aroma_conf:
-        aroma_bars = aroma_conf[:10]
-        aroma_label = "AROMA MODEL · confident odor heads"
-    else:  # nothing cleared the 0.5 bar — show the strongest few, labelled honestly
-        aroma_bars = [(d["odor"], d["score"]) for d in pa.get("descriptors", [])[:3]]
-        aroma_label = "AROMA MODEL · top signals (none cleared 0.5)"
+    aroma_cells = sorted(((d["odor"], d["score"]) for d in pa.get("descriptors", [])),
+                         key=lambda kv: -kv[1])
 
     pill_items = ([(fl, cream) for fl in tags.get("flavors", [])[:3]]
                   + [(t, _TASTE_RGB.get(t, teal)) for t in tags.get("tastes", [])]
                   + [(a, teal) for a in tags.get("aromas", [])[:6]])
 
-    # ---- measure pill wrapping on a scratch canvas, then compute a height that fits everything ----
+    # ---- measure pill wrapping (right column) to know where the full-width grid starts ----
     scratch = ImageDraw.Draw(Image.new("RGB", (10, 10)))
     py = 306
     px = x
@@ -439,12 +435,17 @@ def api_card(q: str = "", dl: int = 0):
             px, py = x, py + 40
         px += w + 30
     pills_bottom = py + 40
-    taste_label_y = pills_bottom + 18
-    taste_bars_y = taste_label_y + 26
-    aroma_label_y = taste_bars_y + len(taste_bars) * 28 + 16
-    aroma_bars_y = aroma_label_y + 26
-    content_bottom = aroma_bars_y + len(aroma_bars) * 28
-    H = max(560, content_bottom + 62)
+
+    # ---- full-width readout grid: 6 columns; TASTE row (6) then AROMA rows (24 = 4 x 6) ----
+    GX0, COLS, ROW_H = 40, 6, 40
+    colw = (W - 80) / COLS
+    grid_top = max(500, pills_bottom + 14)
+    taste_row_y = grid_top + 22
+    aroma_label_y = taste_row_y + ROW_H + 12
+    aroma_grid_y = aroma_label_y + 22
+    aroma_rows = (len(aroma_cells) + COLS - 1) // COLS
+    content_bottom = aroma_grid_y + aroma_rows * ROW_H
+    H = max(560, content_bottom + 56)
 
     img = Image.new("RGB", (W, H), (15, 19, 25))
     dr = ImageDraw.Draw(img)
@@ -466,10 +467,10 @@ def api_card(q: str = "", dl: int = 0):
     dr.text((112, 82), "taste & aroma from chemical structure", font=f_tag, fill=cream)
     dr.line([40, 122, W - 40, 122], fill=(42, 50, 60), width=1)
 
-    # structure panel (white) — grows with the card so it stays balanced
-    panel_bottom = min(H - 66, 620)
+    # structure panel (white) — sits in the upper band, above the grid
+    panel_bottom = grid_top - 14
     dr.rounded_rectangle([40, 150, 470, panel_bottom], radius=14, fill=(245, 247, 245))
-    struct_h = min(360, panel_bottom - 170)
+    struct_h = min(340, panel_bottom - 172)
     d2 = rdMolDraw2D.MolDraw2DCairo(410, struct_h)
     d2.drawOptions().padding = 0.12
     d2.DrawMolecule(mol)
@@ -477,46 +478,45 @@ def api_card(q: str = "", dl: int = 0):
     struct = Image.open(io.BytesIO(d2.GetDrawingText())).convert("RGBA")
     img.paste(struct, (50, 150 + (panel_bottom - 150 - struct_h) // 2), struct)
 
-    # right column — name / IUPAC / SMILES
+    # right column — name / IUPAC / SMILES + READS AS pills
     dr.text((x, 158), name[:34], font=f_name, fill=ink)
     if iupac and iupac.lower() != name.lower():
         dr.text((x, 206), ("IUPAC  " + iupac)[:64], font=f_body, fill=muted)
     dr.text((x, 232), smi[:58], font=f_mono, fill=muted)
-
-    # READS AS pills
     dr.text((x, 280), "READS AS", font=f_lab, fill=muted)
     px, py = x, 306
-    def pill(px, py, text, fg):
+    for text, c in pill_items:
         w = dr.textlength(text, font=f_pill)
         if px + w + 22 > W - 40:
             px, py = x, py + 40
-        dr.rounded_rectangle([px, py, px + w + 22, py + 30], radius=15, outline=fg, width=2)
-        dr.text((px + 11, py + 6), text, font=f_pill, fill=fg)
-        return px + w + 30, py
-    for text, c in pill_items:
-        px, py = pill(px, py, text, c)
+        dr.rounded_rectangle([px, py, px + w + 22, py + 30], radius=15, outline=c, width=2)
+        dr.text((px + 11, py + 6), text, font=f_pill, fill=c)
+        px += w + 30
 
-    def bar_row(by, label, v, c):
-        pct = int(round(v * 100))
-        dr.text((x, by), label, font=f_body, fill=ink)
-        dr.rounded_rectangle([x + 120, by + 4, x + 120 + 320, by + 16], radius=6, fill=(36, 44, 53))
+    # a compact meter cell in the grid: label, %, and a mini bar
+    def cell(col, cy, label, v, color):
+        cx = GX0 + int(col * colw)
+        inner = int(colw) - 12
+        ptxt = f"{int(round(v * 100))}%"
+        pw = dr.textlength(ptxt, font=f_cell)
+        lab = label
+        while lab and dr.textlength(lab, font=f_cell) > inner - pw - 8:
+            lab = lab[:-1]
+        dr.text((cx, cy), lab, font=f_cell, fill=ink)
+        dr.text((cx + inner - pw, cy), ptxt, font=f_cell, fill=muted)
+        dr.rounded_rectangle([cx, cy + 17, cx + inner, cy + 24], radius=3, fill=(36, 44, 53))
         if v > 0:
-            dr.rounded_rectangle([x + 120, by + 4, x + 120 + int(320 * v), by + 16], radius=6, fill=c)
-        dr.text((x + 452, by), f"{pct}%", font=f_body, fill=muted)
+            dr.rounded_rectangle([cx, cy + 17, cx + max(2, int(inner * v)), cy + 24], radius=3, fill=color)
 
-    # TASTE MODEL — all six heads
-    dr.text((x, taste_label_y), "TASTE MODEL · all six heads", font=f_lab, fill=muted)
-    by = taste_bars_y
-    for t, v in taste_bars:
-        bar_row(by, t, v, _TASTE_RGB.get(t, teal))
-        by += 28
+    # TASTE MODEL — all 6 heads across one row
+    dr.text((GX0, grid_top), "TASTE MODEL · all 6 heads", font=f_lab, fill=muted)
+    for i, (t, v) in enumerate(taste_cells):
+        cell(i, taste_row_y, t, v, _TASTE_RGB.get(t, teal))
 
-    # AROMA MODEL — every confident odor head, each with its probability
-    dr.text((x, aroma_label_y), aroma_label, font=f_lab, fill=muted)
-    by = aroma_bars_y
-    for a, v in aroma_bars:
-        bar_row(by, a, v, teal)
-        by += 28
+    # AROMA MODEL — all 24 heads in a 6-wide grid
+    dr.text((GX0, aroma_label_y), "AROMA MODEL · all 24 heads", font=f_lab, fill=muted)
+    for i, (a, v) in enumerate(aroma_cells):
+        cell(i % COLS, aroma_grid_y + (i // COLS) * ROW_H, a, v, teal)
 
     # footer
     fy = H - 54
