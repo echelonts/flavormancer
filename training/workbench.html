@@ -377,6 +377,7 @@
   .cmp-card .empty{padding:20px}
   .cmp-card.loading{display:flex;align-items:center;justify-content:center;min-height:300px}
   .cmp-card.loading img{display:none}
+  .cmp-card:not(.loading) .cmp-load{display:none}
   .cmp-load{display:flex;flex-direction:column;align-items:center;gap:8px}
   .cmp-load .loader-flask{width:96px;height:96px}
   .cmp-load-cap{font-family:'Cinzel',Georgia,serif;font-size:12.5px;letter-spacing:.04em;color:var(--cream)}
@@ -803,7 +804,7 @@
       <button class="mix-btn" id="cmpGo">Compare</button>
     </div>
     <div class="mix-examples"><span>Try:</span>
-      <button type="button" class="mix-ex cmp-ex" data-a="vanillin" data-b="ethylvanillin">vanillin vs ethyl&nbsp;vanillin</button>
+      <button type="button" class="mix-ex cmp-ex" data-a="vanillin" data-b="ethyl vanillin">vanillin vs ethyl&nbsp;vanillin</button>
       <button type="button" class="mix-ex cmp-ex" data-a="(R)-carvone" data-b="(S)-carvone">R- vs S-carvone</button>
       <button type="button" class="mix-ex cmp-ex" data-a="limonene" data-b="menthol">limonene vs menthol</button>
     </div>
