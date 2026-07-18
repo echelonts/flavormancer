@@ -23,13 +23,42 @@ jobs:
         run: ruff check .
       - name: Install runtime deps
         run: pip install -r requirements.txt
-      - name: Pytest
+      - name: Pytest (unit)
         run: |
-          if git ls-files '*test_*.py' '*_test.py' 'tests/**/*.py' | grep -q .; then
-            pytest -q
+          if git ls-files '*test_*.py' '*_test.py' 'tests/**/*.py' | grep -qv '^tests/e2e/'; then
+            pytest -q --ignore=tests/e2e
           else
-            echo "No Python tests yet — skipping."
+            echo "No Python unit tests yet — skipping."
           fi
+
+  e2e:
+    name: E2E — smoke (headless UI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps + browser
+        run: |
+          pip install -r requirements.txt
+          pip install pytest playwright
+          python -m playwright install --with-deps chromium
+      - name: Start the app (model-less — smoke tests don't need trained models)
+        working-directory: training
+        run: |
+          nohup python -m uvicorn app:app --host 127.0.0.1 --port 8010 > /tmp/flavor-app.log 2>&1 &
+          for i in $(seq 1 40); do
+            curl -sf http://127.0.0.1:8010/api/studio_terms >/dev/null && { echo "app up"; break; }
+            sleep 1
+          done
+      - name: Smoke e2e
+        env:
+          FLAVORMANCER_URL: http://127.0.0.1:8010
+        run: pytest tests/e2e -q -m smoke
+      - name: App log on failure
+        if: failure()
+        run: tail -50 /tmp/flavor-app.log || true
 
   dotnet:
     name: .NET — build & test
