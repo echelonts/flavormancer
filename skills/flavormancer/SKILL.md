@@ -44,9 +44,11 @@ Each command prints JSON. Molecules can be given as a **common name, IUPAC name,
 | `reactions <ing> … [--process p]` | Indicative reaction-template products (each with its own predicted taste + aroma). |
 | `notes <note> … [--any-source] [--limit N]` | Find food-safe molecules carrying a set of notes (`citrus fresh sweet`). |
 | `flavor <name>` | The molecule(s) that MAKE a named flavor (`banana` → isoamyl acetate). |
+| `interpret <text>` | Parse a free-text brief (`"food-safe cherry with fruity notes"`) into structured flavor + note picks. |
 | `substitutes <molecule> [-k N]` | Structurally nearest molecules — drop-in swaps / reformulation. |
 | `stereoisomers <molecule>` | Every stereoisomer with any documented isomer-specific odor/taste. |
-| `categories` / `map [--label L] [--full]` | Browse categories; query the ~8k-molecule flavor map (label distribution, a label's molecules, or `--full` for every point). |
+| `categories` / `browse <category>` | List the taste/aroma categories; list the top molecules in one (key from `categories`, e.g. `aroma:citrus`). |
+| `map [--label L] [--full]` | Query the ~8k-molecule flavor map (label distribution, a label's molecules, or `--full` for every point). |
 
 ## Examples
 
