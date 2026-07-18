@@ -312,6 +312,16 @@
   .mix-btn{font-family:var(--ui);font-weight:600;font-size:14px;padding:9px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
   .mix-btn:disabled{opacity:.5}
   #mixResults{margin-top:14px}
+  /* how it works */
+  .how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:4px 0 4px}
+  @media(max-width:820px){.how-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.how-grid{grid-template-columns:1fr}}
+  .how-card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface)}
+  .how-card h4{font-family:'Cinzel',Georgia,serif;font-size:13px;margin:0 0 7px;color:var(--brand-2)}
+  .how-card p{font-size:12.5px;line-height:1.55;color:var(--muted);margin:0}
+  .how-card p b{color:var(--ink)}
+  .how-foot{font-size:11.5px;color:var(--muted);margin:11px 2px 0;line-height:1.5}
+  .how-foot b{color:var(--cream)}
   /* formulation studio */
   .form-ex{font:inherit;font-size:11.5px;padding:3px 10px;border:1px solid var(--line);border-radius:16px;background:transparent;color:var(--brand-2);cursor:pointer}
   .form-ex:hover{border-color:var(--brand-2)}
@@ -673,6 +683,22 @@
     <button type="button" class="tour-chip" data-q="geosmin">geosmin</button>
     <button type="button" class="tour-chip" data-q="caffeine">caffeine</button>
     <button type="button" class="tour-chip" data-q="furaneol">furaneol</button>
+  </div>
+
+  <div class="design-section" id="howStudio">
+    <div class="design-head" id="howToggle"><span id="howCaret">▸</span> How it works
+      <span class="mapsub">— what's real, what's predicted, and where it gets sharper. Honest by design; a read runs 100% on-prem.</span></div>
+    <div id="howWrap" style="display:none">
+      <div class="how-grid">
+        <div class="how-card"><h4>1 · Structure → numbers</h4><p>Every molecule becomes a <b>2,048-bit Morgan fingerprint</b> (which substructures it contains) plus a block of <b>physicochemical descriptors</b> (logP, MW, TPSA, H-bonding…). That one shared vector feeds every model — the same structure-to-property representation QSAR has leaned on for decades.</p></div>
+        <div class="how-card"><h4>2 · Taste — 6 trained heads + 2 rules</h4><p>Six <b>random-forest</b> classifiers (sweet, bitter, umami…) each return a probability, scored by an honest held-out <b>CV-AUROC</b>. Sour and salty are solution / ionic effects, not molecule-shape ones, so they're transparent <b>rules</b> — not faked models. A sweetness-intensity regressor estimates relative-to-sucrose potency.</p></div>
+        <div class="how-card"><h4>3 · Aroma — 24 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 24 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
+        <div class="how-card"><h4>4 · Honest by design</h4><p>Every value is tagged <b>measured / predicted / estimate</b>, so nothing reads as more precise than it is. Where a quantitative feature needs data we can't ship free-commercially (odor thresholds, panel intensities), the UI <b>says so</b> — and it lights up with <b>your</b> data.</p></div>
+        <div class="how-card"><h4>5 · Formulation, not just molecules</h4><p>The <b>Formulation Studio</b> reads a whole recipe before you pour — weighting each ingredient by odor impact, aggregating the blend's note-profile, flagging the overpowering component, and closing the gap to your target. That's single-molecule ML turned into a bench tool.</p></div>
+        <div class="how-card"><h4>6 · On-prem &amp; commercial-clean</h4><p>Nothing leaves the box — a read makes <b>no cloud calls</b>. The shipped models train only on <b>public-domain or permissively-licensed</b> data, so the commercial edition stays clean (provenance tracked in the repo).</p></div>
+      </div>
+      <p class="how-foot">Deeper dives in the repo: <b>docs/HOW-IT-WORKS.md</b> (the full method) · <b>docs/DATA-SOURCES.md</b> (every source + license) · <b>docs/AROMA.md</b> (the odor heads).</p>
+    </div>
   </div>
 
   <div class="design-section" id="studio">
@@ -2092,6 +2118,12 @@ $('mixCheck').addEventListener('click', async ()=>{
     $('mixResults').innerHTML=html;
   }catch(e){ $('mixResults').innerHTML='<div class="err">'+e.message+'</div>'; }
   finally{ $('mixCheck').disabled=false; $('mixCheck').textContent='Check mixture'; }
+});
+
+// --- How it works: collapsible explainer ---
+$('howToggle').addEventListener('click', ()=>{
+  const on=$('howWrap').style.display!=='none';
+  $('howWrap').style.display=on?'none':'block'; $('howCaret').textContent=on?'▸':'▾';
 });
 
 // --- Formulation Studio: whole-recipe read (profile + balance + gap + hazards) ---
