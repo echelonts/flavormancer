@@ -337,9 +337,21 @@
   .form-row .rm{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:0 13px;cursor:pointer;color:var(--muted)}
   .form-target{margin:6px 0 14px}
   .form-target-head{font-family:var(--mono);font-size:11.5px;color:var(--brand-2);margin:0 0 8px}
-  .form-chips{display:flex;flex-wrap:wrap;gap:6px;max-height:132px;overflow-y:auto;padding:2px}
-  .form-chips .chip{cursor:pointer;text-transform:capitalize}
+  .form-chips{display:flex;flex-wrap:wrap;gap:6px;max-height:112px;overflow-y:auto;padding:2px;flex:1}
+  .form-chips .chip{cursor:pointer;text-transform:capitalize;border-color:var(--line)}
   .form-chips .chip.on{background:var(--brand-grad);color:#08121A;border-color:transparent;font-weight:650}
+  .form-chips .chip-flavor.on{background:var(--cream);color:#08121A}
+  .form-tgt-group{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
+  .form-tgt-label{font-family:var(--mono);font-size:11px;color:var(--cream);white-space:nowrap;padding-top:6px;min-width:70px;display:inline-flex;align-items:center;gap:4px}
+  .form-tgt-label .ic{width:13px;height:13px;color:var(--cream)}
+  .form-actions{display:flex;gap:10px;flex-wrap:wrap}
+  #formDesign{background:var(--brand-grad);color:#08121A}
+  .recipe-note{font-size:12px;color:var(--cream);background:rgba(43,196,196,.08);border-left:2px solid var(--brand-2);border-radius:0 8px 8px 0;padding:8px 11px;margin:2px 0 10px;line-height:1.5}
+  .recipe-strip{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 12px}
+  .recipe-ing{border:1px solid var(--line);border-radius:9px;padding:7px 11px;background:var(--surface);min-width:150px}
+  .recipe-ing .ri-name{font-size:12.5px;font-weight:600;color:var(--ink)}
+  .recipe-ing .ri-meta{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px}
+  .recipe-ing .ri-carries{font-size:10.5px;color:var(--brand-2);margin-top:2px;text-transform:capitalize}
   #formResults{margin-top:16px}
   .fprof-basis{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:0 0 12px;padding:8px 11px;border-left:2px solid var(--brand-2);background:var(--accent-soft);border-radius:0 8px 8px 0;line-height:1.5}
   .fprof-row{display:grid;grid-template-columns:118px 1fr 46px;gap:10px;align-items:center;margin-bottom:7px}
@@ -750,15 +762,19 @@
       <div id="formRows"></div>
       <button class="mix-add" id="formAdd">+ add ingredient</button>
       <div class="form-target">
-        <div class="form-target-head">Target profile <span class="mapsub" style="text-transform:none;font-weight:600">— optional; pick the notes you're aiming for and Studio computes the gap + fixes</span></div>
-        <div id="formTargetChips" class="form-chips"></div>
+        <div class="form-target-head">Target profile <span class="mapsub" style="text-transform:none;font-weight:600">— optional; pick the <b>flavors</b> and <b>notes</b> you're aiming for. <b>Analyze</b> scores your rows against it; <b>Design</b> proposes a recipe for it.</span></div>
+        <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors</span><div id="formTargetFlavors" class="form-chips"></div></div>
+        <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-notes"/></svg> Notes</span><div id="formTargetChips" class="form-chips"></div></div>
       </div>
       <div class="mix-proc">Process applied:
         <label><input type="checkbox" class="fproc" value="high_heat"> high heat</label>
         <label><input type="checkbox" class="fproc" value="refining"> refining</label>
         <label><input type="checkbox" class="fproc" value="fermentation"> fermentation</label>
       </div>
-      <button class="mix-btn" id="formGo">Analyze formulation</button>
+      <div class="form-actions">
+        <button class="mix-btn" id="formGo">Analyze formulation</button>
+        <button class="mix-btn" id="formDesign" title="Propose a starting recipe for your target flavors + notes">✨ Design a recipe for this target</button>
+      </div>
       <div id="formResults"></div>
     </div>
   </div>
@@ -2169,15 +2185,47 @@ $('formToggle').addEventListener('click', ()=>{
   $('formWrap').style.display=on?'none':'block'; $('formCaret').textContent=on?'▸':'▾';
 });
 if(!$('formRows').children.length){ formAddRow(); formAddRow(); formAddRow(); }  // flagship: open with rows ready
-const _formTarget=new Set();
+const _formTarget=new Set();    // target NOTES
+const _formFlavors=new Set();   // target FLAVORS
 fetch('/api/design_options').then(r=>r.json()).then(d=>{
   const box=$('formTargetChips');
   (d.descriptors||[]).forEach(t=>{
-    const b=document.createElement('span'); b.className='chip'; b.textContent=t; b.dataset.term=t; b.style.borderColor='var(--line)';
+    const b=document.createElement('span'); b.className='chip'; b.textContent=t; b.dataset.term=t;
     b.onclick=()=>{ if(_formTarget.has(t)){ _formTarget.delete(t); b.classList.remove('on'); } else { _formTarget.add(t); b.classList.add('on'); } };
     box.appendChild(b);
   });
 }).catch(()=>{});
+fetch('/api/studio_terms').then(r=>r.json()).then(d=>{
+  const box=$('formTargetFlavors'), seen=new Set();
+  (d.flavors||[]).forEach(cat=>(cat.flavors||[]).forEach(fl=>{
+    if(seen.has(fl)) return; seen.add(fl);
+    const b=document.createElement('span'); b.className='chip chip-flavor'; b.textContent=fl; b.dataset.term=fl;
+    b.onclick=()=>{ if(_formFlavors.has(fl)){ _formFlavors.delete(fl); b.classList.remove('on'); } else { _formFlavors.add(fl); b.classList.add('on'); } };
+    box.appendChild(b);
+  }));
+}).catch(()=>{});
+let _lastRecipe=[];
+$('formDesign').addEventListener('click', async ()=>{
+  const flavors=[..._formFlavors], notes=[..._formTarget];
+  if(!flavors.length && !notes.length){ $('formResults').innerHTML='<div class="empty">Pick at least one target flavor or note, then Design.</div>'; return; }
+  $('formDesign').disabled=true; $('formDesign').textContent='Designing…';
+  try{
+    const r=await post('/api/design_recipe',{flavors, notes, food_safe:true});
+    $('formResults').innerHTML=renderRecipe(r);
+    const fill=$('formResults').querySelectorAll('.fprof-fill'); requestAnimationFrame(()=>fill.forEach(f=>f.style.width=f.dataset.w));
+  }catch(e){ $('formResults').innerHTML='<div class="err">'+e.message+'</div>'; }
+  finally{ $('formDesign').disabled=false; $('formDesign').innerHTML='✨ Design a recipe for this target'; }
+});
+function renderRecipe(r){
+  const rec=r.recipe||[]; _lastRecipe=rec;
+  if(!rec.length) return '<div class="empty">'+formEsc(r.note||'No food-safe recipe could be designed for that target — try different flavors/notes.')+'</div>';
+  let h='<div class="bsub">Suggested recipe <span style="font-weight:400;color:var(--muted)">— '+rec.length+' ingredient'+(rec.length>1?'s':'')+', a starting point to tune</span></div>';
+  h+='<div class="recipe-note">✨ '+formEsc(r.note||'')+'</div>';
+  h+='<div class="recipe-strip">'+rec.map(i=>`<div class="recipe-ing"><div class="ri-name">${formEsc(i.name)}</div><div class="ri-meta">${i.ppm} ppm · ${formEsc(i.volatility||'')} volatility</div><div class="ri-carries">carries: ${(i.carries||[]).map(formEsc).join(', ')}</div></div>`).join('')+'</div>';
+  h+='<div class="form-actions" style="margin-bottom:12px"><button class="mix-btn" id="recipeLoad">↓ Load into the rows to tune &amp; re-analyze</button></div>';
+  if(r.analysis){ h+='<div class="bsub" style="margin-top:6px">Predicted read of this starting recipe</div>'+renderFormulation(r.analysis); }
+  return h;
+}
 $('formGo').addEventListener('click', async ()=>{
   const rows=[...$('formRows').querySelectorAll('.form-row')].map(r=>{
     const name=r.querySelector('.f-name').value.trim(); const ppm=r.querySelector('.f-ppm').value.trim();
@@ -2239,11 +2287,20 @@ function renderFormulation(r){
   h+='<div class="form-gate"><b>What this is, and what sharpens it.</b> '+formEsc(dg.intensity||'')+' '+formEsc(dg.synergy||'')+'</div>';
   return h;
 }
-$('formResults').addEventListener('click', e=>{ const c=e.target.closest('.form-ing[data-smi]'); if(c){ q.value=c.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); } });
+$('formResults').addEventListener('click', e=>{
+  if(e.target && e.target.id==='recipeLoad'){   // drop the designed recipe into the rows + analyze
+    $('formRows').innerHTML='';
+    (_lastRecipe||[]).forEach(i=>formAddRow(i.name, i.ppm));
+    $('formGo').click();
+    return;
+  }
+  const c=e.target.closest('.form-ing[data-smi]'); if(c){ q.value=c.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
+});
 document.querySelectorAll('.form-ex').forEach(b=> b.addEventListener('click', ()=>{
   $('formRows').innerHTML='';
   b.dataset.ings.split('|').forEach(s=>{ const i=s.indexOf(':'); formAddRow(i<0?s:s.slice(0,i), i<0?'':s.slice(i+1)); });
   _formTarget.clear(); $('formTargetChips').querySelectorAll('.chip.on').forEach(x=>x.classList.remove('on'));
+  _formFlavors.clear(); $('formTargetFlavors').querySelectorAll('.chip.on').forEach(x=>x.classList.remove('on'));
   (b.dataset.tgt||'').split(',').filter(Boolean).forEach(t=>{ _formTarget.add(t); const c=$('formTargetChips').querySelector(`.chip[data-term="${t}"]`); if(c) c.classList.add('on'); });
   $('formGo').click();
 }));
