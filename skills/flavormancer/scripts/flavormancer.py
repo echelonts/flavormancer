@@ -123,6 +123,11 @@ def cmd_stereoisomers(a):
     return _req("/api/stereoisomers", "POST", {"smiles": a.molecule})
 
 
+def cmd_design(a):
+    return _req("/api/design_recipe", "POST",
+                {"flavors": a.flavors or [], "notes": a.notes or [], "food_safe": not a.any_source})
+
+
 def cmd_interpret(a):
     return _req("/api/nl", params={"q": a.text})
 
@@ -190,6 +195,12 @@ def main():
     s = sub.add_parser("flavor")
     s.add_argument("flavor")
     s.set_defaults(fn=cmd_flavor)
+
+    s = sub.add_parser("design")
+    s.add_argument("--flavor", action="append", dest="flavors", default=[], help="target flavor (repeatable)")
+    s.add_argument("--note", action="append", dest="notes", default=[], help="target aroma note (repeatable)")
+    s.add_argument("--any-source", action="store_true", help="allow non-GRAS carriers")
+    s.set_defaults(fn=cmd_design)
 
     s = sub.add_parser("interpret")
     s.add_argument("text", help="a free-text brief, e.g. 'food-safe cherry with fruity notes'")

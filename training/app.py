@@ -847,8 +847,12 @@ def api_design_recipe(d: DesignRecipeQuery):
         "recipe": recipe,
         "analysis": analysis,
         "targeted": {"flavors": d.flavors, "notes": d.notes},
-        "note": ("Starting recipe — food-safe carriers at rough, volatility-balanced doses. Tune on "
-                 "the bench; calibrated dosing unlocks with odor-threshold / panel data."),
+        "note": ("How these doses are set: each target flavor maps to its character-impact molecule "
+                 "and each note to a food-safe (GRAS) carrier, then doses are assigned by INVERSE "
+                 "VOLATILITY — volatile top-notes start low (~33 ppm), heavier base-notes higher "
+                 "(~100 ppm) — so no single ingredient's odor impact dominates the directional model. "
+                 "It's an honest STARTING POINT to tune on the bench; true calibrated dosing needs "
+                 "odor thresholds / panel intensities (a data-gate that comes with your data)."),
     }
 
 

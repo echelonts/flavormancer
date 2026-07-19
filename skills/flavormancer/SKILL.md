@@ -40,6 +40,7 @@ Each command prints JSON. Molecules can be given as a **common name, IUPAC name,
 | `read <molecule>` | Predict one molecule's taste (6 heads) + confident aromas + GRAS status. |
 | `read-full <molecule>` | The complete read: physicochemical props (logP/MW/TPSA, **boiling point, vapor pressure**, solubility, volatility), stability, chemesthesis, chirality, retention index, EU-allergen labeling, spectra links, full safety block. |
 | `formulate <name:ppm> … [--target notes] [--process p]` | **The flagship.** Read a whole recipe: blended note-profile with the driving ingredient per note, the overpowering-component flag, a gap analysis vs `--target` (food-safe add/cut suggestions), and a hazard screen. `ppm` is optional. |
+| `design [--flavor F …] [--note N …]` | **The inverse:** pick a target and get a starting recipe — food-safe carriers dosed by inverse volatility, already run through the analyzer. Doses are a bench starting point (calibrated dosing is data-gated). |
 | `mixture <ing> … [--process p]` | Screen a mixture for **documented** combination hazards (e.g. benzoate + ascorbate → benzene), gated on process. |
 | `reactions <ing> … [--process p]` | Indicative reaction-template products (each with its own predicted taste + aroma). |
 | `notes <note> … [--any-source] [--limit N]` | Find food-safe molecules carrying a set of notes (`citrus fresh sweet`). |
