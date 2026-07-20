@@ -41,6 +41,10 @@ cinnamon,cinnamic acid,O=C(O)C=Cc1ccccc1,aroma-supplement
 cinnamon,methyl cinnamate,COC(=O)C=Cc1ccccc1,aroma-supplement
 cinnamon,ethyl cinnamate,CCOC(=O)C=Cc1ccccc1,aroma-supplement
 cinnamon,cinnamyl acetate,CC(=O)OCC=Cc1ccccc1,aroma-supplement
+cinnamon,alpha-methylcinnamaldehyde,CC(C=O)=Cc1ccccc1,aroma-supplement
+cinnamon,cinnamyl formate,O=COCC=Cc1ccccc1,aroma-supplement
+cinnamon,hydrocinnamaldehyde,O=CCCc1ccccc1,aroma-supplement
+cinnamon,cinnamyl butyrate,CCCC(=O)OCC=Cc1ccccc1,aroma-supplement
 spicy,eugenol,C=CCc1ccc(O)c(OC)c1,aroma-supplement
 spicy,cinnamaldehyde,O=CC=Cc1ccccc1,aroma-supplement
 spicy,zingerone,COc1cc(CCC(C)=O)ccc1O,aroma-supplement
@@ -50,6 +54,9 @@ banana,isoamyl acetate,CC(=O)OCCC(C)C,aroma-supplement
 banana,amyl acetate,CCCCCOC(C)=O,aroma-supplement
 banana,isoamyl butyrate,CCCC(=O)OCCC(C)C,aroma-supplement
 banana,isoamyl isovalerate,CC(C)CCOC(=O)CC(C)C,aroma-supplement
+banana,isoamyl propionate,CCC(=O)OCCC(C)C,aroma-supplement
+banana,isobutyl acetate,CC(=O)OCC(C)C,aroma-supplement
+banana,isoamyl formate,CC(C)CCOC=O,aroma-supplement
 nutty,"2,3-dimethylpyrazine",Cc1nccnc1C,aroma-supplement
 nutty,"2,5-dimethylpyrazine",Cc1cnc(C)cn1,aroma-supplement
 nutty,2-ethylpyrazine,CCc1cnccn1,aroma-supplement
@@ -71,6 +78,10 @@ smoky,"2,6-dimethoxyphenol",COc1cccc(OC)c1O,aroma-supplement
 smoky,4-methylguaiacol,COc1cc(C)ccc1O,aroma-supplement
 smoky,4-ethylguaiacol,CCc1ccc(O)c(OC)c1,aroma-supplement
 smoky,4-vinylguaiacol,C=Cc1ccc(O)c(OC)c1,aroma-supplement
+smoky,phenol,Oc1ccccc1,aroma-supplement
+smoky,p-cresol,Cc1ccc(O)cc1,aroma-supplement
+smoky,o-cresol,Cc1ccccc1O,aroma-supplement
+smoky,"2,6-dimethylphenol",Cc1cccc(C)c1O,aroma-supplement
 anise,anethole,CC=Cc1ccc(OC)cc1,aroma-supplement
 anise,estragole,C=CCc1ccc(OC)cc1,aroma-supplement
 anise,anisaldehyde,COc1ccc(C=O)cc1,aroma-supplement

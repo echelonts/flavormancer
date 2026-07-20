@@ -75,7 +75,8 @@ def cmd_read(a):
         if isinstance(d.get(k), (int, float)):
             taste[lbl] = round(d[k], 3)
     desc = (aroma.get("predicted") or {}).get("descriptors", [])
-    return {"name": names.get("common"), "iupac": names.get("iupac"), "smiles": d.get("smiles"),
+    return {"name": names.get("common"), "iupac": names.get("iupac"),
+            "formula": names.get("formula"), "smiles": d.get("smiles"),
             "taste_probabilities": taste, "sour_rule": d.get("sour"), "salty_rule": d.get("salty"),
             "confident_aromas": [x["odor"] for x in desc if x.get("confident")],
             "gras_status": (d.get("safety") or {}).get("gras_status"),

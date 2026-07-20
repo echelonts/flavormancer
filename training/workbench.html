@@ -714,7 +714,7 @@
       <div class="how-grid">
         <div class="how-card"><h4>1 · Structure → numbers</h4><p>Every molecule becomes a <b>2,048-bit Morgan fingerprint</b> (which substructures it contains) plus a block of <b>physicochemical descriptors</b> (logP, MW, TPSA, H-bonding…). That one shared vector feeds every model — the same structure-to-property representation QSAR has leaned on for decades.</p></div>
         <div class="how-card"><h4>2 · Taste — 6 trained heads + 2 rules</h4><p>Six <b>random-forest</b> classifiers (sweet, bitter, umami…) each return a probability, scored by an honest held-out <b>CV-AUROC</b>. Sour and salty are solution / ionic effects, not molecule-shape ones, so they're transparent <b>rules</b> — not faked models. A sweetness-intensity regressor estimates relative-to-sucrose potency.</p></div>
-        <div class="how-card"><h4>3 · Aroma — 34 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 34 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
+        <div class="how-card"><h4>3 · Aroma — 37 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 37 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
         <div class="how-card"><h4>4 · Honest by design</h4><p>Every value is tagged <b>measured / predicted / estimate</b>, so nothing reads as more precise than it is. Where a quantitative feature needs data we can't ship free-commercially (odor thresholds, panel intensities), the UI <b>says so</b> — and it lights up with <b>your</b> data.</p></div>
         <div class="how-card"><h4>5 · Formulation, not just molecules</h4><p>The <b>Formulation Studio</b> reads a whole recipe before you pour — weighting each ingredient by odor impact, aggregating the blend's note-profile, flagging the overpowering component, and closing the gap to your target. That's single-molecule ML turned into a bench tool.</p></div>
         <div class="how-card"><h4>6 · On-prem &amp; commercial-clean</h4><p>Nothing leaves the box — a read makes <b>no cloud calls</b>. The shipped models train only on <b>public-domain or permissively-licensed</b> data, so the commercial edition stays clean (provenance tracked in the repo).</p></div>
@@ -871,7 +871,7 @@
           the trend, exactly the kind of lead worth a closer look.</p>
           <p><b>Two flavor dimensions.</b> Flip the color toggle between <b>taste</b> (sweet /
           bitter / umami / sour / salty / tasteless) and <b>aroma</b> (= odor — the same thing;
-          the 34 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
+          the 37 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
           same structural layout — you're overlaying a different sense. The <b>both</b> toggle merges
           them into one full-flavor view: each dot takes its <b>taste</b> color where a taste is known,
           otherwise its <b>aroma</b> color — so nearly every molecule is colored by its dominant known
@@ -965,6 +965,7 @@
       <div class="structure3d" id="structure3d" style="display:none"></div>
       <div class="cname" id="cname"></div>
       <p class="smiles" id="smiles"></p>
+      <p class="iupac" id="formula"></p>
       <p class="iupac" id="iupac"></p>
       <div id="domainBanner" class="domain-banner" style="display:none"></div>
       <div id="flavorTags" class="flavor-tags"></div>
@@ -1128,6 +1129,9 @@ const AROMA_HELP = {
   vanilla:'vanilla — vanillin &amp; guaiacol-derived phenolic aldehydes',
   buttery:'butter / cream — vicinal diketones (diacetyl, acetoin)',
   balsamic:'sweet-resinous balsam — benzyl / cinnamyl esters',
+  smoky:'smoke / phenolic — guaiacol &amp; alkylphenols',
+  cinnamon:'cinnamon — cinnamaldehyde &amp; esters',
+  spicy:'warm spice — eugenol / cinnamaldehyde / capsaicinoid family',
   caramel:'burnt-sugar / toffee — maltol, furaneol, cyclotene',
   honey:'sweet honey / beeswax — phenylacetic acid &amp; esters',
   nutty:'roasted nut / hazelnut — alkylpyrazines',
@@ -1253,6 +1257,8 @@ function render(p, neighbors, svg, names){
   $('cname').textContent = common;
   $('cname').style.display = common ? 'block' : 'none';
   $('smiles').textContent = p.smiles;
+  $('formula').textContent = names.formula ? ('Formula: ' + names.formula) : '';
+  $('formula').style.display = names.formula ? 'block' : 'none';
   $('iupac').textContent = (iupac && !dupe) ? ('IUPAC: ' + iupac) : '';
   $('iupac').style.display = (iupac && !dupe) ? 'block' : 'none';
   // plain-folk "reads as" tags: everyday flavors, tastes, aroma notes
@@ -1679,7 +1685,7 @@ function setMapColor(c){ _mapColorBy=c;
 let _mapHi = new Set();  // classes highlighted from the legend (empty = show all evenly)
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
-  // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 34 aroma heads /
+  // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 37 aroma heads /
   // both), plus 'other' last. Present classes are ordered by count; any with zero points still
   // appear (dimmed) so the legend is a full reference — never hide a real head.
   const canon=legendClasses();
@@ -1727,7 +1733,7 @@ function drawClusterLabels(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), groups={};
   for(const p of _mapPts){ const l=mapLabel(p); if(!l||l==='other') continue; (groups[l]=groups[l]||[]).push(p); }
   ctx.save(); ctx.font='700 14px "Cinzel Decorative",Georgia,serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  // label EVERY class that has points (all 34 aroma / 6 taste heads), not just the big ones
+  // label EVERY class that has points (all 37 aroma / 6 taste heads), not just the big ones
   for(const l in groups){ const pts=groups[l]; if(pts.length<3) continue;
     let sx=0,sy=0,n=0; for(const p of pts){ const x=_mapProj.px(p),y=_mapProj.py(p); if(x<-9000||!isFinite(x)) continue; sx+=x; sy+=y; n++; }
     if(!n) continue; sx/=n; sy/=n;
