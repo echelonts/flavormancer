@@ -63,3 +63,4 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+!training/aroma_supplement.csv

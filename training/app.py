@@ -18,6 +18,7 @@ instance) for the demo; deployment puts this behind login + per-user history, an
 prediction core doesn't change.
 """
 
+import math
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -534,7 +535,7 @@ def api_card(q: str = "", dl: int = 0):
         cell(i, taste_row_y, t, v, _TASTE_RGB.get(t, teal))
 
     # AROMA MODEL — all 24 heads in a 6-wide grid
-    dr.text((GX0, aroma_label_y), "AROMA MODEL · all 24 heads", font=f_lab, fill=muted)
+    dr.text((GX0, aroma_label_y), f"AROMA MODEL · all {len(aroma_cells)} heads", font=f_lab, fill=muted)
     for i, (a, v) in enumerate(aroma_cells):
         cell(i % COLS, aroma_grid_y + (i // COLS) * ROW_H, a, v, teal)
 
@@ -780,6 +781,29 @@ def api_formulation(f: FormulationQuery):
 _VOL_PPM = {"high": 33.0, "moderate": 50.0, "low": 100.0}  # inverse-volatility: aim for balanced contributions
 
 
+def _load_note_carriers():
+    """descriptor/note -> [(smiles, name)] of KNOWN character-impact molecules, from the curated
+    flavors.csv + aroma_supplement.csv. The recipe designer prefers these (e.g. gamma-nonalactone
+    for coconut, maltol for caramel) over a generic palette match, which can surface poor carriers."""
+    import csv
+    m = {}
+    for path in ("flavors.csv", "aroma_supplement.csv"):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                for r in csv.DictReader(fh):
+                    note = (r.get("flavor") or "").strip().lower()
+                    smi = (r.get("smiles") or "").strip()
+                    nm = (r.get("molecule") or "").strip()
+                    if note and smi:
+                        m.setdefault(note, []).append((smi, nm or note))
+        except Exception:  # noqa: BLE001 — missing file / bad rows; just skip
+            pass
+    return m
+
+
+_NOTE_CARRIERS = _load_note_carriers()
+
+
 class DesignRecipeQuery(BaseModel):
     flavors: list[str] = []
     notes: list[str] = []
@@ -817,15 +841,18 @@ def api_design_recipe(d: DesignRecipeQuery):
     # notes -> a food-safe carrier (GRAS-preferred, named)
     for note in d.notes:
         chosen, fallback = None, None
-        for mt in P.palette_match([], [note], k=8).get("matches", []):
-            nm = _name_local(mt["smiles"])
+        # curated character-impact molecules first, then a generic palette match as backstop
+        candidates = list(_NOTE_CARRIERS.get(note.strip().lower(), []))
+        candidates += [(mt["smiles"], _name_local(mt["smiles"]))
+                       for mt in P.palette_match([], [note], k=8).get("matches", [])]
+        for smi, nm in candidates:
             if not nm:
                 continue
-            cmol = Chem.MolFromSmiles(mt["smiles"])
+            cmol = Chem.MolFromSmiles(smi)
             if cmol is not None and P._gras_status(cmol).startswith("in GRAS"):
-                chosen = (mt["smiles"], nm)
+                chosen = (smi, nm)
                 break
-            fallback = fallback or (mt["smiles"], nm)
+            fallback = fallback or (smi, nm)
         pick = chosen or (None if d.food_safe else fallback)
         if pick:
             add(pick[0], note, pick[1])
@@ -836,9 +863,19 @@ def api_design_recipe(d: DesignRecipeQuery):
 
     recipe = []
     for cs, carries, name in picks:
-        vt = P.physchem(Chem.MolFromSmiles(cs))["qualitative"]["aroma_volatility"].split()[0]
-        recipe.append({"name": name, "smiles": cs, "ppm": _VOL_PPM.get(vt, 50.0),
-                       "carries": carries, "volatility": vt})
+        pc = P.physchem(Chem.MolFromSmiles(cs))
+        vt = pc["qualitative"]["aroma_volatility"].split()[0]
+        vp = (pc.get("measured") or {}).get("vapor_pressure_pa")
+        if isinstance(vp, (int, float)) and vp > 0:
+            # continuous dose from MEASURED vapor pressure: more volatile -> less needed. A decade
+            # more volatile drops the starting dose ~20 ppm, clamped to a sane 20-150 ppm band.
+            ppm = round(max(20.0, min(150.0, 70.0 - 20.0 * math.log10(vp))), 1)
+            basis = "vapor pressure"
+        else:
+            ppm = _VOL_PPM.get(vt, 50.0)  # fall back to the coarse volatility tier
+            basis = "volatility tier"
+        recipe.append({"name": name, "smiles": cs, "ppm": ppm,
+                       "carries": carries, "volatility": vt, "dose_basis": basis})
 
     analysis = api_formulation(FormulationQuery(
         ingredients=[{"name": r["smiles"], "ppm": r["ppm"]} for r in recipe],
@@ -849,10 +886,11 @@ def api_design_recipe(d: DesignRecipeQuery):
         "targeted": {"flavors": d.flavors, "notes": d.notes},
         "note": ("How these doses are set: each target flavor maps to its character-impact molecule "
                  "and each note to a food-safe (GRAS) carrier, then doses are assigned by INVERSE "
-                 "VOLATILITY — volatile top-notes start low (~33 ppm), heavier base-notes higher "
-                 "(~100 ppm) — so no single ingredient's odor impact dominates the directional model. "
-                 "It's an honest STARTING POINT to tune on the bench; true calibrated dosing needs "
-                 "odor thresholds / panel intensities (a data-gate that comes with your data)."),
+                 "VOLATILITY — from each molecule's MEASURED vapor pressure where available (a decade "
+                 "more volatile ≈ 20 ppm lower, clamped 20–150 ppm), else a coarse volatility tier — "
+                 "so no single ingredient's odor impact dominates the directional model. It's an "
+                 "honest STARTING POINT to tune on the bench; true calibrated dosing needs odor "
+                 "thresholds / panel intensities (a data-gate that comes with your data)."),
     }
 
 
