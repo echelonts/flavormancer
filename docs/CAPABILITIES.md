@@ -32,7 +32,7 @@ by how it's derived, and nothing claims more certainty than its source supports.
 - Multitaste — fires when 2+ taste heads are high (**trained**-derived).
 - Known-taste ground truth — verified labels override predictions (**lookup**).
 
-**Aroma** — **24 odor-descriptor heads ship** (**trained**)
+**Aroma** — **34 odor-descriptor heads ship** (**trained**)
 - Presence/absence per descriptor (citrus, floral, minty, almond, fatty, petroleum, earthy,
   medicinal, sulfurous, camphor, fruity, fishy, garlic, ethereal, ammoniacal, pungent) —
   RandomForests on fingerprint + physicochemical features, over public-domain HSDB odor text +

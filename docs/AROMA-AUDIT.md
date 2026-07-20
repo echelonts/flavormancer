@@ -1,5 +1,16 @@
 # Aroma-head audit — where more data buys more heads
 
+> **Update — supplement applied.** `build_aroma_supplement.py` added a curated **public-domain**
+> character-impact set (`aroma_supplement.csv`, resolved via PubChem) for the sparse descriptors
+> below. Result: **24 → 34 heads** — **10 new**: `coconut` (0.89), `nutty` (0.94), `caramel` (0.91),
+> `winey` (0.90), `onion` (0.87), `honey` (0.80), `herbal` (0.80), `vanilla` (0.93), `buttery` (0.87),
+> `balsamic` (0.93) — and `grassy` kept above the bar
+> (0.80) with its classic green-leaf volatiles. `coconut` is now *predictable* (γ-nonalactone →
+> coconut 1.0), which closes its earlier data-gate. `spicy` (0.667) and `sweet`-odor (0.646) stayed
+> unlearnable even with more data — a real representation limit (revisit with a GNN). The numbers
+> below describe the **pre-supplement** baseline + the standing plan.
+
+
 An honest look at the aroma model: which odor descriptors we can predict from structure today,
 which are *just* out of reach, and exactly what data would unlock more. Regenerate the numbers
 with `python training/train_aroma.py` (deterministic, `random_state=42`).

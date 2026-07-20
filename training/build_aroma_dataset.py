@@ -126,6 +126,11 @@ if __name__ == "__main__":
         rows.append(row)
     n_odor = len(rows)
     rows, n_lbl, n_new = fold_flavors(rows)  # curated character-impact molecules as extra positives
+    # public-domain aroma supplement (build_aroma_supplement.py) — extra positives for the sparse
+    # descriptors flagged in docs/AROMA-AUDIT.md, sourced from open flavor-chemistry facts
+    rows, n_sup, n_sup_new = fold_flavors(rows, path="aroma_supplement.csv")
+    n_lbl += n_sup
+    n_new += n_sup_new
     out = pd.DataFrame(rows).drop(columns=["inchikey_skel"])
     out.to_parquet("aroma_train.parquet")
     counts = {d: int(out[d].sum()) for d in VOCAB}

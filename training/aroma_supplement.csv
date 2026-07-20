@@ -1,0 +1,106 @@
+flavor,molecule,smiles,category
+coconut,gamma-nonalactone,CCCCCC1CCC(=O)O1,aroma-supplement
+coconut,gamma-octalactone,CCCCC1CCC(=O)O1,aroma-supplement
+coconut,delta-decalactone,CCCCCC1CCCC(=O)O1,aroma-supplement
+coconut,gamma-decalactone,CCCCCCC1CCC(=O)O1,aroma-supplement
+coconut,delta-octalactone,CCCC1CCCC(=O)O1,aroma-supplement
+coconut,massoia lactone,CCCCCC1CC=CC(=O)O1,aroma-supplement
+caramel,maltol,Cc1occc(=O)c1O,aroma-supplement
+caramel,ethyl maltol,CCc1occc(=O)c1O,aroma-supplement
+caramel,cyclotene,CC1=C(O)C(=O)CC1,aroma-supplement
+caramel,"4-hydroxy-2,5-dimethyl-3(2H)-furanone",CC1=C(O)C(=O)C(C)O1,aroma-supplement
+caramel,homofuraneol,CCC1OC(C)=C(O)C1=O,aroma-supplement
+caramel,5-methylfurfural,Cc1ccc(C=O)o1,aroma-supplement
+honey,phenylacetic acid,O=C(O)Cc1ccccc1,aroma-supplement
+honey,methyl phenylacetate,COC(=O)Cc1ccccc1,aroma-supplement
+honey,ethyl phenylacetate,CCOC(=O)Cc1ccccc1,aroma-supplement
+honey,2-phenylethanol,OCCc1ccccc1,aroma-supplement
+honey,phenylacetaldehyde,O=CCc1ccccc1,aroma-supplement
+honey,2-phenylethyl acetate,CC(=O)OCCc1ccccc1,aroma-supplement
+honey,methyl anthranilate,COC(=O)c1ccccc1N,aroma-supplement
+buttery,"2,3-butanedione",CC(=O)C(C)=O,aroma-supplement
+buttery,acetoin,CC(=O)C(C)O,aroma-supplement
+buttery,"2,3-pentanedione",CCC(=O)C(C)=O,aroma-supplement
+buttery,"2,3-hexanedione",CCCC(=O)C(C)=O,aroma-supplement
+buttery,"2,3-heptanedione",CCCCC(=O)C(C)=O,aroma-supplement
+vanilla,vanillin,COc1cc(C=O)ccc1O,aroma-supplement
+vanilla,ethylvanillin,CCOc1cc(C=O)ccc1O,aroma-supplement
+vanilla,vanillyl alcohol,COc1cc(CO)ccc1O,aroma-supplement
+vanilla,vanillic acid,COc1cc(C(=O)O)ccc1O,aroma-supplement
+vanilla,acetovanillone,COc1cc(C(C)=O)ccc1O,aroma-supplement
+vanilla,isovanillin,COc1ccc(C=O)cc1O,aroma-supplement
+vanilla,veratraldehyde,COc1ccc(C=O)cc1OC,aroma-supplement
+vanilla,syringaldehyde,COc1cc(C=O)cc(OC)c1O,aroma-supplement
+clove,eugenol,C=CCc1ccc(O)c(OC)c1,aroma-supplement
+clove,isoeugenol,CC=Cc1ccc(O)c(OC)c1,aroma-supplement
+clove,eugenyl acetate,C=CCc1ccc(OC(C)=O)c(OC)c1,aroma-supplement
+clove,methyleugenol,C=CCc1ccc(OC)c(OC)c1,aroma-supplement
+cinnamon,cinnamaldehyde,O=CC=Cc1ccccc1,aroma-supplement
+cinnamon,cinnamyl alcohol,OCC=Cc1ccccc1,aroma-supplement
+cinnamon,cinnamic acid,O=C(O)C=Cc1ccccc1,aroma-supplement
+cinnamon,methyl cinnamate,COC(=O)C=Cc1ccccc1,aroma-supplement
+cinnamon,ethyl cinnamate,CCOC(=O)C=Cc1ccccc1,aroma-supplement
+cinnamon,cinnamyl acetate,CC(=O)OCC=Cc1ccccc1,aroma-supplement
+spicy,eugenol,C=CCc1ccc(O)c(OC)c1,aroma-supplement
+spicy,cinnamaldehyde,O=CC=Cc1ccccc1,aroma-supplement
+spicy,zingerone,COc1cc(CCC(C)=O)ccc1O,aroma-supplement
+spicy,piperonal,O=Cc1ccc2c(c1)OCO2,aroma-supplement
+spicy,carvacrol,Cc1ccc(C(C)C)cc1O,aroma-supplement
+banana,isoamyl acetate,CC(=O)OCCC(C)C,aroma-supplement
+banana,amyl acetate,CCCCCOC(C)=O,aroma-supplement
+banana,isoamyl butyrate,CCCC(=O)OCCC(C)C,aroma-supplement
+banana,isoamyl isovalerate,CC(C)CCOC(=O)CC(C)C,aroma-supplement
+nutty,"2,3-dimethylpyrazine",Cc1nccnc1C,aroma-supplement
+nutty,"2,5-dimethylpyrazine",Cc1cnc(C)cn1,aroma-supplement
+nutty,2-ethylpyrazine,CCc1cnccn1,aroma-supplement
+nutty,2-acetylpyrazine,CC(=O)c1cnccn1,aroma-supplement
+nutty,5-methylfurfural,Cc1ccc(C=O)o1,aroma-supplement
+nutty,2-ethyl-3-methylpyrazine,CCc1nccnc1C,aroma-supplement
+nutty,2-acetylthiazole,CC(=O)c1nccs1,aroma-supplement
+nutty,"2,3-diethylpyrazine",CCc1nccnc1CC,aroma-supplement
+cocoa,"2,3,5,6-tetramethylpyrazine",Cc1nc(C)c(C)nc1C,aroma-supplement
+cocoa,"2,3,5-trimethylpyrazine",Cc1cnc(C)c(C)n1,aroma-supplement
+cocoa,3-methylbutanal,CC(C)CC=O,aroma-supplement
+cocoa,2-methylbutanal,CCC(C)C=O,aroma-supplement
+coffee,furfuryl mercaptan,SCc1ccco1,aroma-supplement
+coffee,guaiacol,COc1ccccc1O,aroma-supplement
+coffee,2-acetylpyrazine,CC(=O)c1cnccn1,aroma-supplement
+coffee,5-methylfurfural,Cc1ccc(C=O)o1,aroma-supplement
+smoky,guaiacol,COc1ccccc1O,aroma-supplement
+smoky,"2,6-dimethoxyphenol",COc1cccc(OC)c1O,aroma-supplement
+smoky,4-methylguaiacol,COc1cc(C)ccc1O,aroma-supplement
+smoky,4-ethylguaiacol,CCc1ccc(O)c(OC)c1,aroma-supplement
+smoky,4-vinylguaiacol,C=Cc1ccc(O)c(OC)c1,aroma-supplement
+anise,anethole,CC=Cc1ccc(OC)cc1,aroma-supplement
+anise,estragole,C=CCc1ccc(OC)cc1,aroma-supplement
+anise,anisaldehyde,COc1ccc(C=O)cc1,aroma-supplement
+balsamic,benzyl benzoate,O=C(OCc1ccccc1)c1ccccc1,aroma-supplement
+balsamic,benzyl cinnamate,O=C(C=Cc1ccccc1)OCc1ccccc1,aroma-supplement
+balsamic,benzoic acid,O=C(O)c1ccccc1,aroma-supplement
+balsamic,benzyl salicylate,O=C(OCc1ccccc1)c1ccccc1O,aroma-supplement
+balsamic,cinnamyl cinnamate,O=C(C=Cc1ccccc1)OCC=Cc1ccccc1,aroma-supplement
+herbal,thymol,Cc1ccc(C(C)C)c(O)c1,aroma-supplement
+herbal,carvacrol,Cc1ccc(C(C)C)cc1O,aroma-supplement
+herbal,eucalyptol,CC12CCC(CC1)C(C)(C)O2,aroma-supplement
+herbal,menthone,CC1CCC(C(C)C)C(=O)C1,aroma-supplement
+meaty,methional,CSCCC=O,aroma-supplement
+meaty,2-methyl-3-furanthiol,Cc1occc1S,aroma-supplement
+meaty,furfuryl mercaptan,SCc1ccco1,aroma-supplement
+cherry,benzaldehyde,O=Cc1ccccc1,aroma-supplement
+cherry,p-tolualdehyde,Cc1ccc(C=O)cc1,aroma-supplement
+winey,ethyl lactate,CCOC(=O)C(C)O,aroma-supplement
+winey,ethyl hexanoate,CCCCCC(=O)OCC,aroma-supplement
+winey,"2,3-butanediol",CC(O)C(C)O,aroma-supplement
+onion,dipropyl disulfide,CCCSSCCC,aroma-supplement
+onion,methyl propyl disulfide,CCCSSC,aroma-supplement
+onion,allyl propyl disulfide,C=CCSSCCC,aroma-supplement
+grassy,cis-3-hexenal,CCC=CCC=O,aroma-supplement
+grassy,cis-3-hexen-1-ol,CCC=CCCO,aroma-supplement
+grassy,trans-2-hexenal,CCCC=CC=O,aroma-supplement
+grassy,hexanal,CCCCCC=O,aroma-supplement
+grassy,trans-2-hexen-1-ol,CCCC=CCO,aroma-supplement
+grassy,cis-3-hexenyl acetate,CCC=CCCOC(C)=O,aroma-supplement
+green,cis-3-hexenal,CCC=CCC=O,aroma-supplement
+green,trans-2-hexenal,CCCC=CC=O,aroma-supplement
+green,cis-3-hexen-1-ol,CCC=CCCO,aroma-supplement
+green,hexanal,CCCCCC=O,aroma-supplement
