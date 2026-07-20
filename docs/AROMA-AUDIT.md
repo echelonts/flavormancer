@@ -2,17 +2,19 @@
 
 > **Update — supplement applied.** `build_aroma_supplement.py` added a curated **public-domain**
 > character-impact set (`aroma_supplement.csv`, resolved via PubChem) for the sparse descriptors
-> below. Result: **24 → 37 heads** — **13 new**: `coconut` (0.89), `nutty` (0.94), `caramel` (0.91),
+> below. Result: **24 → 41 heads** — **17 new**: `coconut` (0.89), `nutty` (0.94), `caramel` (0.91),
 > `winey` (0.90), `onion` (0.87), `honey` (0.80), `herbal` (0.80), `vanilla` (0.93), `buttery` (0.87),
-> `balsamic` (0.93), `smoky` (0.99), `cinnamon` (1.00), `spicy` (0.71) — and `grassy` kept above the
+> `balsamic` (0.93), `smoky` (0.99), `cinnamon` (1.00), `spicy` (0.71), `banana` (0.95),
+> `fresh` (0.73), `musky` (1.00), `vegetable` (0.85) — and `grassy` kept above the
 > bar (0.80) with its classic green-leaf volatiles. `coconut` is now *predictable* (γ-nonalactone →
-> coconut 1.0), which closes its earlier data-gate. `spicy` finally crossed (0.71, borderline — it
-> shares character molecules with cinnamon/clove). **Only `sweet`-odor (0.637) remains unlearnable**
-> even with 185 examples — a genuine representation limit (revisit with a GNN).
+> coconut 1.0), which closes its earlier data-gate. `spicy`/`fresh` are borderline (0.71–0.73).
+> **Only `sweet`-odor (0.637) remains unlearnable** even with 185 examples — a genuine representation
+> limit (revisit with a GNN).
 >
 > **Small-n caveat (honest):** the *highest*-AUROC new heads are small, structurally-homogeneous
-> classes — e.g. `cinnamon` reaches CV-AUROC **1.00** only because all 10 positives are one
-> cinnamaldehyde-family scaffold the fingerprint separates trivially. That is memorising a scaffold,
+> classes — e.g. `cinnamon` and `musky` reach CV-AUROC **~1.00** only because their ~10 positives
+> are one scaffold (cinnamaldehyde family; macrocyclic musks) the fingerprint separates trivially.
+> That is memorising a scaffold,
 > not a superb general model: these heads are **narrow and high-variance** (like `grassy`/`coffee`)
 > and will sharpen — or get honestly re-scored — with more diverse examples. Treat AUROC on n≈10
 > heads as indicative, not gospel. The numbers
