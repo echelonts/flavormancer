@@ -761,19 +761,17 @@
       <div class="form-cols"><span class="form-col-h">ingredient</span><span class="form-col-h form-col-ppm">ppm</span></div>
       <div id="formRows"></div>
       <button class="mix-add" id="formAdd">+ add ingredient</button>
-      <div class="form-target">
-        <div class="form-target-head">Target profile <span class="mapsub" style="text-transform:none;font-weight:600">— optional; pick the <b>flavors</b> and <b>notes</b> you're aiming for. <b>Analyze</b> scores your rows against it; <b>Design</b> proposes a recipe for it.</span></div>
-        <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors</span><div id="formTargetFlavors" class="form-chips"></div></div>
-        <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-notes"/></svg> Notes</span><div id="formTargetChips" class="form-chips"></div></div>
-      </div>
       <div class="mix-proc">Process applied:
         <label><input type="checkbox" class="fproc" value="high_heat"> high heat</label>
         <label><input type="checkbox" class="fproc" value="refining"> refining</label>
         <label><input type="checkbox" class="fproc" value="fermentation"> fermentation</label>
       </div>
-      <div class="form-actions">
-        <button class="mix-btn" id="formGo">Analyze formulation</button>
-        <button class="mix-btn" id="formDesign" title="Propose a starting recipe for your target flavors + notes">✨ Design a recipe for this target</button>
+      <button class="mix-btn" id="formGo">Analyze formulation</button>
+      <div class="form-target">
+        <div class="form-target-head">Target profile <span class="mapsub" style="text-transform:none;font-weight:600">— optional; pick the <b>flavors</b> and <b>notes</b> you're aiming for. <b>Analyze</b> (above) scores your rows against it; <b>Design</b> (below) proposes a recipe for it.</span></div>
+        <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors</span><div id="formTargetFlavors" class="form-chips"></div></div>
+        <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-notes"/></svg> Notes</span><div id="formTargetChips" class="form-chips"></div></div>
+        <button class="mix-btn" id="formDesign" title="Propose a starting recipe for your target flavors + notes" style="margin-top:4px">✨ Design a recipe for this target</button>
       </div>
       <div id="formResults"></div>
     </div>
