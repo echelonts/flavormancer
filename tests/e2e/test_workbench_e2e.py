@@ -100,3 +100,26 @@ def test_flavor_map_renders(page, base_url, needs_models):
     _open(page, base_url)
     page.locator("#mapLegend .leg").first.wait_for(timeout=30000)
     assert page.locator("#mapLegend .leg").count() >= 5  # legend classes populated
+
+
+def test_molecular_formula_shown(page, base_url, needs_models):
+    _open(page, base_url)
+    page.fill("#q", "vanillin")
+    page.click("#go")
+    page.wait_for_selector("#formula", timeout=30000)
+    page.wait_for_timeout(600)
+    assert "Formula" in (page.locator("#formula").inner_text() or "")  # the 4th identifier row
+
+
+def test_recipe_designer(page, base_url, needs_models):
+    _open(page, base_url)
+    # pick a note that is a new supplement head, then design a recipe for it
+    chip = page.locator("#formTargetChips .chip", has_text="coconut").first
+    chip.wait_for(timeout=15000)
+    chip.click()
+    page.locator("#formDesign").click()
+    page.wait_for_selector("#formResults .recipe-strip .recipe-ing", timeout=40000)
+    page.wait_for_timeout(600)
+    assert page.locator("#formResults .recipe-ing").count() >= 1
+    assert page.locator("#recipeLoad").count() == 1  # the "load into rows" bridge
+    assert page._flavor_errors == [], f"page errors: {page._flavor_errors}"
