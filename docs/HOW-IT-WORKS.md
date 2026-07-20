@@ -62,7 +62,7 @@ features (trained on SweetenersDB).
 
 ---
 
-## 3. Aroma — 37 descriptor heads from public odor text
+## 3. Aroma — 41 descriptor heads from public odor text
 
 Odor is the hard, licensed part of this field — most rich odor datasets are NonCommercial. Our
 clean route:
@@ -75,7 +75,7 @@ clean route:
    `minty`), producing a presence/absence label per descriptor. We also fold in the curated
    character-impact facts from `flavors.csv`.
 3. **`train_aroma.py`** trains one RandomForest per descriptor (on fingerprint + descriptors) and
-   **keeps only the heads that clear CV-AUROC ≥ 0.70** — an honest bar. **37 heads** survive
+   **keeps only the heads that clear CV-AUROC ≥ 0.70** — an honest bar. **41 heads** survive
    (citrus, floral, minty, almond, fatty, petroleum, earthy, medicinal, sulfurous, camphor,
    fruity, fishy, garlic, ethereal, ammoniacal, pungent, pine, rose, rancid, alcoholic,
    woody, green, grassy, putrid), 0.71–0.98. The lower-population heads (≈10–20 documented

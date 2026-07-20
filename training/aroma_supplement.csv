@@ -57,6 +57,9 @@ banana,isoamyl isovalerate,CC(C)CCOC(=O)CC(C)C,aroma-supplement
 banana,isoamyl propionate,CCC(=O)OCCC(C)C,aroma-supplement
 banana,isobutyl acetate,CC(=O)OCC(C)C,aroma-supplement
 banana,isoamyl formate,CC(C)CCOC=O,aroma-supplement
+banana,amyl butyrate,CCCCCOC(=O)CCC,aroma-supplement
+banana,2-methylbutyl acetate,CCC(C)COC(C)=O,aroma-supplement
+banana,isoamyl hexanoate,CCCCCC(=O)OCCC(C)C,aroma-supplement
 nutty,"2,3-dimethylpyrazine",Cc1nccnc1C,aroma-supplement
 nutty,"2,5-dimethylpyrazine",Cc1cnc(C)cn1,aroma-supplement
 nutty,2-ethylpyrazine,CCc1cnccn1,aroma-supplement
@@ -85,6 +88,7 @@ smoky,"2,6-dimethylphenol",Cc1cccc(C)c1O,aroma-supplement
 anise,anethole,CC=Cc1ccc(OC)cc1,aroma-supplement
 anise,estragole,C=CCc1ccc(OC)cc1,aroma-supplement
 anise,anisaldehyde,COc1ccc(C=O)cc1,aroma-supplement
+anise,fenchone,CC12CCC(C1)C(C)(C)C2=O,aroma-supplement
 balsamic,benzyl benzoate,O=C(OCc1ccccc1)c1ccccc1,aroma-supplement
 balsamic,benzyl cinnamate,O=C(C=Cc1ccccc1)OCc1ccccc1,aroma-supplement
 balsamic,benzoic acid,O=C(O)c1ccccc1,aroma-supplement
@@ -105,6 +109,18 @@ winey,"2,3-butanediol",CC(O)C(C)O,aroma-supplement
 onion,dipropyl disulfide,CCCSSCCC,aroma-supplement
 onion,methyl propyl disulfide,CCCSSC,aroma-supplement
 onion,allyl propyl disulfide,C=CCSSCCC,aroma-supplement
+fresh,melonal,CC(C)=CCCC(C)C=O,aroma-supplement
+fresh,dihydromyrcenol,C=CC(C)CCCC(C)(C)O,aroma-supplement
+fresh,cis-3-hexenyl acetate,CCC=CCCOC(C)=O,aroma-supplement
+fresh,hexanal,CCCCCC=O,aroma-supplement
+musky,muscone,CC1CCCCCCCCCCCCC(=O)C1,aroma-supplement
+musky,ethylene brassylate,O=C1CCCCCCCCCCCC(=O)OCCO1,aroma-supplement
+musky,ambrettolide,O=C1CCCCCC=CCCCCCCCCO1,aroma-supplement
+musky,habanolide,O=C1CCCCCCCCCC=CCCCO1,aroma-supplement
+vegetable,2-isobutyl-3-methoxypyrazine,COc1nccnc1CC(C)C,aroma-supplement
+vegetable,2-isopropyl-3-methoxypyrazine,COc1nccnc1C(C)C,aroma-supplement
+vegetable,dimethyl sulfide,CSC,aroma-supplement
+vegetable,2-acetylpyrrole,CC(=O)c1ccc[nH]1,aroma-supplement
 grassy,cis-3-hexenal,CCC=CCC=O,aroma-supplement
 grassy,cis-3-hexen-1-ol,CCC=CCCO,aroma-supplement
 grassy,trans-2-hexenal,CCCC=CC=O,aroma-supplement
