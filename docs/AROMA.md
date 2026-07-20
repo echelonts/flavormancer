@@ -18,7 +18,7 @@ enumerable via the annotations API. Pipeline:
   physicochemical descriptor block** (`chemfeatures.py`: MW, logP, TPSA, H-bond donors/
   acceptors, rotatable bonds, ring counts, fraction sp3, heteroatoms — the global properties
   bare bits miss). After broadening the vocabulary, folding the curated `flavors.csv` molecules
-  in (825 → **1027** molecules, incl. a curated public-domain supplement), and adding those features, **34 heads clear CV-AUROC ≥ 0.70**
+  in (825 → **1034** molecules, incl. a curated public-domain supplement), and adding those features, **37 heads clear CV-AUROC ≥ 0.70**
   (each score is that descriptor's own held-out AUROC): medicinal 0.97, ammoniacal 0.96,
   petroleum 0.96, citrus 0.94, camphor 0.93, almond 0.92, fatty 0.89, minty 0.88, ethereal 0.87,
   fruity 0.87, fishy 0.86, sulfurous 0.85, garlic 0.84, floral 0.83, pungent 0.81, earthy 0.73.

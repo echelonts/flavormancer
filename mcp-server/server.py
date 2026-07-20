@@ -69,7 +69,8 @@ def _read_flavor(molecule: str) -> dict:
         taste["salty"] = d["salty_predicted"]
     descriptors = (aroma.get("predicted") or {}).get("descriptors", [])
     return {
-        "name": names.get("common"), "iupac": names.get("iupac"), "smiles": d.get("smiles"),
+        "name": names.get("common"), "iupac": names.get("iupac"),
+        "formula": names.get("formula"), "smiles": d.get("smiles"),
         "taste_probabilities": {k: round(v, 3) for k, v in taste.items()},
         "sour_rule": d.get("sour"), "salty_rule": d.get("salty"),
         "confident_aromas": [x["odor"] for x in descriptors if x.get("confident")],

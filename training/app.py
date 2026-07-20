@@ -323,7 +323,15 @@ def api_names(q: Query):
     # resolves to Title "3-Phenylprop-2-Enal"), which then looks like the IUPAC name repeated.
     if smi and raw and Chem.MolFromSmiles(raw) is None:
         common = raw[:1].upper() + raw[1:]
-    return {"common": common, "iupac": iupac, "smiles": smi}
+    return {"common": common, "iupac": iupac, "smiles": smi, "formula": _formula(smi)}
+
+
+def _formula(smi):
+    """Hill-system molecular formula (e.g. C9H16O2) — a compact 4th identifier alongside
+    common / IUPAC / SMILES. None for an unparseable SMILES."""
+    from rdkit.Chem import rdMolDescriptors
+    m = Chem.MolFromSmiles(smi) if smi else None
+    return rdMolDescriptors.CalcMolFormula(m) if m is not None else None
 
 
 @app.post("/api/structure")
@@ -504,7 +512,8 @@ def api_card(q: str = "", dl: int = 0):
     if iupac and iupac.lower() != name.lower():
         dr.text((x, 206), ("IUPAC  " + iupac)[:64], font=f_body, fill=muted)
     dr.text((x, 232), smi[:58], font=f_mono, fill=muted)
-    dr.text((x, 280), "READS AS", font=f_lab, fill=muted)
+    dr.text((x, 254), "formula  " + (_formula(smi) or ""), font=f_mono, fill=muted)
+    dr.text((x, 282), "READS AS", font=f_lab, fill=muted)
     px, py = x, 306
     for text, c in pill_items:
         w = dr.textlength(text, font=f_pill)
@@ -1160,6 +1169,17 @@ def _precompute_design():
                 continue
             pool.append({"smiles": smi, "name": nm, "tags": tags, "gras": skel in P._GRAS})
             cnt.update(tags)
+        # fold the curated character-impact molecules (supplement + flavors) into the index so
+        # their descriptors (coconut, nutty, vanilla, cinnamon...) are searchable + offerable even
+        # where the industrial-skewed odor corpus is thin on them
+        for note, carriers in _NOTE_CARRIERS.items():
+            for csmi, cnm in carriers:
+                cm = Chem.MolFromSmiles(csmi)
+                if cm is None:
+                    continue
+                pool.append({"smiles": csmi, "name": cnm or "", "tags": {note},
+                             "gras": Chem.MolToInchiKey(cm).split("-")[0] in P._GRAS})
+                cnt.update([note])
         _DESIGN[:] = pool
         _DESIGN_DESCS[:] = sorted(d for d, n in cnt.items() if n >= 5)
     except Exception:  # noqa: BLE001 — no corpus/models; designer just stays empty
@@ -1389,6 +1409,7 @@ ENRICH_COLUMNS = [
     {"key": "name", "label": "Common name", "why": "Everyday name (PubChem Title, public domain) where one exists."},
     {"key": "iupac", "label": "IUPAC name", "why": "Systematic IUPAC name (public-domain PubChem) — the unambiguous identity."},
     {"key": "smiles", "label": "SMILES", "why": "The machine-readable structure string the models actually read."},
+    {"key": "formula", "label": "Formula", "why": "Hill-system molecular formula (e.g. C9H16O2) — a compact 4th identifier."},
     {"key": "taste", "label": "Taste", "why": "Documented taste where known, else the model's call — what it tastes like."},
     {"key": "aroma_top", "label": "Aroma", "why": "The strongest predicted odor descriptor — the note it most reads as."},
     {"key": "mw", "label": "MW", "why": "Molecular weight (Da) — size. Heavier molecules are generally less volatile, so aroma fades."},
@@ -1420,6 +1441,7 @@ def _load_enrichment():
         iupac = (_NAME_TABLE.get(skel) or (None, None))[1] if isinstance(skel, str) else None
         rows.append({
             "smiles": r["smiles"], "name": _s(r.get("name")), "iupac": iupac or "",
+            "formula": _formula(r["smiles"]) or "",
             "taste": taste, "aroma_top": _s(r.get("aroma_top")),
             "mw": _num(r.get("mw")), "logp": _num(r.get("logp")), "tpsa": _num(r.get("tpsa")),
             "hbd": _num(r.get("hbd")), "hba": _num(r.get("hba")), "rot_bonds": _num(r.get("rot_bonds")),
