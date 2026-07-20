@@ -121,6 +121,14 @@ def _analyze_formulation(ingredients: list, target: list, processes: list) -> di
     return _strip(r.json())
 
 
+def _design_recipe(flavors: list, notes: list, food_safe: bool) -> dict:
+    r = _post("/api/design_recipe",
+              {"flavors": flavors or [], "notes": notes or [], "food_safe": food_safe})
+    if r.status_code != 200:
+        return {"error": f"recipe design failed (HTTP {r.status_code})"}
+    return _strip(r.json())
+
+
 def _screen_mixture(ingredients: list, processes: list) -> dict:
     r = _post("/api/mixture", {"ingredients": ingredients, "processes": processes or []})
     if r.status_code != 200:
@@ -271,6 +279,20 @@ def analyze_formulation(ingredients: list[dict], target: list[str] = [], process
     suggestions, a documented-hazard screen, and honest data-gate notes.
     """
     return _analyze_formulation(ingredients, target, processes)
+
+
+@mcp.tool()
+def design_recipe(flavors: list[str] = [], notes: list[str] = [], food_safe: bool = True) -> dict:
+    """Design a STARTING formulation for a target profile — the inverse of analyze_formulation.
+
+    Give target flavors (e.g. ["lemon"]) and/or aroma notes (e.g. ["citrus","fresh"]). Returns a
+    food-safe recipe: character-impact molecules for the flavors + GRAS carriers for the notes,
+    deduped, dosed by INVERSE VOLATILITY (volatile top-notes start low ~33 ppm, heavy base-notes
+    higher ~100 ppm) to aim for balanced contributions in the directional model — already run
+    through the analyzer so you see the predicted profile + gap. Doses are a bench starting point;
+    calibrated dosing needs odor-threshold / panel data (a data-gate).
+    """
+    return _design_recipe(flavors, notes, food_safe)
 
 
 @mcp.tool()

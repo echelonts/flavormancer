@@ -773,6 +773,89 @@ def api_formulation(f: FormulationQuery):
     }
 
 
+# ── Recipe generator ────────────────────────────────────────────────────────
+# The inverse of the analyzer: pick a target (flavors + notes) and Studio proposes a starting
+# formulation — food-safe carriers at rough, volatility-balanced doses — then runs it through
+# the analyzer so you see the predicted profile + gap right away. Doses are a starting point.
+_VOL_PPM = {"high": 33.0, "moderate": 50.0, "low": 100.0}  # inverse-volatility: aim for balanced contributions
+
+
+class DesignRecipeQuery(BaseModel):
+    flavors: list[str] = []
+    notes: list[str] = []
+    food_safe: bool = True
+
+
+@app.post("/api/design_recipe")
+def api_design_recipe(d: DesignRecipeQuery):
+    """Design a STARTING formulation for a desired profile. Pick target flavors + notes; get a
+    food-safe recipe (carriers + rough starting ppm) already run through the analyzer, so you see
+    its predicted profile and the gap. Doses are a bench starting point — calibrated dosing needs
+    odor-threshold / panel data (a data-gate)."""
+    picks = []  # [canonical_smiles, [carries...], name]
+    seen = {}
+
+    def add(smi, carries, name):
+        m = Chem.MolFromSmiles(smi) if smi else None
+        if m is None:
+            return
+        cs = Chem.MolToSmiles(m)
+        if cs in seen:
+            if carries not in seen[cs][1]:
+                seen[cs][1].append(carries)
+            return
+        row = [cs, [carries], name or _name_local(cs) or cs]
+        seen[cs] = row
+        picks.append(row)
+
+    # flavors -> their character-impact molecule
+    for fl in d.flavors:
+        entries = _FLAVORS.get(fl.strip().lower()) or _FLAVORS.get(fl.strip())
+        if entries:
+            add(entries[0]["smiles"], fl, entries[0].get("molecule"))
+
+    # notes -> a food-safe carrier (GRAS-preferred, named)
+    for note in d.notes:
+        chosen, fallback = None, None
+        for mt in P.palette_match([], [note], k=8).get("matches", []):
+            nm = _name_local(mt["smiles"])
+            if not nm:
+                continue
+            cmol = Chem.MolFromSmiles(mt["smiles"])
+            if cmol is not None and P._gras_status(cmol).startswith("in GRAS"):
+                chosen = (mt["smiles"], nm)
+                break
+            fallback = fallback or (mt["smiles"], nm)
+        pick = chosen or (None if d.food_safe else fallback)
+        if pick:
+            add(pick[0], note, pick[1])
+
+    if not picks:
+        return {"recipe": [], "targeted": {"flavors": d.flavors, "notes": d.notes},
+                "note": "No food-safe carriers found for that target — try different flavors/notes."}
+
+    recipe = []
+    for cs, carries, name in picks:
+        vt = P.physchem(Chem.MolFromSmiles(cs))["qualitative"]["aroma_volatility"].split()[0]
+        recipe.append({"name": name, "smiles": cs, "ppm": _VOL_PPM.get(vt, 50.0),
+                       "carries": carries, "volatility": vt})
+
+    analysis = api_formulation(FormulationQuery(
+        ingredients=[{"name": r["smiles"], "ppm": r["ppm"]} for r in recipe],
+        target=d.notes, processes=[]))
+    return {
+        "recipe": recipe,
+        "analysis": analysis,
+        "targeted": {"flavors": d.flavors, "notes": d.notes},
+        "note": ("How these doses are set: each target flavor maps to its character-impact molecule "
+                 "and each note to a food-safe (GRAS) carrier, then doses are assigned by INVERSE "
+                 "VOLATILITY — volatile top-notes start low (~33 ppm), heavier base-notes higher "
+                 "(~100 ppm) — so no single ingredient's odor impact dominates the directional model. "
+                 "It's an honest STARTING POINT to tune on the bench; true calibrated dosing needs "
+                 "odor thresholds / panel intensities (a data-gate that comes with your data)."),
+    }
+
+
 def _load_suggest():
     import csv
     try:
