@@ -17,7 +17,7 @@ running entirely on hardware you own.
 <p align="center">
   <img src="docs/assets/flavor-map.png" alt="Flavor-space map in 3D on MW × logP × TPSA axes, colored by taste and aroma" width="900">
 </p>
-<p align="center"><sub>The interactive flavor-space map in 3D on real <b>MW × logP × TPSA</b> axes, colored by <b>taste &amp; aroma</b> — every one of the 41 aroma + 6 taste classes labelled.</sub></p>
+<p align="center"><sub>The interactive flavor-space map in 3D on real <b>MW × logP × TPSA</b> axes, colored by <b>taste &amp; aroma</b> — every one of the 42 aroma + 6 taste classes labelled.</sub></p>
 
 > **8,393 unique molecules** across the open datasets · **taste + aroma** prediction from
 > structure · a **flavor library** (start from a flavor → its character-impact molecule) and
@@ -25,7 +25,7 @@ running entirely on hardware you own.
 > interactive 2D/3D **flavor-space map** · **2D & 3D** structure views. All on
 > commercial-clean public data.
 >
-> Per set (unique molecules): taste training **3,845** · aroma training **1046** · odor
+> Per set (unique molecules): taste training **3,845** · aroma training **1060** · odor
 > corpus **2,255** · documented taste **676** · GRAS reference **2,781** · sweetness
 > intensity **316** · curated character-impact flavors **95 flavors / 77 molecules** · public-domain aroma supplement **102 associations**.
 > Every one of the 8,393 is enriched with names + measured properties from public-domain PubChem.
@@ -59,7 +59,7 @@ is tagged by how it was derived**, so nothing reads as more certain than its sou
   **tasteless** (RandomForests on fingerprint + physicochemical features), plus a
   sweetness-**intensity** regressor. Sour and salty *also* keep a transparent chemistry
   rule (acid group / alkali-salt) as a deterministic cross-check alongside the model.
-- **Aroma** — **41 odor-descriptor heads** (citrus, floral, minty, almond, fatty,
+- **Aroma** — **42 odor-descriptor heads** (citrus, floral, minty, almond, fatty,
   petroleum, earthy, medicinal, sulfurous, camphor, fruity, fishy, garlic, ethereal,
   ammoniacal, pungent, pine, rose, rancid, alcoholic, woody, green, grassy, putrid)
   trained on **public-domain** HSDB odor text + curated character-impact facts, surfaced
@@ -154,7 +154,7 @@ Flavormancer ships as two editions of one method:
 | Edition | Commercial | Academic / open-source *(coming soon)* |
 | License | Apache-2.0 | open-source, **research / NonCommercial** |
 | Data | commercial-clean open data only | adds research odor datasets with **NonCommercial** terms |
-| Aroma | **41 presence/absence descriptor heads ship** (public-domain HSDB); scored **intensity** is trained on your data or a licensed set (PMP 2001) | full open model incl. **intensity** (research odor data) |
+| Aroma | **42 presence/absence descriptor heads ship** (public-domain HSDB); scored **intensity** is trained on your data or a licensed set (PMP 2001) | full open model incl. **intensity** (research odor data) |
 | Use | free to use, sell, run on-prem | research, teaching, advancing the method |
 
 The split is deliberate. The richest aroma data is licensed for research only, so

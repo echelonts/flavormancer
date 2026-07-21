@@ -297,6 +297,28 @@ def design_recipe(flavors: list[str] = [], notes: list[str] = [], food_safe: boo
 
 
 @mcp.tool()
+def design_recipe_csv(flavors: list[str] = [], notes: list[str] = [], food_safe: bool = True) -> str:
+    """Same as design_recipe, but returns the recipe as a CSV bench sheet (a string) instead of
+    JSON — parity with the workbench's 'Export CSV' and the skill CLI's `design --csv`. Columns:
+    ingredient, smiles, ppm, volatility, carries, dose_basis. Hand this straight to a formulator
+    or drop it into a spreadsheet."""
+    import csv as _csv
+    import io as _io
+    out = _design_recipe(flavors, notes, food_safe)
+    if isinstance(out, dict) and out.get("error"):
+        return "error," + str(out["error"])
+    rec = (out or {}).get("recipe") or []
+    buf = _io.StringIO()
+    buf.write("# Flavormancer formulation - directional starting recipe (tune on the bench)\n")
+    w = _csv.writer(buf)
+    w.writerow(["ingredient", "smiles", "ppm", "volatility", "carries", "dose_basis"])
+    for i in rec:
+        w.writerow([i.get("name", ""), i.get("smiles", ""), i.get("ppm", ""),
+                    i.get("volatility", ""), "; ".join(i.get("carries") or []), i.get("dose_basis", "")])
+    return buf.getvalue()
+
+
+@mcp.tool()
 def screen_mixture(ingredients: list[str], processes: list[str] = []) -> dict:
     """Screen a mixture of ingredients for DOCUMENTED food hazards (e.g. benzoate + ascorbate
     -> benzene), gated on process. Includes per-ingredient reads, a palette match, and

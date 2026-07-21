@@ -714,7 +714,7 @@
       <div class="how-grid">
         <div class="how-card"><h4>1 · Structure → numbers</h4><p>Every molecule becomes a <b>2,048-bit Morgan fingerprint</b> (which substructures it contains) plus a block of <b>physicochemical descriptors</b> (logP, MW, TPSA, H-bonding…). That one shared vector feeds every model — the same structure-to-property representation QSAR has leaned on for decades.</p></div>
         <div class="how-card"><h4>2 · Taste — 6 trained heads + 2 rules</h4><p>Six <b>random-forest</b> classifiers (sweet, bitter, umami…) each return a probability, scored by an honest held-out <b>CV-AUROC</b>. Sour and salty are solution / ionic effects, not molecule-shape ones, so they're transparent <b>rules</b> — not faked models. A sweetness-intensity regressor estimates relative-to-sucrose potency.</p></div>
-        <div class="how-card"><h4>3 · Aroma — 41 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 41 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
+        <div class="how-card"><h4>3 · Aroma — 42 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 42 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
         <div class="how-card"><h4>4 · Honest by design</h4><p>Every value is tagged <b>measured / predicted / estimate</b>, so nothing reads as more precise than it is. Where a quantitative feature needs data we can't ship free-commercially (odor thresholds, panel intensities), the UI <b>says so</b> — and it lights up with <b>your</b> data.</p></div>
         <div class="how-card"><h4>5 · Formulation, not just molecules</h4><p>The <b>Formulation Studio</b> reads a whole recipe before you pour — weighting each ingredient by odor impact, aggregating the blend's note-profile, flagging the overpowering component, and closing the gap to your target. That's single-molecule ML turned into a bench tool.</p></div>
         <div class="how-card"><h4>6 · On-prem &amp; commercial-clean</h4><p>Nothing leaves the box — a read makes <b>no cloud calls</b>. The shipped models train only on <b>public-domain or permissively-licensed</b> data, so the commercial edition stays clean (provenance tracked in the repo).</p></div>
@@ -740,7 +740,7 @@
       </div>
       <div id="studioChips" class="studio-chips"></div>
       <div class="design-controls">
-        <label class="design-gras"><input type="checkbox" id="designGras" checked> food-safe (GRAS) only</label>
+        <label class="design-gras"><input type="checkbox" id="designGras" checked> food-listed only</label>
         <button class="mix-btn" id="studioGo">Find molecules<span id="studioGoCount" class="studio-count"></span></button>
         <button type="button" id="studioClear" class="studio-clear">clear</button>
       </div>
@@ -871,7 +871,7 @@
           the trend, exactly the kind of lead worth a closer look.</p>
           <p><b>Two flavor dimensions.</b> Flip the color toggle between <b>taste</b> (sweet /
           bitter / umami / sour / salty / tasteless) and <b>aroma</b> (= odor — the same thing;
-          the 41 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
+          the 42 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
           same structural layout — you're overlaying a different sense. The <b>both</b> toggle merges
           them into one full-flavor view: each dot takes its <b>taste</b> color where a taste is known,
           otherwise its <b>aroma</b> color — so nearly every molecule is colored by its dominant known
@@ -1030,12 +1030,17 @@
           sour / tasteless). <span class="lic">CC BY 4.0</span></li>
         <li><b>SweetenersDB</b> — relative sweetness values for the sweetness-intensity
           regressor. <span class="lic">MIT</span></li>
-        <li><b>FEMA GRAS</b> — food-safe (Generally Recognized As Safe) flavor-substance
-          reference. <span class="pd">public listing</span></li>
+        <li><b>FDA “Substances Added to Food” (SAF)</b> — the food-use listing cross-check
+          (broader than GRAS). A <i>listing</i> signal, not a GRAS or safety determination.
+          <span class="pd">public domain</span></li>
+        <li><b>EU / GB flavourings Union List</b> (<code>data.food.gov.uk</code>, Reg. 1334/2008
+          Annex I) — food-clearance for a few odorants absent from the SAF crawl, cited by FL
+          number. <span class="pd">Open Government Licence v3</span></li>
         <li><b>Tox21</b> (NIH / EPA / NCATS / FDA) — in-vitro assay data for the caution-only
           structural tox cross-check. <span class="pd">public domain</span></li>
         <li>Curated <b>character-impact compounds</b> — well-documented public flavor-chemistry
-          facts (which molecule gives a flavor its signature note).</li>
+          facts (which molecule gives a flavor its signature note); each food-clearance is cited
+          to an open-government register (SAF / EU FL / 21 CFR), never a commercial compilation.</li>
         <li><b>PubChem</b> &amp; <b>NIST WebBook</b> — deep-linked per molecule for spectra
           (IR / MS) and GC retention indices. We link, never rehost (NIST is individual-use).</li>
       </ul>
@@ -1132,7 +1137,9 @@ const AROMA_HELP = {
   balsamic:'sweet-resinous balsam — benzyl / cinnamyl esters',
   smoky:'smoke / phenolic — guaiacol &amp; alkylphenols',
   cinnamon:'cinnamon — cinnamaldehyde &amp; esters',
-  spicy:'warm spice — eugenol / cinnamaldehyde / capsaicinoid family',
+  spicy:'warm spice — eugenol / cinnamaldehyde / piperine / cuminaldehyde family',
+  anise:'anise / licorice — anethole &amp; anisyl aromatics',
+  meaty:'savoury / cooked-meat — sulfur volatiles (furanthiols, thiazoles, methional)',
   banana:'ripe banana — isoamyl acetate &amp; branched esters',
   fresh:'clean / airy — light aldehydes &amp; dihydromyrcenol',
   musky:'musk — macrocyclic ketones / lactones',
@@ -1338,7 +1345,7 @@ function render(p, neighbors, svg, names){
           ${_has3D?`<button type="button" class="mini-3d nb-3d" data-i="${i}" data-m="2d">3D</button>`:''}
         </div>
         <div class="nb-info">
-          <div class="nb-name">${x.name||'—'}${x.gras?'<span class="nb-gras" title="On the FEMA/FDA food-safe (GRAS) reference — a flag, not a clearance">GRAS</span>':''}</div>
+          <div class="nb-name">${x.name||'—'}${x.gras?'<span class="nb-gras" title="Listed in a food-use reference (FDA Substances-Added-to-Food / EU flavourings) — a listing flag, not a GRAS or safety clearance">Food-listed</span>':''}</div>
           ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
           <div class="s">${x.smiles}</div>
           <div class="kt">${x.known_tastes.length?x.known_tastes.map(t=>`<span class="tchip" style="background:${TASTE_COLORS[t]||'var(--muted)'}">${t}</span>`).join(''):'<span class="muted">no known taste</span>'}</div>
@@ -1627,7 +1634,7 @@ const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD2
 // aroma head shows, even if the current map has few or zero of one (e.g. salty).
 const TASTE_CLASSES = ['sweet','bitter','umami','sour','salty','tasteless'];
 // all trained aroma heads — keep in sync with aroma_models/ (see docs/AROMA-AUDIT.md)
-const AROMA_HEADS = ['citrus','floral','minty','almond','fatty','petroleum','earthy','medicinal','sulfurous','camphor','fruity','fishy','garlic','ethereal','ammoniacal','pungent','pine','rose','rancid','alcoholic','woody','green','grassy','putrid','coconut','nutty','caramel','honey','herbal','winey','onion','vanilla','buttery','balsamic','smoky','cinnamon','spicy','banana','fresh','musky','vegetable'];
+const AROMA_HEADS = ['pungent','ammoniacal','fruity','ethereal','medicinal','sulfurous','floral','garlic','fishy','earthy','camphor','fatty','almond','citrus','minty','spicy','petroleum','putrid','alcoholic','green','grassy','woody','rose','vanilla','winey','banana','musky','nutty','rancid','pine','coconut','anise','herbal','caramel','buttery','onion','balsamic','smoky','honey','cinnamon','meaty','vegetable'];
 function legendClasses(){
   if(_mapColorBy==='aroma') return AROMA_HEADS;
   if(_mapColorBy==='both')  return TASTE_CLASSES.concat(AROMA_HEADS);
@@ -1691,7 +1698,7 @@ function setMapColor(c){ _mapColorBy=c;
 let _mapHi = new Set();  // classes highlighted from the legend (empty = show all evenly)
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
-  // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 41 aroma heads /
+  // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 42 aroma heads /
   // both), plus 'other' last. Present classes are ordered by count; any with zero points still
   // appear (dimmed) so the legend is a full reference — never hide a real head.
   const canon=legendClasses();
@@ -1739,7 +1746,7 @@ function drawClusterLabels(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), groups={};
   for(const p of _mapPts){ const l=mapLabel(p); if(!l||l==='other') continue; (groups[l]=groups[l]||[]).push(p); }
   ctx.save(); ctx.font='700 14px "Cinzel Decorative",Georgia,serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  // label EVERY class that has points (all 41 aroma / 6 taste heads), not just the big ones
+  // label EVERY class that has points (all 42 aroma / 6 taste heads), not just the big ones
   for(const l in groups){ const pts=groups[l]; if(pts.length<3) continue;
     let sx=0,sy=0,n=0; for(const p of pts){ const x=_mapProj.px(p),y=_mapProj.py(p); if(x<-9000||!isFinite(x)) continue; sx+=x; sy+=y; n++; }
     if(!n) continue; sx/=n; sy/=n;
@@ -2004,7 +2011,7 @@ async function runStudio(offset){
     <span>${from}–${to} of ${tot}</span>
     <button class="pg" id="sNext" ${to>=tot?'disabled':''}>next ›</button></div>`;
   res.innerHTML=`<div class="empty" style="grid-column:1/-1">${tot} molecule${tot>1?'s':''} for <b>${[..._studioSel].join(' + ')}</b>${gras?' (food-safe)':''} — the ones hitting the most picks first:</div>`+items.map((it,i)=>{
-    const badge=it.gras?'<span class="dbadge">GRAS</span>':'';
+    const badge=it.gras?'<span class="dbadge" title="Listed in a food-use reference (FDA SAF / EU flavourings) — not a GRAS or safety clearance">Food-listed</span>':'';
     const match=(it.matched||[]).map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('');
     const other=(it.other&&it.other.length)?`<div class="dmatch">${it.other.map(t=>`<span class="mt" style="background:#2A323C;color:var(--muted)">${t}</span>`).join('')}</div>`:'';
     const subs=(it.subs&&it.subs.length)?`<div class="dsubs">food-safe drop-ins: ${it.subs.map(s=>`<a data-smi="${s.smiles.replace(/"/g,'&quot;')}">${s.name||s.smiles.slice(0,14)}</a>`).join(', ')}</div>`:'';
@@ -2045,7 +2052,7 @@ function etCell(c, r){
   if(c.key==='smiles') return `<td><span class="et-clip et-smiles" title="${(v||'').replace(/"/g,'&quot;')}">${v||''}</span></td>`;
   if(c.key==='iupac') return `<td>${v?`<span class="et-clip" title="${v.replace(/"/g,'&quot;')}">${v}</span>`:'<span class="et-mut">—</span>'}</td>`;
   if(c.key==='name'){ const iso=r.is_isomer?' <span class="et-iso" title="A stereoisomer with its own documented odor/taste">isomer</span>':''; return `<td class="et-name">${v||'<span class="et-mut">—</span>'}${iso}</td>`; }
-  if(c.key==='gras') return `<td>${v?'<span class="et-gras">GRAS</span>':''}</td>`;
+  if(c.key==='gras') return `<td>${v?'<span class="et-gras" title="Listed in a food-use reference (FDA SAF / EU flavourings) — not a GRAS or safety clearance">Food-listed</span>':''}</td>`;
   if(c.key==='taste') return `<td>${(v||'').split(',').filter(Boolean).map(t=>`<span class="et-tag" style="background:${(TASTE_COLORS[t]||'#8A96A0')};color:#08121A">${t}</span>`).join(' ')}</td>`;
   if(c.key==='aroma_top') return `<td>${v?`<span class="et-tag" style="background:${aromaColor(v)};color:#08121A">${v}</span>`:''}</td>`;
   return `<td>${v==null?'<span class="et-mut">—</span>':v}</td>`;
@@ -2150,7 +2157,7 @@ $('mixCheck').addEventListener('click', async ()=>{
         <div class="mix-ing">
           <div class="nb-struct">${it.svg||''}</div>
           <div class="nb-info"><div class="nb-name">${it.name||it.smiles}</div>
-            <div class="kt">${(it.tastes||[]).join(' · ')||'—'}${(it.gras||'').indexOf('in GRAS')===0?' · GRAS':''}</div>
+            <div class="kt">${(it.tastes||[]).join(' · ')||'—'}${(it.gras||'').indexOf('listed')===0?' · Food-listed':''}</div>
             ${((it.alerts||[]).length||(it.tox_flags||[]).length)?`<div class="kt" style="color:#8A3A22">⚠ ${[...(it.alerts||[]),...(it.tox_flags||[]).map(f=>'tox:'+f)].join(', ')}</div>`:''}
           </div></div>`).join('')+'</div>';
     }
@@ -2224,10 +2231,11 @@ fetch('/api/studio_terms').then(r=>r.json()).then(d=>{
     box.appendChild(b);
   }));
 }).catch(()=>{});
-let _lastRecipe=[];
+let _lastRecipe=[]; let _lastRecipeMeta={flavors:[],notes:[]};
 $('formDesign').addEventListener('click', async ()=>{
   const flavors=[..._formFlavors], notes=[..._formTarget];
   if(!flavors.length && !notes.length){ $('formResults').innerHTML='<div class="empty">Pick at least one target flavor or note, then Design.</div>'; return; }
+  _lastRecipeMeta={flavors, notes};
   $('formDesign').disabled=true; $('formDesign').textContent='Designing…';
   try{
     const r=await post('/api/design_recipe',{flavors, notes, food_safe:true});
@@ -2242,7 +2250,11 @@ function renderRecipe(r){
   let h='<div class="bsub">Suggested recipe <span style="font-weight:400;color:var(--muted)">— '+rec.length+' ingredient'+(rec.length>1?'s':'')+', a starting point to tune</span></div>';
   h+='<div class="recipe-note">✨ '+formEsc(r.note||'')+'</div>';
   h+='<div class="recipe-strip">'+rec.map(i=>`<div class="recipe-ing"><div class="ri-name">${formEsc(i.name)}</div><div class="ri-meta">${i.ppm} ppm · ${formEsc(i.volatility||'')} volatility</div><div class="ri-carries">carries: ${(i.carries||[]).map(formEsc).join(', ')}</div></div>`).join('')+'</div>';
-  h+='<div class="form-actions" style="margin-bottom:12px"><button class="mix-btn" id="recipeLoad">↓ Load into the rows to tune &amp; re-analyze</button></div>';
+  h+='<div class="form-actions" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px">'
+    +'<button class="mix-btn" id="recipeLoad">↓ Load into the rows to tune &amp; re-analyze</button>'
+    +'<button class="mix-btn" id="recipeCsv" title="Download this recipe as a CSV bench sheet">⤓ Export CSV</button>'
+    +'<button class="mix-btn" id="recipeCard" title="Download a shareable recipe card (PNG)">⤓ Export card (PNG)</button>'
+    +'</div>';
   if(r.analysis){ h+='<div class="bsub" style="margin-top:6px">Predicted read of this starting recipe</div>'+renderFormulation(r.analysis); }
   return h;
 }
@@ -2307,6 +2319,47 @@ function renderFormulation(r){
   h+='<div class="form-gate"><b>What this is, and what sharpens it.</b> '+formEsc(dg.intensity||'')+' '+formEsc(dg.synergy||'')+'</div>';
   return h;
 }
+function _recipeTitle(){
+  const m=_lastRecipeMeta||{flavors:[],notes:[]};
+  const parts=[...(m.flavors||[]), ...(m.notes||[])];
+  return parts.length? (parts.join(' · ')+' formulation') : 'Formulation';
+}
+function _dl(blob, filename){
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+function _recipeCsv(){
+  const rec=_lastRecipe||[]; if(!rec.length) return;
+  const esc=v=>{ const s=(v==null?'':String(v)); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const head=['ingredient','smiles','ppm','volatility','carries','dose_basis'];
+  const lines=[head.join(',')].concat(rec.map(i=>[
+    i.name, i.smiles||'', (i.ppm==null?'':i.ppm), i.volatility||'',
+    (i.carries||[]).join('; '), i.dose_basis||''
+  ].map(esc).join(',')));
+  const m=_lastRecipeMeta||{flavors:[],notes:[]};
+  // provenance/target header lines (comment rows) so the sheet is self-describing
+  const pre=['# Flavormancer formulation — directional starting recipe (tune on the bench)',
+             '# target flavors: '+((m.flavors||[]).join('; ')||'—'),
+             '# target notes: '+((m.notes||[]).join('; ')||'—')];
+  const csv=pre.concat(lines).join('\n')+'\n';
+  const slug=_recipeTitle().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'recipe';
+  _dl(new Blob([csv],{type:'text/csv'}), 'flavormancer-'+slug+'.csv');
+}
+async function _recipeCard(btn){
+  const rec=_lastRecipe||[]; if(!rec.length) return;
+  const m=_lastRecipeMeta||{flavors:[],notes:[]};
+  const old=btn.textContent; btn.disabled=true; btn.textContent='Rendering…';
+  try{
+    const res=await fetch('/api/recipe_card?dl=1',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title:_recipeTitle(), flavors:m.flavors||[], notes:m.notes||[],
+        ingredients:rec.map(i=>({name:i.name, smiles:i.smiles||'', ppm:i.ppm, carries:i.carries||[], volatility:i.volatility||''}))})});
+    if(!res.ok) throw new Error('render failed');
+    const slug=_recipeTitle().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'recipe';
+    _dl(await res.blob(), 'flavormancer-'+slug+'.png');
+  }catch(err){ btn.textContent='Export failed'; setTimeout(()=>{btn.textContent=old;},1500); return; }
+  finally{ btn.disabled=false; if(btn.textContent==='Rendering…') btn.textContent=old; }
+}
 $('formResults').addEventListener('click', e=>{
   if(e.target && e.target.id==='recipeLoad'){   // drop the designed recipe into the rows + analyze
     $('formRows').innerHTML='';
@@ -2314,6 +2367,8 @@ $('formResults').addEventListener('click', e=>{
     $('formGo').click();
     return;
   }
+  if(e.target && e.target.id==='recipeCsv'){ _recipeCsv(); return; }
+  if(e.target && e.target.id==='recipeCard'){ _recipeCard(e.target); return; }
   const c=e.target.closest('.form-ing[data-smi]'); if(c){ q.value=c.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
 });
 document.querySelectorAll('.form-ex').forEach(b=> b.addEventListener('click', ()=>{
