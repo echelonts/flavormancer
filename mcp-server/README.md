@@ -14,7 +14,7 @@ MCP client ──stdio──▶ flavormancer-mcp ──HTTP──▶ Flavormance
 
 ## Tools
 
-Full coverage of Flavormancer's capabilities — 13 tools.
+Full coverage of Flavormancer's capabilities — 15 tools.
 
 **Single molecule**
 

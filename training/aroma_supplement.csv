@@ -28,13 +28,15 @@ vanilla,ethylvanillin,CCOc1cc(C=O)ccc1O,aroma-supplement
 vanilla,vanillyl alcohol,COc1cc(CO)ccc1O,aroma-supplement
 vanilla,vanillic acid,COc1cc(C(=O)O)ccc1O,aroma-supplement
 vanilla,acetovanillone,COc1cc(C(C)=O)ccc1O,aroma-supplement
-vanilla,isovanillin,COc1ccc(C=O)cc1O,aroma-supplement
 vanilla,veratraldehyde,COc1ccc(C=O)cc1OC,aroma-supplement
 vanilla,syringaldehyde,COc1cc(C=O)cc(OC)c1O,aroma-supplement
+vanilla,piperonal,O=Cc1ccc2c(c1)OCO2,aroma-supplement
+vanilla,4-hydroxybenzaldehyde,O=Cc1ccc(O)cc1,aroma-supplement
+vanilla,4-formyl-2-methoxyphenyl acetate,COc1cc(C=O)ccc1OC(C)=O,aroma-supplement
 clove,eugenol,C=CCc1ccc(O)c(OC)c1,aroma-supplement
 clove,isoeugenol,CC=Cc1ccc(O)c(OC)c1,aroma-supplement
 clove,eugenyl acetate,C=CCc1ccc(OC(C)=O)c(OC)c1,aroma-supplement
-clove,methyleugenol,C=CCc1ccc(OC)c(OC)c1,aroma-supplement
+clove,4-vinylguaiacol,C=Cc1ccc(O)c(OC)c1,aroma-supplement
 cinnamon,cinnamaldehyde,O=CC=Cc1ccccc1,aroma-supplement
 cinnamon,cinnamyl alcohol,OCC=Cc1ccccc1,aroma-supplement
 cinnamon,cinnamic acid,O=C(O)C=Cc1ccccc1,aroma-supplement
@@ -50,6 +52,12 @@ spicy,cinnamaldehyde,O=CC=Cc1ccccc1,aroma-supplement
 spicy,zingerone,COc1cc(CCC(C)=O)ccc1O,aroma-supplement
 spicy,piperonal,O=Cc1ccc2c(c1)OCO2,aroma-supplement
 spicy,carvacrol,Cc1ccc(C(C)C)cc1O,aroma-supplement
+spicy,piperine,O=C(C=CC=Cc1ccc2c(c1)OCO2)N1CCCCC1,aroma-supplement
+spicy,cuminaldehyde,CC(C)c1ccc(C=O)cc1,aroma-supplement
+spicy,beta-caryophyllene,C=C1CCC=C(C)CCC2C1CC2(C)C,aroma-supplement
+spicy,cinnamyl acetate,CC(=O)OCC=Cc1ccccc1,aroma-supplement
+spicy,eugenyl acetate,C=CCc1ccc(OC(C)=O)c(OC)c1,aroma-supplement
+spicy,isoeugenol,CC=Cc1ccc(O)c(OC)c1,aroma-supplement
 banana,isoamyl acetate,CC(=O)OCCC(C)C,aroma-supplement
 banana,amyl acetate,CCCCCOC(C)=O,aroma-supplement
 banana,isoamyl butyrate,CCCC(=O)OCCC(C)C,aroma-supplement
@@ -86,9 +94,11 @@ smoky,p-cresol,Cc1ccc(O)cc1,aroma-supplement
 smoky,o-cresol,Cc1ccccc1O,aroma-supplement
 smoky,"2,6-dimethylphenol",Cc1cccc(C)c1O,aroma-supplement
 anise,anethole,CC=Cc1ccc(OC)cc1,aroma-supplement
-anise,estragole,C=CCc1ccc(OC)cc1,aroma-supplement
 anise,anisaldehyde,COc1ccc(C=O)cc1,aroma-supplement
 anise,fenchone,CC12CCC(C1)C(C)(C)C2=O,aroma-supplement
+anise,anisyl alcohol,COc1ccc(CO)cc1,aroma-supplement
+anise,anisyl phenylacetate,COc1ccc(COC(=O)Cc2ccccc2)cc1,aroma-supplement
+anise,methyl anisate,COC(=O)c1ccc(OC)cc1,aroma-supplement
 balsamic,benzyl benzoate,O=C(OCc1ccccc1)c1ccccc1,aroma-supplement
 balsamic,benzyl cinnamate,O=C(C=Cc1ccccc1)OCc1ccccc1,aroma-supplement
 balsamic,benzoic acid,O=C(O)c1ccccc1,aroma-supplement
@@ -101,6 +111,11 @@ herbal,menthone,CC1CCC(C(C)C)C(=O)C1,aroma-supplement
 meaty,methional,CSCCC=O,aroma-supplement
 meaty,2-methyl-3-furanthiol,Cc1occc1S,aroma-supplement
 meaty,furfuryl mercaptan,SCc1ccco1,aroma-supplement
+meaty,bis(2-methyl-3-furyl) disulfide,Cc1occc1SSc1ccoc1C,aroma-supplement
+meaty,"2,4,5-trimethylthiazole",Cc1nc(C)c(C)s1,aroma-supplement
+meaty,2-methyl-3-(methylthio)furan,CSc1ccoc1C,aroma-supplement
+meaty,4-methyl-5-vinylthiazole,C=Cc1scnc1C,aroma-supplement
+meaty,dimethyl trisulfide,CSSSC,aroma-supplement
 cherry,benzaldehyde,O=Cc1ccccc1,aroma-supplement
 cherry,p-tolualdehyde,Cc1ccc(C=O)cc1,aroma-supplement
 winey,ethyl lactate,CCOC(=O)C(C)O,aroma-supplement
@@ -116,7 +131,9 @@ fresh,hexanal,CCCCCC=O,aroma-supplement
 musky,muscone,CC1CCCCCCCCCCCCC(=O)C1,aroma-supplement
 musky,ethylene brassylate,O=C1CCCCCCCCCCCC(=O)OCCO1,aroma-supplement
 musky,ambrettolide,O=C1CCCCCC=CCCCCCCCCO1,aroma-supplement
-musky,habanolide,O=C1CCCCCCCCCC=CCCCO1,aroma-supplement
+musky,15-pentadecanolide,O=C1CCCCCCCCCCCCCCO1,aroma-supplement
+musky,16-hexadecanolide,O=C1CCCCCCCCCCCCCCCO1,aroma-supplement
+musky,civetone,O=C1CCCCCCCC=CCCCCCCC1,aroma-supplement
 vegetable,2-isobutyl-3-methoxypyrazine,COc1nccnc1CC(C)C,aroma-supplement
 vegetable,2-isopropyl-3-methoxypyrazine,COc1nccnc1C(C)C,aroma-supplement
 vegetable,dimethyl sulfide,CSC,aroma-supplement

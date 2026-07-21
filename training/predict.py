@@ -256,6 +256,31 @@ if _GRAS_FILE.exists():
     if "inchikey" in _g.columns:
         _GRAS = {str(k).split("-")[0] for k in _g["inchikey"].dropna()}
 
+# Curated food-clearance supplement (food_safe_supplement.csv) — a few molecules that carry an
+# aroma head but are NOT in the FDA SAF crawl, each backed by an OPEN-GOVERNMENT register only:
+# the EU Union List (Reg. 1334/2008 Annex I, via data.food.gov.uk under the Open Government
+# Licence) or US 21 CFR (public-domain law). Regulatory facts are non-copyrightable (Feist);
+# no commercial compilation is used. Union into the same defensive "recognized food ingredient?"
+# signal so these read as food-cleared everywhere the SAF list does.
+_FOODSAFE_FILE = Path("food_safe_supplement.csv")
+_FOODSAFE_BASIS = {}   # skeleton -> specific open-gov authority string (e.g. "EU FL 07.142")
+if _FOODSAFE_FILE.exists():
+    import pandas as pd  # noqa: F811
+    # dtype=str + keep_default_na=False so FL numbers keep leading zeros ("07.142", not 7.142)
+    # and empty cells read as "" rather than NaN.
+    _fs = pd.read_csv(_FOODSAFE_FILE, dtype=str, keep_default_na=False)
+    if "inchikey" in _fs.columns:
+        _GRAS |= {str(k).split("-")[0] for k in _fs["inchikey"].dropna()}
+        def _clean(v):
+            s = str(v).strip()
+            return "" if s.lower() in ("", "nan", "none") else s
+        for _, _r in _fs.iterrows():
+            _sk = str(_r.get("inchikey", "")).split("-")[0]
+            _fl, _cfr = _clean(_r.get("eu_fl")), _clean(_r.get("us_cfr"))
+            _basis = f"EU FL {_fl}" if _fl else _cfr
+            if _sk and _basis:
+                _FOODSAFE_BASIS[_sk] = _basis
+
 # Optional measured-property + dosing table. Data-gated like GRAS. Drop
 # properties.(parquet|csv) with an 'inchikey' column and any of:
 # odor_threshold_ppm, fema_use_max_ppm, boiling_point_c, vapor_pressure_pa.
@@ -349,11 +374,19 @@ def _tox_alerts(mol):
 
 
 def _gras_status(mol):
-    """Defensive 'is this even a recognized food ingredient?' check."""
+    """Defensive 'is this even a recognized food ingredient?' check — NOT a GRAS or safety
+    determination. The reference is a union of FDA's *Substances Added to Food* (SAF) inventory
+    (public domain; broader than GRAS) and a curated EU/GB flavourings + 21 CFR set
+    (`food_safe_supplement.csv`, open-government). We report *listing*, with the specific
+    authority where known, and never claim a molecule is "GRAS" unless it actually is."""
     if not _GRAS:
-        return "no GRAS reference loaded — not checked"
+        return "no food-use reference loaded — not checked"
     ik = Chem.MolToInchiKey(mol).split("-")[0]
-    return "in GRAS/flavor reference" if ik in _GRAS else "NOT in reference — unverified for food use"
+    if ik in _FOODSAFE_BASIS:
+        return f"listed as an authorised food flavouring ({_FOODSAFE_BASIS[ik]})"
+    if ik in _GRAS:
+        return "listed in the FDA Substances-Added-to-Food food-use reference"
+    return "not in the food-use reference — unverified for food use"
 
 
 def _safety(mol):

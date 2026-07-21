@@ -12,7 +12,9 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 > CC-BY-4.0** (confirmed on the Zenodo dataset deposit) and **SweetenersDB MIT**
 > (confirmed on `github.com/chemosim-lab/SweetenersDB`) for taste + sweetness; **PubChem
 > / HSDB / CAMEO / Haz-Map / Tox21 / FDA-SAF** are US-government public domain for
-> odor text, properties, tox assays, and GRAS. **No NonCommercial data is in the
+> odor text, properties, tox assays, and GRAS; the **EU/GB flavourings Union List**
+> (`data.food.gov.uk`, **Open Government Licence v3** — commercial reuse permitted) supplies
+> food-clearance facts for a handful of molecules absent from FDA-SAF. **No NonCommercial data is in the
 > commercial edition** — FlavorDB (CC-BY-NC-SA), the Leffingwell/GoodScents **GS-LF**
 > aroma set (NonCommercial), the FartDB composite, and PlantMolecularTasteDB are
 > **excluded** and reserved for the **academic edition** (or a licensed source such as
@@ -31,7 +33,9 @@ What feeds the models, what each source unlocks, its license, and how to get it.
 | **SweetenersDB v2.0** | the sweetness-**intensity** regressor | **MIT** | ✅ in use | direct CSV from `github.com/chemosim-lab/SweetenersDB` (`SweetenersDB_v2.0.csv`, 316 cmpds, `logSw` column). R²≈0.82. |
 | **Pyrfume — Leffingwell/GoodScents (GS-LF)** | the **aroma model** (OpenPOM) — #17/#18 | **RESTRICTED** | ❌ **excluded** | Use restrictions (John Leffingwell & Google; GoodScents/Arctander/Flavornet © Datu Inc.). **GS-LF = OpenPOM's GoodScents + Leffingwell *combined* set (~4,983 cmpds — rich precisely because it merges both), NonCommercial.** Excluded from the commercial edition entirely; it's the **academic edition's** aroma data. *Distinct from* **PMP 2001** — Leffingwell's *paid, commercially-licensable* product — which the commercial edition could use if licensed. |
 | **Pyrfume — open academic sets** | aroma model, **clean but small** | CC-BY / open-access (verify each) | candidates | `keller_2016` (BMC, CC-BY, ~480 cmpds), `snitz_2013` (PLOS, CC-BY), etc. Confirm each data deposit's license; combine + harmonize descriptor vocabularies for volume. |
-| **FEMA GRAS / FDA SAF** | GRAS cross-reference + dosing/OAV lookups | gov public / FEMA | ⬜ to get | FDA "Substances Added to Food" (public domain) → `gras_reference.parquet`; FEMA use-level PDFs → `properties.parquet`. **Verify every scraped dosing number.** |
+| **FDA SAF (Substances Added to Food)** | GRAS/food-ingredient cross-reference (the defensive "recognized food ingredient?" signal) | US-gov **public domain** | ✅ in use | FDA "Substances Added to Food" inventory (`build_gras_reference.py` → `gras_reference.parquet`, CAS→InChIKey via PubChem). |
+| **EU/GB flavourings Union List** | food-clearance for a few aroma-supplement molecules absent from the SAF crawl (`food_safe_supplement.csv`) | **Open Government Licence v3 / EU law (Reg. 1334/2008 Annex I)** — commercial reuse permitted | ✅ in use | Queried at `data.food.gov.uk/regulated-products/flavouring_authorisations/<FL>`; each entry's chemical name + status confirmed. **8 molecules** added (EU FL numbers / 21 CFR 172.515), unioned into the same GRAS signal. Regulatory facts are non-copyrightable (Feist). **NOT sourced from Good Scents / FEMA flavor-library / Leffingwell** — those are finding aids only, never the citation. |
+| **Excluded — non-food odorants** | — | — | ❌ **removed from corpus** | `isovanillin` (no EU FL / CFR clearance; "not for flavor use") and `habanolide` (fragrance-only musk, no corroborated food clearance) were **dropped from the aroma supplement** — this is a flavor app, so molecules that aren't food ingredients are kept out of the training data, not merely flagged. Dropping them retired the `musky` head (fragrance-leaning) and `vanilla` was re-based on food-safe molecules. |
 
 ## Commercial data-completion plan (the data-gated features)
 

@@ -64,3 +64,4 @@ Thumbs.db
 .vscode/
 *.swp
 !training/aroma_supplement.csv
+!training/food_safe_supplement.csv

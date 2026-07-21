@@ -564,6 +564,158 @@ def api_card(q: str = "", dl: int = 0):
     return Response(content=data, media_type="image/png", headers=headers)
 
 
+class RecipeIngredient(BaseModel):
+    name: str = ""
+    smiles: str = ""
+    ppm: float | None = None
+    carries: list[str] = []
+    volatility: str = ""
+    dose_basis: str = ""
+
+
+class RecipeCardQuery(BaseModel):
+    ingredients: list[RecipeIngredient] = []
+    flavors: list[str] = []          # target flavors this recipe was designed for
+    notes: list[str] = []            # target aroma notes
+    title: str = ""                  # optional recipe name
+    note: str = ""                   # the "how it was dosed" caption
+
+
+@app.post("/api/recipe_card")
+def api_recipe_card(rc: RecipeCardQuery, dl: int = 0):
+    """A branded, shareable 'recipe card' PNG for a designed/analyzed formulation —
+    the bench-sheet parity of /api/card. Lists each ingredient (structure swatch,
+    name, formula, ppm, volatility, what it carries) under the target profile, with
+    the same honest 'directional, not calibrated' footing as the Studio itself.
+
+    SMILES/formula are recomputed server-side from each ingredient's structure, so the
+    card is authoritative even though the recipe rows are posted from the client."""
+    from fastapi.responses import Response
+
+    import io
+    from PIL import Image, ImageDraw, ImageFont
+    from rdkit.Chem.Draw import rdMolDraw2D
+
+    def font(path, size):
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:  # noqa: BLE001
+            return ImageFont.load_default()
+    DJ = "/usr/share/fonts/truetype/dejavu/"
+    f_title = font("static/headerfont.ttf", 46)
+    f_tag = font("static/wordmark.ttf", 17)
+    f_sub = font(DJ + "DejaVuSans-Bold.ttf", 22)
+    f_name = font(DJ + "DejaVuSans-Bold.ttf", 21)
+    f_body = font(DJ + "DejaVuSans.ttf", 15)
+    f_mono = font(DJ + "DejaVuSansMono.ttf", 13)
+    f_ppm = font(DJ + "DejaVuSans-Bold.ttf", 26)
+    f_lab = font(DJ + "DejaVuSans-Bold.ttf", 13)
+    f_pill = font(DJ + "DejaVuSans-Bold.ttf", 15)
+
+    ink, muted, cream, teal = (231, 237, 234), (148, 162, 169), (217, 171, 116), (43, 196, 196)
+    W = 1000
+
+    # canonicalise ingredients server-side (authoritative formula + structure)
+    rows = []
+    for ing in rc.ingredients[:14]:  # a bench recipe is a handful of ingredients; cap defensively
+        smi = (ing.smiles or "").strip()
+        mol = Chem.MolFromSmiles(smi) if smi else None
+        if mol is None and ing.name:
+            smi2 = _resolve(ing.name)
+            mol = Chem.MolFromSmiles(smi2) if smi2 else None
+            if mol is not None:
+                smi = smi2
+        rows.append({"mol": mol, "smiles": Chem.MolToSmiles(mol) if mol else smi,
+                     "formula": _formula(smi) if mol else "",
+                     "name": ing.name or (_name_local(smi) if mol else "") or smi,
+                     "ppm": ing.ppm, "carries": ing.carries, "volatility": ing.volatility})
+
+    ROW_H = 92
+    head_h = 210 if (rc.flavors or rc.notes) else 168
+    H = max(420, head_h + len(rows) * ROW_H + 78)
+
+    img = Image.new("RGB", (W, H), (15, 19, 25))
+    dr = ImageDraw.Draw(img)
+    for cx, cy, col in [(0, 0, (138, 107, 224)), (W, H, (43, 196, 196))]:
+        glow = Image.new("RGB", (W, H), (15, 19, 25))
+        gd = ImageDraw.Draw(glow)
+        gd.ellipse([cx - 340, cy - 300, cx + 340, cy + 300], fill=col)
+        img = Image.blend(img, glow, 0.06)
+        dr = ImageDraw.Draw(img)
+
+    # header
+    try:
+        emblem = Image.open("static/logo.png").convert("RGBA").resize((58, 58))
+        img.paste(emblem, (40, 30), emblem)
+    except Exception:  # noqa: BLE001
+        pass
+    dr.text((110, 30), "Flavormancer", font=f_title, fill=ink)
+    dr.text((112, 82), "taste & aroma from chemical structure", font=f_tag, fill=cream)
+    dr.line([40, 122, W - 40, 122], fill=(42, 50, 60), width=1)
+
+    # sub-title + target profile pills
+    title = rc.title.strip() or "Formulation"
+    dr.text((40, 138), title[:52], font=f_sub, fill=ink)
+    if rc.flavors or rc.notes:
+        dr.text((40, 174), "TARGET", font=f_lab, fill=muted)
+        px, py = 118, 170
+        for text, c in ([(f, cream) for f in rc.flavors] + [(n, teal) for n in rc.notes]):
+            w = dr.textlength(text, font=f_pill)
+            if px + w + 22 > W - 40:
+                px, py = 118, py + 34
+            dr.rounded_rectangle([px, py, px + w + 20, py + 28], radius=14, outline=c, width=2)
+            dr.text((px + 10, py + 5), text, font=f_pill, fill=c)
+            px += w + 28
+
+    # ingredient rows
+    y = head_h
+    for r in rows:
+        dr.rounded_rectangle([40, y, W - 40, y + ROW_H - 12], radius=12, outline=(42, 50, 60), width=1)
+        # structure swatch (white)
+        dr.rounded_rectangle([52, y + 10, 152, y + ROW_H - 22], radius=8, fill=(245, 247, 245))
+        if r["mol"] is not None:
+            d2 = rdMolDraw2D.MolDraw2DCairo(96, ROW_H - 36)
+            d2.drawOptions().padding = 0.1
+            d2.DrawMolecule(r["mol"])
+            d2.FinishDrawing()
+            sw = Image.open(io.BytesIO(d2.GetDrawingText())).convert("RGBA")
+            img.paste(sw, (54, y + 12), sw)
+        # name + identifiers
+        dr.text((168, y + 12), r["name"][:40], font=f_name, fill=ink)
+        ident = r["formula"] + ("   " + r["smiles"][:40] if r["smiles"] else "")
+        dr.text((168, y + 40), ident[:70], font=f_mono, fill=muted)
+        carries = ", ".join(r["carries"]) if r["carries"] else ""
+        if carries:
+            dr.text((168, y + 60), ("carries: " + carries)[:64], font=f_body, fill=teal)
+        # ppm + volatility (right-aligned)
+        if r["ppm"] is not None:
+            ptxt = f"{r['ppm']:g} ppm"
+            pw = dr.textlength(ptxt, font=f_ppm)
+            dr.text((W - 60 - pw, y + 16), ptxt, font=f_ppm, fill=cream)
+        if r["volatility"]:
+            vt = r["volatility"] + " volatility"
+            vw = dr.textlength(vt, font=f_body)
+            dr.text((W - 60 - vw, y + 50), vt, font=f_body, fill=muted)
+        y += ROW_H
+
+    # caption (honest scope) + footer
+    cap = (rc.note.strip() or "Directional starting recipe — doses balanced by inverse volatility. "
+           "Tune on the bench; calibrated intensity comes with your odor-threshold / panel data.")
+    dr.text((40, y + 4), ("— " + cap)[:118], font=f_body, fill=muted)
+    fy = H - 46
+    dr.line([40, fy, W - 40, fy], fill=(42, 50, 60), width=1)
+    dr.text((40, fy + 12), "flavormancer.echelonts.net", font=f_mono, fill=teal)
+    tw = dr.textlength("before you pour", font=f_tag)
+    dr.text((W - 40 - tw, fy + 10), "before you pour", font=f_tag, fill=cream)
+
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    data = buf.getvalue()
+    fn = "".join(ch for ch in title.lower().replace(" ", "-") if ch.isalnum() or ch in "-_") or "recipe"
+    headers = {"Content-Disposition": f'attachment; filename="flavormancer-{fn}.png"'} if dl else {}
+    return Response(content=data, media_type="image/png", headers=headers)
+
+
 class MixtureQuery(BaseModel):
     ingredients: list[str]
     processes: list[str] = []
@@ -742,8 +894,8 @@ def api_formulation(f: FormulationQuery):
                     nm = _name_local(mt["smiles"])             # local-only (no network) — named carriers, fast
                     if not nm or nm in gras_adds or nm in other_adds:
                         continue
-                    cmol = Chem.MolFromSmiles(mt["smiles"])     # cheap GRAS lookup — no full predict() pipeline
-                    is_gras = cmol is not None and P._gras_status(cmol).startswith("in GRAS")
+                    cmol = Chem.MolFromSmiles(mt["smiles"])     # cheap food-listed lookup — no full predict() pipeline
+                    is_gras = cmol is not None and Chem.MolToInchiKey(cmol).split("-")[0] in P._GRAS
                     (gras_adds if is_gras else other_adds).append(nm)
                     if len(gras_adds) >= 2:
                         break
@@ -858,7 +1010,9 @@ def api_design_recipe(d: DesignRecipeQuery):
             if not nm:
                 continue
             cmol = Chem.MolFromSmiles(smi)
-            if cmol is not None and P._gras_status(cmol).startswith("in GRAS"):
+            # food-listed check: match the InChIKey skeleton against the reference set directly
+            # (robust — don't string-match the human-readable status text)
+            if cmol is not None and Chem.MolToInchiKey(cmol).split("-")[0] in P._GRAS:
                 chosen = (smi, nm)
                 break
             fallback = fallback or (smi, nm)
@@ -1420,7 +1574,7 @@ ENRICH_COLUMNS = [
     {"key": "rot_bonds", "label": "RotB", "why": "Rotatable bonds — molecular flexibility (rigidity often tracks with a sharper odor)."},
     {"key": "melting_point_c", "label": "MP °C", "why": "Melting point (measured) — solid vs liquid at room temperature."},
     {"key": "boiling_point_c", "label": "BP °C", "why": "Boiling point (measured) — a direct handle on volatility, hence aroma strength."},
-    {"key": "gras", "label": "GRAS", "why": "On the FEMA/FDA food-safe (Generally Recognized As Safe) list — a flag, not a clearance."},
+    {"key": "gras", "label": "Food-listed", "why": "Listed in a food-use reference (FDA Substances-Added-to-Food / EU flavourings) — a listing flag, not a GRAS or safety clearance."},
 ]
 
 

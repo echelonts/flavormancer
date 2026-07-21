@@ -123,3 +123,24 @@ def test_recipe_designer(page, base_url, needs_models):
     assert page.locator("#formResults .recipe-ing").count() >= 1
     assert page.locator("#recipeLoad").count() == 1  # the "load into rows" bridge
     assert page._flavor_errors == [], f"page errors: {page._flavor_errors}"
+
+
+def test_recipe_export(page, base_url, needs_models):
+    _open(page, base_url)
+    chip = page.locator("#formTargetChips .chip", has_text="coconut").first
+    chip.wait_for(timeout=15000)
+    chip.click()
+    page.locator("#formDesign").click()
+    page.wait_for_selector("#formResults .recipe-strip .recipe-ing", timeout=40000)
+    # both export affordances present (parity with the flavor-card export)
+    assert page.locator("#recipeCsv").count() == 1
+    assert page.locator("#recipeCard").count() == 1
+    # CSV downloads as a text/csv bench sheet
+    with page.expect_download(timeout=15000) as dl_csv:
+        page.locator("#recipeCsv").click()
+    assert dl_csv.value.suggested_filename.endswith(".csv")
+    # recipe card downloads as a PNG
+    with page.expect_download(timeout=30000) as dl_png:
+        page.locator("#recipeCard").click()
+    assert dl_png.value.suggested_filename.endswith(".png")
+    assert page._flavor_errors == [], f"page errors: {page._flavor_errors}"

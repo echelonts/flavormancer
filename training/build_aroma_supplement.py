@@ -33,11 +33,20 @@ CURATED = {
                  "methyl anthranilate"],
     "buttery":  ["2,3-butanedione", "acetoin", "2,3-pentanedione", "2,3-hexanedione", "2,3-heptanedione"],
     "vanilla":  ["vanillin", "ethylvanillin", "vanillyl alcohol", "vanillic acid",
-                 "acetovanillone", "isovanillin", "veratraldehyde", "syringaldehyde"],
-    "clove":    ["eugenol", "isoeugenol", "eugenyl acetate", "methyleugenol"],
+                 "acetovanillone", "veratraldehyde", "syringaldehyde",
+                 # food-safe re-base (EU Union List, open-gov) after dropping non-food isovanillin:
+                 "piperonal", "4-hydroxybenzaldehyde", "4-formyl-2-methoxyphenyl acetate"],
+    # isovanillin EXCLUDED: no EU FL / 21 CFR food clearance — not a food ingredient (this is a
+    # flavor app, so non-food odorants are kept out of the corpus, not merely flagged)
+    # methyleugenol EXCLUDED: removed from 21 CFR 172.515 in the 2018 Delaney delisting and
+    # restricted in the EU (genotoxic) — not an authorised added flavouring anywhere. Out of the corpus.
+    "clove":    ["eugenol", "isoeugenol", "eugenyl acetate", "4-vinylguaiacol"],
     "cinnamon": ["cinnamaldehyde", "cinnamyl alcohol", "cinnamic acid", "methyl cinnamate",
                  "ethyl cinnamate", "cinnamyl acetate", "alpha-methylcinnamaldehyde", "cinnamyl formate", "hydrocinnamaldehyde", "cinnamyl butyrate"],
-    "spicy":    ["eugenol", "cinnamaldehyde", "zingerone", "piperonal", "carvacrol"],
+    "spicy":    ["eugenol", "cinnamaldehyde", "zingerone", "piperonal", "carvacrol",
+                 # food-authorised spice odorants (EU Union List / 21 CFR, open-gov):
+                 "piperine", "cuminaldehyde", "beta-caryophyllene", "cinnamyl acetate",
+                 "eugenyl acetate", "isoeugenol"],
     "banana":   ["isoamyl acetate", "amyl acetate", "isoamyl butyrate", "isoamyl isovalerate", "isoamyl propionate", "isobutyl acetate", "isoamyl formate", "amyl butyrate", "2-methylbutyl acetate", "isoamyl hexanoate"],
     "nutty":    ["2,3-dimethylpyrazine", "2,5-dimethylpyrazine", "2-ethylpyrazine",
                  "2-acetylpyrazine", "5-methylfurfural", "2-ethyl-3-methylpyrazine",
@@ -47,16 +56,27 @@ CURATED = {
     "coffee":   ["furfuryl mercaptan", "guaiacol", "2-acetylpyrazine", "5-methylfurfural"],
     "smoky":    ["guaiacol", "2,6-dimethoxyphenol", "4-methylguaiacol", "4-ethylguaiacol",
                  "4-vinylguaiacol", "creosol", "phenol", "p-cresol", "o-cresol", "2,6-dimethylphenol"],
-    "anise":    ["anethole", "estragole", "anisaldehyde", "p-anisaldehyde", "fenchone", "methyl chavicol"],
+    # estragole / methyl chavicol EXCLUDED (same molecule, CAS 140-67-0): prohibited as an added
+    # flavouring in the EU/GB (Reg. 1334/2008 Annex III, genotoxicity). Kept out of the corpus.
+    "anise":    ["anethole", "anisaldehyde", "p-anisaldehyde", "fenchone",
+                 "anisyl alcohol", "anisyl phenylacetate", "methyl anisate"],
     "balsamic": ["benzyl benzoate", "benzyl cinnamate", "benzoic acid", "benzyl salicylate", "cinnamyl cinnamate"],
     "herbal":   ["thymol", "carvacrol", "eucalyptol", "1,8-cineole", "menthone", "isomenthone"],
-    "meaty":    ["methional", "2-methyl-3-furanthiol", "furfuryl mercaptan"],
+    "meaty":    ["methional", "2-methyl-3-furanthiol", "furfuryl mercaptan",
+                 # food-authorised savoury sulfur volatiles (EU Union List / 21 CFR, open-gov):
+                 "bis(2-methyl-3-furyl) disulfide", "2,4,5-trimethylthiazole",
+                 "2-methyl-3-(methylthio)furan", "4-methyl-5-vinylthiazole", "dimethyl trisulfide"],
     "cherry":   ["benzaldehyde", "p-tolualdehyde"],
     "winey":    ["ethyl lactate", "ethyl hexanoate", "2,3-butanediol"],
     "onion":    ["dipropyl disulfide", "methyl propyl disulfide", "allyl propyl disulfide"],
     # keep the fragile grassy head above the bar with its classic green-leaf volatiles
     "fresh":    ["melonal", "dihydromyrcenol", "cis-3-hexenyl acetate", "hexanal"],
-    "musky":    ["muscone", "ethylene brassylate", "ambrettolide", "habanolide"],
+    # habanolide EXCLUDED: fragrance-only musk, no food clearance found — dropped like isovanillin.
+    # Reclaimed FOOD-SAFE with EU-authorised macrocyclic musks (pentadecanolide FL 10.004,
+    # dihydroambrettolide FL 10.047) + US GRAS/SAF musks (muscone, civetone) so the head stands
+    # entirely on food-authorised molecules.
+    "musky":    ["muscone", "ethylene brassylate", "ambrettolide",
+                 "15-pentadecanolide", "16-hexadecanolide", "civetone"],
     "vegetable":["2-isobutyl-3-methoxypyrazine", "2-isopropyl-3-methoxypyrazine", "dimethyl sulfide", "2-acetylpyrrole"],
     "grassy":   ["cis-3-hexenal", "cis-3-hexen-1-ol", "trans-2-hexenal", "hexanal",
                  "trans-2-hexen-1-ol", "cis-3-hexenyl acetate"],

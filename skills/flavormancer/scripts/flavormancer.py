@@ -129,6 +129,22 @@ def cmd_design(a):
                 {"flavors": a.flavors or [], "notes": a.notes or [], "food_safe": not a.any_source})
 
 
+def _recipe_csv(out):
+    """Render a design_recipe response as a self-describing CSV bench sheet — the
+    same shape the workbench's 'Export CSV' produces, so every surface exports alike."""
+    import csv as _csv
+    import io as _io
+    rec = out.get("recipe") or []
+    buf = _io.StringIO()
+    buf.write("# Flavormancer formulation - directional starting recipe (tune on the bench)\n")
+    w = _csv.writer(buf)
+    w.writerow(["ingredient", "smiles", "ppm", "volatility", "carries", "dose_basis"])
+    for i in rec:
+        w.writerow([i.get("name", ""), i.get("smiles", ""), i.get("ppm", ""),
+                    i.get("volatility", ""), "; ".join(i.get("carries") or []), i.get("dose_basis", "")])
+    return buf.getvalue()
+
+
 def cmd_interpret(a):
     return _req("/api/nl", params={"q": a.text})
 
@@ -201,6 +217,7 @@ def main():
     s.add_argument("--flavor", action="append", dest="flavors", default=[], help="target flavor (repeatable)")
     s.add_argument("--note", action="append", dest="notes", default=[], help="target aroma note (repeatable)")
     s.add_argument("--any-source", action="store_true", help="allow non-GRAS carriers")
+    s.add_argument("--csv", action="store_true", help="emit the recipe as a CSV bench sheet instead of JSON")
     s.set_defaults(fn=cmd_design)
 
     s = sub.add_parser("interpret")
@@ -222,8 +239,11 @@ def main():
 
     a = p.parse_args()
     out = a.fn(a)
-    json.dump(out, sys.stdout, indent=2, ensure_ascii=False)
-    sys.stdout.write("\n")
+    if getattr(a, "csv", False) and isinstance(out, dict) and not out.get("error"):
+        sys.stdout.write(_recipe_csv(out))
+    else:
+        json.dump(out, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
     if isinstance(out, dict) and out.get("error"):
         sys.exit(1)
 

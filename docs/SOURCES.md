@@ -56,8 +56,19 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 **Safety / regulatory / properties**
 - **FDA "Substances Added to Food" (SAF)** — the GRAS / recognized-food-ingredient
   cross-check. **US-government work, public domain.** In use via `build_gras_reference.py`.
+- **EU / GB flavourings Union List** — Regulation (EC) 1334/2008 Annex I, published as the
+  authorised-flavourings register at **`data.food.gov.uk/regulated-products/flavouring_authorisations`**.
+  Used to confirm food-clearance (by **FL number**) for ~26 aroma-supplement molecules absent from
+  the FDA SAF crawl (`food_safe_supplement.csv`). **Open Government Licence v3 — commercial reuse
+  permitted.** Regulatory facts (a molecule's authorised status + FL number) are non-copyrightable
+  (*Feist v. Rural*, 1991). **Finding-aid note:** commercial compilations (The Good Scents Company,
+  the FEMA flavor library, Leffingwell) were used *only* to locate a candidate FL number, which was
+  then **confirmed on the open-government register**; no content from those compilations is copied,
+  redistributed, or shipped. **12** further molecules are cleared via **US 21 CFR 172.515 / FDA SAF**
+  (public domain), flagged US-only where they carry no EU/GB entry.
 - **FEMA usual/maximum use levels** — for *quantitative* dosing. Published in FEMA's
   copyrighted GRAS papers — **not freely available in bulk**; data-gated (customer/licensed).
+  We cite FEMA *numbers* only as public regulatory identifiers, never FEMA's compiled dosing text.
 - **EU declarable fragrance/flavor allergen annex** — the labeling flags. (EU regulation.)
 - **PubChem** (NIH/NCBI) — used three ways: name/CAS↔SMILES↔CID resolution; experimental
   **boiling point / vapor pressure** (`build_properties.py`); and CAS→InChIKey for GRAS
