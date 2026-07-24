@@ -1,0 +1,13 @@
+molecule,smiles,inchikey,eu_fl,us_cfr,source_url
+(Z)-3-hexen-1-ol,CC/C=C\CCO,UFLHIIWVXFIJGU-ARJAWSKDSA-N,02.056,FDA SAF (FEMA 2563),https://data.food.gov.uk/regulated-products/flavouring_authorisations/02.056
+(Z)-3-hexenyl 2-methylbutanoate,CC/C=C\CCOC(=O)C(C)CC,JKKGTSUICJWEKB-SREVYHEPSA-N,09.854,FDA SAF (FEMA 3497),https://data.food.gov.uk/regulated-products/flavouring_authorisations/09.854
+(Z)-3-hexenyl acetate,CC/C=C\CCOC(C)=O,NPFVOOAXDOBMCE-PLNGDYQASA-N,09.197,FDA SAF (FEMA 3171),https://data.food.gov.uk/regulated-products/flavouring_authorisations/09.197
+(Z)-3-hexenyl butyrate,CC/C=C\CCOC(=O)CCC,ZCHOPXVYTWUHDS-WAYWQWQTSA-N,09.270,FDA SAF (FEMA 3402),https://data.food.gov.uk/regulated-products/flavouring_authorisations/09.270
+(Z)-3-hexenyl formate,CC/C=C\CCOC=O,XJHQVZQZUGLZLS-ARJAWSKDSA-N,09.240,FDA SAF (FEMA 3353),https://data.food.gov.uk/regulated-products/flavouring_authorisations/09.240
+(Z)-3-nonen-1-ol,CCCCC/C=C\CCO,IFTBJDZSLBRRMC-SREVYHEPSA-N,02.234,FDA SAF (FEMA 4412),https://data.food.gov.uk/regulated-products/flavouring_authorisations/02.234
+1-hexanol,CCCCCCO,ZSIAUFGUXNUGDI-UHFFFAOYSA-N,02.005,FDA SAF (FEMA 2567),https://data.food.gov.uk/regulated-products/flavouring_authorisations/02.005
+14-pentadecanolide,O=C1CCCCCCCCCCCCCO1,LFSYLMRHJKGLDV-UHFFFAOYSA-N,10.068,,https://data.food.gov.uk/regulated-products/flavouring_authorisations/10.068
+15-pentadecanolide,O=C1CCCCCCCCCCCCCCO1,FKUPPRZPSYCDRS-UHFFFAOYSA-N,10.004,,https://data.food.gov.uk/regulated-products/flavouring_authorisations/10.004
+16-hexadecanolide,O=C1CCCCCCCCCCCCCCCO1,LOKPJYNMYCVCRM-UHFFFAOYSA-N,10.047,,https://data.food.gov.uk/regulated-products/flavouring_authorisations/10.047
+"2,3,5-trimethylpyrazine",Cc1cnc(C)c(C)n1,IAEGWXHKWJGQAZ-UHFFFAOYSA-N,14.019,,https://data.food.gov.uk/regulated-products/flavouring_authorisations/14.019
+"2,3-butanediol",CC(O)C(C)O,OWBTYPJTUOEWEK-UHFFFAOYSA-N,02.133,,https://data.food.gov.uk/regulated-products/flavouring_authorisations/02.133

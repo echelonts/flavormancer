@@ -1,0 +1,13 @@
+flavor,molecule,smiles,category
+coconut,gamma-nonalactone,CCCCCC1CCC(=O)O1,aroma-supplement
+coconut,gamma-octalactone,CCCCC1CCC(=O)O1,aroma-supplement
+coconut,delta-decalactone,CCCCCC1CCCC(=O)O1,aroma-supplement
+coconut,gamma-decalactone,CCCCCCC1CCC(=O)O1,aroma-supplement
+coconut,delta-octalactone,CCCC1CCCC(=O)O1,aroma-supplement
+coconut,massoia lactone,CCCCCC1CC=CC(=O)O1,aroma-supplement
+caramel,maltol,Cc1occc(=O)c1O,aroma-supplement
+caramel,ethyl maltol,CCc1occc(=O)c1O,aroma-supplement
+caramel,cyclotene,CC1=C(O)C(=O)CC1,aroma-supplement
+caramel,"4-hydroxy-2,5-dimethyl-3(2H)-furanone",CC1=C(O)C(=O)C(C)O1,aroma-supplement
+caramel,homofuraneol,CCC1OC(C)=C(O)C1=O,aroma-supplement
+caramel,5-methylfurfural,Cc1ccc(C=O)o1,aroma-supplement

@@ -58,9 +58,13 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
   cross-check. **US-government work, public domain.** In use via `build_gras_reference.py`.
 - **EU / GB flavourings Union List** — Regulation (EC) 1334/2008 Annex I, published as the
   authorised-flavourings register at **`data.food.gov.uk/regulated-products/flavouring_authorisations`**.
-  Used to confirm food-clearance (by **FL number**) for ~26 aroma-supplement molecules absent from
-  the FDA SAF crawl (`food_safe_supplement.csv`). **Open Government Licence v3 — commercial reuse
-  permitted.** Regulatory facts (a molecule's authorised status + FL number) are non-copyrightable
+  The **entire register (~2,200 authorised flavourings)** is ingested as the food-use reference
+  (`build_gb_union_list.py` → `gb_union_list.csv`, loaded by `predict.py`), each cited by **FL number**;
+  a curated subset also backs `food_safe_supplement.csv`. **Open Government Licence v3 — commercial
+  reuse permitted** (verified: OGL v3 grants the right to "exploit the Information commercially… by
+  including it in your own product or application"). Required attribution: *"Contains public sector
+  information licensed under the Open Government Licence v3.0."* Regulatory facts (a molecule's
+  authorised status + FL number) are non-copyrightable
   (*Feist v. Rural*, 1991). **Finding-aid note:** commercial compilations (The Good Scents Company,
   the FEMA flavor library, Leffingwell) were used *only* to locate a candidate FL number, which was
   then **confirmed on the open-government register**; no content from those compilations is copied,
@@ -69,6 +73,18 @@ record of provenance, not legal advice. Get an IP/OSS-license review before ship
 - **FEMA usual/maximum use levels** — for *quantitative* dosing. Published in FEMA's
   copyrighted GRAS papers — **not freely available in bulk**; data-gated (customer/licensed).
   We cite FEMA *numbers* only as public regulatory identifiers, never FEMA's compiled dosing text.
+- **Aroma-head structure→odor associations** — two provenances. **Food heads**: HSDB odor text
+  (US NLM, **public domain**) + character-impact facts confirmed on the open-gov food registers above.
+  **Fragrance / aroma-only heads** (musk, amber, oakmoss, sandalwood, the botanical and floral-subtype
+  notes): **general public flavor & fragrance chemistry knowledge** — the ubiquitous "any perfumer
+  knows this" associations (e.g. *santalol = sandalwood*), **some supplied by Claude Opus 4.8
+  (Anthropic)** — each resolved to a **public-domain PubChem** structure. Odor descriptors are measured
+  facts, **non-copyrightable** (*Feist v. Rural*, 1991); **no** proprietary compilation (The Good Scents
+  Company, Leffingwell, GS-LF, FlavorDB) is a source — those are excluded everywhere. **Honest caveat:**
+  unlike the food-clearance data, the fragrance associations do not each carry a single citable public
+  register, so a **spot-verification + formal IP/provenance review is the standing pre-commercial gate**
+  (≥2 independent public sources per association; drop anything traceable only to a proprietary set;
+  counsel sign-off before commercial sale).
 - **EU declarable fragrance/flavor allergen annex** — the labeling flags. (EU regulation.)
 - **PubChem** (NIH/NCBI) — used three ways: name/CAS↔SMILES↔CID resolution; experimental
   **boiling point / vapor pressure** (`build_properties.py`); and CAS→InChIKey for GRAS

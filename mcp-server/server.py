@@ -75,6 +75,7 @@ def _read_flavor(molecule: str) -> dict:
         "sour_rule": d.get("sour"), "salty_rule": d.get("salty"),
         "confident_aromas": [x["odor"] for x in descriptors if x.get("confident")],
         "all_aroma_scores": {x["odor"]: round(x["score"], 3) for x in descriptors},
+        "aroma_descriptions": {x["odor"]: x["desc"] for x in descriptors if x.get("desc")},
         "gras_status": safety.get("gras_status"),
         "structural_alerts": safety.get("structural_alerts"),
         "in_applicability_domain": (d.get("applicability") or {}).get("in_domain"),

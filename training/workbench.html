@@ -714,7 +714,7 @@
       <div class="how-grid">
         <div class="how-card"><h4>1 · Structure → numbers</h4><p>Every molecule becomes a <b>2,048-bit Morgan fingerprint</b> (which substructures it contains) plus a block of <b>physicochemical descriptors</b> (logP, MW, TPSA, H-bonding…). That one shared vector feeds every model — the same structure-to-property representation QSAR has leaned on for decades.</p></div>
         <div class="how-card"><h4>2 · Taste — 6 trained heads + 2 rules</h4><p>Six <b>random-forest</b> classifiers (sweet, bitter, umami…) each return a probability, scored by an honest held-out <b>CV-AUROC</b>. Sour and salty are solution / ionic effects, not molecule-shape ones, so they're transparent <b>rules</b> — not faked models. A sweetness-intensity regressor estimates relative-to-sucrose potency.</p></div>
-        <div class="how-card"><h4>3 · Aroma — 42 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 42 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
+        <div class="how-card"><h4>3 · Aroma — 164 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 164 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
         <div class="how-card"><h4>4 · Honest by design</h4><p>Every value is tagged <b>measured / predicted / estimate</b>, so nothing reads as more precise than it is. Where a quantitative feature needs data we can't ship free-commercially (odor thresholds, panel intensities), the UI <b>says so</b> — and it lights up with <b>your</b> data.</p></div>
         <div class="how-card"><h4>5 · Formulation, not just molecules</h4><p>The <b>Formulation Studio</b> reads a whole recipe before you pour — weighting each ingredient by odor impact, aggregating the blend's note-profile, flagging the overpowering component, and closing the gap to your target. That's single-molecule ML turned into a bench tool.</p></div>
         <div class="how-card"><h4>6 · On-prem &amp; commercial-clean</h4><p>Nothing leaves the box — a read makes <b>no cloud calls</b>. The shipped models train only on <b>public-domain or permissively-licensed</b> data, so the commercial edition stays clean (provenance tracked in the repo).</p></div>
@@ -871,7 +871,7 @@
           the trend, exactly the kind of lead worth a closer look.</p>
           <p><b>Two flavor dimensions.</b> Flip the color toggle between <b>taste</b> (sweet /
           bitter / umami / sour / salty / tasteless) and <b>aroma</b> (= odor — the same thing;
-          the 42 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
+          the 164 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
           same structural layout — you're overlaying a different sense. The <b>both</b> toggle merges
           them into one full-flavor view: each dot takes its <b>taste</b> color where a taste is known,
           otherwise its <b>aroma</b> color — so nearly every molecule is colored by its dominant known
@@ -1026,6 +1026,12 @@
           and odor-detection thresholds. <span class="pd">public domain</span></li>
         <li><b>CAMEO Chemicals</b> (NOAA) &amp; <b>Haz-Map</b> — physical descriptions and
           odor notes. <span class="pd">public domain</span></li>
+        <li><b>Fragrance / aroma-only associations</b> — the perfumery notes (musk, amber, oakmoss,
+          sandalwood, botanical &amp; floral-subtype heads) come from <b>general public flavor &amp;
+          fragrance chemistry knowledge</b>, some supplied by <b>Claude Opus 4.8 (Anthropic)</b>, each
+          resolved to a public-domain PubChem structure. Odor descriptors are measured facts, <b>non-copyrightable</b>
+          (<i>Feist v. Rural</i>); no proprietary compilation (Good Scents / Leffingwell / FlavorDB) is a source.
+          <span class="pd">public facts</span></li>
         <li><b>ChemTastesDB</b> — curated molecular taste labels (sweet / bitter / umami /
           sour / tasteless). <span class="lic">CC BY 4.0</span></li>
         <li><b>SweetenersDB</b> — relative sweetness values for the sweetness-intensity
@@ -1034,8 +1040,11 @@
           (broader than GRAS). A <i>listing</i> signal, not a GRAS or safety determination.
           <span class="pd">public domain</span></li>
         <li><b>EU / GB flavourings Union List</b> (<code>data.food.gov.uk</code>, Reg. 1334/2008
-          Annex I) — food-clearance for a few odorants absent from the SAF crawl, cited by FL
-          number. <span class="pd">Open Government Licence v3</span></li>
+          Annex I) — the <b>full register of ~2,200 authorised food flavourings</b>, ingested as the
+          food-use reference and cited per molecule by FL number. <span class="pd">Open Government Licence v3</span>
+          <br><span class="ax-abstract">Contains public sector information licensed under the Open Government Licence v3.0.</span></li>
+        <li><b>FDA “Substances Added to Food” + 21 CFR 172.515</b> — the US food-substance inventory &amp;
+          flavoring-substance regulations, ingested as the US food-use universe. <span class="pd">US public domain (17 U.S.C. §105)</span></li>
         <li><b>Tox21</b> (NIH / EPA / NCATS / FDA) — in-vitro assay data for the caution-only
           structural tox cross-check. <span class="pd">public domain</span></li>
         <li>Curated <b>character-impact compounds</b> — well-documented public flavor-chemistry
@@ -1088,12 +1097,17 @@ const AROMA_COLORS = {fruity:'#E8913C',citrus:'#EFC01F',floral:'#E86AA6',minty:'
   pungent:'#E4572E',garlic:'#8FA31E',fishy:'#4F8FC0',sulfurous:'#B8A93A',rose:'#E07A9E',
   herbal:'#5AA469',green:'#6DB33F',earthy:'#8B7355',caramel:'#C68A3E',nutty:'#B0813F',
   buttery:'#E6C34D',balsamic:'#9A6B8C',smoky:'#7A6B5D',anise:'#C05A6E',coconut:'#CBB994',
-  cinnamon:'#B5561F',clove:'#8A5A2B',coffee:'#6A4632',cocoa:'#6B4226',meaty:'#A0522D',
+  cinnamon:'#B5561F',clove:'#8A5A2B',coffee:'#6A4632',cocoa:'#6B4226',meaty:'#A0522D',burnt:'#3E2A20',
+  cassis:'#6E1F3E',elderflower:'#C6D89A',fennel:'#A7C48A',mushroom:'#8C7B63',cardamom:'#7F9E6B',plum:'#7D3A63',tonka:'#B98A4C',tea:'#7BA36A',
+  phenolic:'#9A7B5A',orange:'#EE8A2E',tropical:'#E4B33C',peach:'#EFA878',pear:'#B7C36A',
+  acidic:'#C8D45A',grape:'#7B4B8A',berry:'#A83254',muguet:'#B9C6B0',
+  wintergreen:'#2FA37A',lavender:'#9C8BC4',jasmine:'#EBD98A',melon:'#8FD46A',violet:'#8A6BB0',
+  ginger:'#C57A2E',hay:'#C7B15A',apricot:'#EBA95C',malty:'#A87838',marine:'#4A9BA8',
   cheesy:'#D9B84D',creamy:'#E3CE9A',waxy:'#C4BE96',fresh:'#4FC0B0',grassy:'#7DAF3A',
   rancid:'#9A8B5A',tarry:'#4A4038',winey:'#8E4B6E',honey:'#E0A83C',apple:'#8DBF4A',
   cherry:'#C0392B',pine:'#3FA06B',banana:'#E6C84D',fatty:'#C9B27A',petroleum:'#6E7B8B',
-  alcoholic:'#9FB6C4',musky:'#8B7BA5',putrid:'#6E7A4A',soapy:'#B9C6D0',vegetable:'#6FA36B',bready:'#C7A06A',
-  onion:'#B7A64B'};
+  alcoholic:'#9FB6C4',musky:'#8B7BA5',putrid:'#6E7A4A',soapy:'#B9C6D0',vegetable:'#6FA36B',bready:'#C7A06A',odorless:'#9AA4AC',
+  onion:'#B7A64B',neroli:'#F0A5A0',aldehydic:'#E8C070',animalic:'#8A6B5A',amber:'#C08A4E',leathery:'#6E5544',powdery:'#D9C6D0',resinous:'#7A8B5A',terpenic:'#6B9E5A',ozonic:'#6FC2C4',hyacinth:'#8FC46A',cooling:'#6FD0C0',metallic:'#9BB0BE',lactonic:'#E3C99A',popcorn:'#D9B87A',celery:'#A8C46A',maple:'#B5773A',chamomile:'#E8D888',tobacco:'#8A6B4A',carnation:'#D9607A',mimosa:'#E8D77A',magnolia:'#E6E29A',narcissus:'#E0C878',saffron:'#E0700E',tuberose:'#EBA9C0',gardenia:'#E8C9D6',ylang:'#D9A6C4',lilac:'#C9A6D6',osmanthus:'#E8B48A',geranium:'#D77A8E',eucalyptus:'#5FA98A',corky:'#8A8A6E',violet_leaf:'#7DB36A',fir:'#3E7A5A',oakmoss:'#6E7A4A',vetiver:'#7A6B4A',patchouli:'#8A5A3A',sandalwood:'#C9A87A',cedarwood:'#9C6B4A',cognac:'#A85A2E',grapefruit:'#E8846A',bergamot:'#C8D45A',mandarin:'#EE9A2E',lime:'#8FC44A',yuzu:'#D4D46A',honeysuckle:'#E8C86A',freesia:'#E0D0A0',cyclamen:'#D98AB0',linden:'#C8D488',coriander:'#9DBE6A',cumin:'#B5883A',passionfruit:'#E0C84A',rosemary:'#5A8A6A',black_pepper:'#6E5A4A',nutmeg:'#A8703A',sage:'#8AA07A',thyme:'#7A9A5A',oregano:'#8A9A4A',mustard:'#D9C84A',pineapple:'#EBD24A',strawberry:'#E0506A',raspberry:'#C0396B',myrrh:'#8A6B4E',frankincense:'#B0A07A',musty:'#8AA07A',hazelnut:'#C6B07A',blueberry:'#C08A6A',guava:'#9AA6B0',juniper:'#C6B07A',allspice:'#B0A07A',dill:'#8AA07A',tomato:'#C08A6A',fig:'#C08A6A',mango:'#B0A07A',champaca:'#C6B07A',styrax:'#8AA07A',davana:'#B0A07A',truffle:'#8AA07A',clary_sage:'#C08A6A',opoponax:'#8AA07A',turmeric:'#9AA6B0',costus:'#C6B07A',elemi:'#9AA6B0',labdanum:'#C6B07A',};
 const aromaColor = n => AROMA_COLORS[n] || 'var(--aroma)';
 
 const $ = id => document.getElementById(id);
@@ -1131,6 +1145,7 @@ const TASTE_HELP = {
 };
 // per-descriptor "what this note smells like" — the aroma parallel to TASTE_HELP
 const AROMA_HELP = {
+  neroli:'orange-blossom / neroli — anthranilates &amp; indole over a terpene-alcohol base',
   coconut:'creamy coconut — γ / δ lactones (nonalactone, decalactone)',
   vanilla:'vanilla — vanillin &amp; guaiacol-derived phenolic aldehydes',
   buttery:'butter / cream — vicinal diketones (diacetyl, acetoin)',
@@ -1140,6 +1155,48 @@ const AROMA_HELP = {
   spicy:'warm spice — eugenol / cinnamaldehyde / piperine / cuminaldehyde family',
   anise:'anise / licorice — anethole &amp; anisyl aromatics',
   meaty:'savoury / cooked-meat — sulfur volatiles (furanthiols, thiazoles, methional)',
+  odorless:'odorless — no documented smell (water, salts, most sugars, involatile solids); the aroma parallel to tasteless',
+  sweet:'sweet-smelling — indicative; clears the bar with odorless negatives, weaker at sweet-vs-other-sweet-odors',
+  clove:'clove — eugenol / isoeugenol / alkyl-guaiacol phenylpropanoids',
+  cocoa:'cocoa / chocolate — pyrazines &amp; malty Strecker aldehydes',
+  coffee:'roasted coffee — furfurylthiols &amp; roast pyrazines',
+  burnt:'burnt / roasted — pyrolysis furanones &amp; roast pyrazines',
+  caramel:'caramel — maltol / furaneol / cyclotene sugar-pyrolysis',
+  tarry:'tar / creosote — heavy smoky phenols (cresols, catechol)',
+  apple:'apple — green-fruity esters (ethyl 2-methylbutyrate, hexyl acetate)',
+  creamy:'creamy / milky — γ &amp; δ dairy lactones',
+  phenolic:'phenolic / carbolic — phenol, cresols &amp; alkylphenols',
+  cherry:'cherry — benzaldehyde / almond-fruity aromatics',
+  orange:'sweet orange — limonene, decanal &amp; orange esters',
+  waxy:'waxy / fatty — long-chain aldehydes, acids &amp; alcohols',
+  cheesy:'cheesy / fermented — short &amp; branched fatty acids',
+  soapy:'soapy — C10–C12 fatty aldehydes &amp; ketones',
+  tropical:'tropical — pineapple / mango / passionfruit esters &amp; thioesters',
+  bready:'bread / toasted — pyrazines, pyrrolines &amp; furfural',
+  peach:'peach — γ / δ lactones (undecalactone) &amp; fruity esters',
+  pear:'pear — ethyl 2,4-decadienoate &amp; light fruity esters',
+  cassis:'blackcurrant / cassis — sulfury cassis thiol &amp; berry esters',
+  elderflower:'elderflower — linalool / rose-oxide floral-green',
+  fennel:'fennel / anise-spice — anethole &amp; terpene spice',
+  mushroom:'mushroom — C8 volatiles (1-octen-3-ol / -one)',
+  cardamom:'cardamom — cineole &amp; terpinyl spice terpenoids',
+  plum:'plum / prune — dried-fruit lactones &amp; esters',
+  tonka:'tonka / coumarinic — dihydrocoumarin, sweet-hay',
+  tea:'tea — linalool / ionone / damascenone leaf notes',
+  acidic:'acidic / vinegar — short-chain carboxylic acids (acetic family)',
+  grape:'grape / foxy — anthranilate esters (methyl anthranilate)',
+  berry:'berry — strawberry / raspberry furanones &amp; esters',
+  muguet:'muguet / lily-of-the-valley — hydroxycitronellal &amp; floral aldehydes',
+  wintergreen:'wintergreen / teaberry — methyl salicylate &amp; salicylate esters',
+  lavender:'lavender — linalool &amp; linalyl esters',
+  jasmine:'jasmine — jasmonoids (hedione, cis-jasmone) &amp; floral esters',
+  melon:'melon / cucumber — (E,Z)-nonadienals',
+  violet:'violet / orris — ionones &amp; irones',
+  ginger:'ginger — gingerol / zingerone / zingiberene',
+  hay:'new-mown hay — dihydrocoumarin &amp; hay lactones',
+  apricot:'apricot — γ-lactones &amp; fruity esters',
+  malty:'malty — Strecker aldehydes (2/3-methylbutanal)',
+  marine:'marine / oceanic — sulfur volatiles &amp; cucumber aldehydes',
   banana:'ripe banana — isoamyl acetate &amp; branched esters',
   fresh:'clean / airy — light aldehydes &amp; dihydromyrcenol',
   musky:'musk — macrocyclic ketones / lactones',
@@ -1173,7 +1230,88 @@ const AROMA_HELP = {
   woody:'woody — cedar / sandalwood character',
   green:'green — fresh-cut leaf, grassy aldehydes',
   grassy:'grassy — mown hay, cis-3-hexenol',
-  putrid:'putrid — decay / rotten off-note'
+  putrid:'putrid — decay / rotten off-note',
+  aldehydic:'aldehydic — fatty-aldehyde sparkle (C8–C13 aldehydes)',
+  animalic:'animalic — indolic / civet / castoreum (indole, skatole, muscone)',
+  amber:'amber / ambergris — labdane &amp; woody-amber (ambroxide, sclareolide)',
+  leathery:'leathery — quinolines &amp; alkylphenols (suede / birch-tar)',
+  powdery:'powdery — soft orris / cosmetic (ionones, heliotropin, coumarin, musks)',
+  resinous:'resinous / incense — sesquiterpenes &amp; resin acids (labdanum, olibanum)',
+  terpenic:'terpenic / turpentine — monoterpene hydrocarbons (pinenes, myrcene)',
+  ozonic:'ozonic / aquatic — fresh sea-air (Calone, helional, melonal)',
+  hyacinth:'hyacinth — green floral (phenylacetaldehyde family)',
+  cooling:'cooling — physiological coolants (menthol, menthyl lactate, WS-agents)',
+  metallic:'metallic — sharp blood / tin note (1-octen-3-one, epoxy-decenal)',
+  lactonic:'lactonic — creamy γ/δ-lactones (structural class; overlaps coconut/peach/creamy)',
+  popcorn:'popcorn / roasted-cereal — pyrazines &amp; 2-acetylpyrroline',
+  celery:'celery / lovage — phthalides (butylphthalide, sedanolide)',
+  maple:'maple / fenugreek — sotolon &amp; furanones (sweet-curry)',
+  chamomile:'chamomile — fruity-herbal angelate &amp; tiglate esters',
+  tobacco:'tobacco — dry cured (megastigmatrienone, damascones)',
+  carnation:'carnation — spicy clove-floral (eugenol / isoeugenol over floral)',
+  mimosa:'mimosa — powdery-green anisic floral (anisaldehyde, heliotropin)',
+  magnolia:'magnolia — fresh lemony-floral (linalool, citral, dihydromyrcenol)',
+  narcissus:'narcissus — green-animalic floral (indole, p-cresol, cinnamic esters)',
+  saffron:'saffron — safranal &amp; carotenoid-degradation ketones (oxophorones)',
+  tuberose:'tuberose — heavy white floral (methyl benzoate/salicylate, farnesol)',
+  gardenia:'gardenia — green-creamy white floral (styralyl acetate, cis-3-hexenyl esters)',
+  ylang:'ylang-ylang — narcotic phenolic-floral (p-cresyl ethers, benzyl benzoate)',
+  lilac:'lilac — soft floral (lilac aldehydes, terpineol, anisaldehyde)',
+  osmanthus:'osmanthus — apricot-floral (ionones, damascones, lactones)',
+  geranium:'geranium — rosy-green (geraniol, citronellol, rose oxide)',
+  eucalyptus:'eucalyptus — cineole / camphoraceous terpenoids',
+  sandalwood:'sandalwood — creamy-woody santalols (narrow single-scaffold — AUROC inflated by small n)',
+  grapefruit:'grapefruit — citrus-thiol &amp; nootkatone over limonene',
+  corky:'corky / cork-taint — haloanisoles (TCA) &amp; moldy phenols',
+  bergamot:'bergamot — linalyl acetate / linalool citrus',
+  mandarin:'mandarin / tangerine — sinensals over citrus terpenes',
+  honeysuckle:'honeysuckle — nectar floral (hotrienol, jasmine lactone); marginal (0.74)',
+  freesia:'freesia — soft ionone-green floral',
+  violet_leaf:'violet leaf — green-cucumber (methyl octine carbonate, 2,6-nonadienal); distinct from powdery violet',
+  oakmoss:'oakmoss — mossy orcinol / orsellinate esters (fragrance; atranol restricted)',
+  patchouli:'patchouli — camphoraceous-woody (patchoulol, patchoulenes)',
+  linden:'linden / lime-blossom — honeyed floral (farnesol, decadienal); marginal (0.81)',
+  fir:'fir / pine-needle — bornyl acetate &amp; conifer terpenes',
+  vetiver:'vetiver — earthy-woody sesquiterpenes (vetivones, khusimol)',
+  cedarwood:'cedarwood — dry cedar (cedrol, cedrenes, thujopsene)',
+  cognac:'cognac — fruity-fermented ethyl esters (heptanoate–laurate)',
+  lime:'lime — citral &amp; terpinen-4-ol citrus',
+  yuzu:'yuzu — terpene-rich citrus (phellandrene, terpinolene)',
+  cyclamen:'cyclamen — aquatic-green floral (cyclamen aldehyde)',
+  mustard:'mustard / horseradish / wasabi — pungent isothiocyanates',
+  pineapple:'pineapple — allyl &amp; methylthio esters (tropical)',
+  strawberry:'strawberry — furaneol &amp; fruity esters; marginal (0.78)',
+  cumin:'cumin — cuminaldehyde &amp; cymene terpenes',
+  rosemary:'rosemary — cineole / camphor / verbenone herb',
+  black_pepper:'black pepper — rotundone &amp; peppery sesquiterpenes',
+  nutmeg:'nutmeg / mace — myristicin &amp; terpene spice',
+  thyme:'thyme — thymol / carvacrol phenolic herb',
+  oregano:'oregano / marjoram — carvacrol &amp; thymol',
+  coriander:'coriander / cilantro — linalool over fatty (2E)-alkenals',
+  raspberry:'raspberry — raspberry ketone &amp; ionones; marginal (0.76)',
+  frankincense:'frankincense / olibanum — incensole &amp; resin terpenes',
+  passionfruit:'passionfruit — tropical thiols &amp; esters (mercaptohexanol, oxathiane)',
+  sage:'sage — thujones, camphor &amp; cineole',
+  myrrh:'myrrh — furanosesquiterpenes (narrow single-scaffold — AUROC inflated by small n)',
+  hazelnut:'hazelnut — filbertone &amp; roasted pyrazines (narrow — AUROC inflated by small n)',
+  blueberry:'blueberry — fruity esters &amp; cinnamates (ethyl 2-methylbutanoate)',
+  guava:'guava — tropical sulfur-esters (3-sulfanylhexyl acetate) &amp; green',
+  juniper:'juniper / gin — piney terpenes (pinene, myrcene, terpinen-4-ol)',
+  allspice:'allspice / pimento — eugenol &amp; clove-spice terpenes',
+  dill:'dill — carvone &amp; dill ether',
+  tomato:'tomato — green-vegetal (cis-3-hexenal, 2-isobutylthiazole)',
+  fig:'fig — green-lactonic fruit (hexenals, decalactones); marginal (0.72)',
+  mango:'mango — tropical (car-3-ene, terpinolene, lactones &amp; esters)',
+  champaca:'champaca — magnolia-type floral (methyl anthranilate, ionones)',
+  styrax:'styrax / storax — cinnamate esters (sweet-balsamic)',
+  davana:'davana — davanone &amp; davana ether (fruity-balsamic; narrow scaffold)',
+  truffle:'truffle — dimethyl-polysulfides &amp; dithiapentane (savoury-sulfurous)',
+  clary_sage:'clary sage — sclareol / linalyl acetate (amber-herbal)',
+  opoponax:'opoponax — bisabolene &amp; santalol resins',
+  turmeric:'turmeric — ar-turmerone &amp; curcuma sesquiterpenes',
+  costus:'costus — costunolide &amp; sesquiterpene lactones',
+  elemi:'elemi — elemol &amp; elemicin (lemon-resinous)',
+  labdanum:'labdanum / cistus — labdane amber-resins',
 };
 // Tox21 in-vitro assay codes -> [friendly name, what it means]. Shown so a reader doesn't have to
 // look up "NR-AhR". NR = nuclear-receptor (hormone) signaling; SR = cellular stress response.
@@ -1469,7 +1607,8 @@ function renderAroma(ar){
       const tag = isDoc ? '<span class="tag measured">documented</span>' : '<span class="tag predicted">predicted</span>';
       const lvl = pct>=65?'likely':pct>=40?'possible':pct>=15?'weak':'unlikely';
       const au = (d.auroc && !isDoc) ? ` <span class="au">· AUROC ${d.auroc}</span>` : '';
-      const help = AROMA_HELP[d.odor] ? `<div class="meter-help">${AROMA_HELP[d.odor]}</div>` : '';
+      const blurb = d.desc || AROMA_HELP[d.odor];  // API is canonical; local map is the fallback
+      const help = blurb ? `<div class="meter-help">${blurb}</div>` : '';
       return `<div class="ameter${d.confident?'':' dim'}">`+
         `<div class="arow"><span class="aname" style="color:${col}">${d.odor}${tag}</span>`+
         `<span class="aval"><b>${lvl}</b> · ${pct}%${au}</span></div>`+
@@ -1634,7 +1773,7 @@ const MAP_COLORS = {sweet:'#E8A94A',bitter:'#A88AE0',umami:'#E0805E',sour:'#BFD2
 // aroma head shows, even if the current map has few or zero of one (e.g. salty).
 const TASTE_CLASSES = ['sweet','bitter','umami','sour','salty','tasteless'];
 // all trained aroma heads — keep in sync with aroma_models/ (see docs/AROMA-AUDIT.md)
-const AROMA_HEADS = ['pungent','ammoniacal','fruity','ethereal','medicinal','sulfurous','floral','garlic','fishy','earthy','camphor','fatty','almond','citrus','minty','spicy','petroleum','putrid','alcoholic','green','grassy','woody','rose','vanilla','winey','banana','musky','nutty','rancid','pine','coconut','anise','herbal','caramel','buttery','onion','balsamic','smoky','honey','cinnamon','meaty','vegetable'];
+const AROMA_HEADS = ['odorless','pungent','sweet','ammoniacal','fruity','ethereal','phenolic','sulfurous','floral','acidic','garlic','fishy','gardenia','camphor','terpenic','fatty','almond','champaca','minty','ylang','spicy','petroleum','honeysuckle','cherry','jasmine','earthy','grassy','aldehydic','resinous','fresh','grape','berry','putrid','animalic','powdery','raspberry','orange','muguet','waxy','alcoholic','leathery','hyacinth','citrus','herbal','meaty','musky','geranium','wintergreen','green','woody','pine','winey','burnt','ozonic','saffron','oakmoss','mustard','pineapple','styrax','tropical','lavender','rose','nutty','anise','cheesy','creamy','soapy','amber','lactonic','popcorn','sandalwood','strawberry','neroli','magnolia','vanilla','balsamic','smoky','banana','vegetable','bready','cooling','celery','grapefruit','hazelnut','davana','truffle','clary_sage','melon','mushroom','cassis','fennel','buttery','onion','coconut','apple','coffee','maple','carnation','mimosa','corky','bergamot','mandarin','freesia','cumin','rosemary','black_pepper','nutmeg','thyme','oregano','myrrh','blueberry','guava','juniper','allspice','dill','opoponax','peach','violet','ginger','hay','tonka','caramel','rancid','medicinal','honey','clove','cinnamon','tarry','metallic','chamomile','violet_leaf','patchouli','linden','coriander','frankincense','mango','tomato','turmeric','costus','pear','apricot','malty','marine','cardamom','plum','tea','elderflower','cocoa','lilac','osmanthus','eucalyptus','tobacco','narcissus','fir','vetiver','cedarwood','cognac','lime','yuzu','cyclamen','passionfruit','sage','elemi','labdanum'];
 function legendClasses(){
   if(_mapColorBy==='aroma') return AROMA_HEADS;
   if(_mapColorBy==='both')  return TASTE_CLASSES.concat(AROMA_HEADS);
@@ -1698,7 +1837,7 @@ function setMapColor(c){ _mapColorBy=c;
 let _mapHi = new Set();  // classes highlighted from the legend (empty = show all evenly)
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
-  // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 42 aroma heads /
+  // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 164 aroma heads /
   // both), plus 'other' last. Present classes are ordered by count; any with zero points still
   // appear (dimmed) so the legend is a full reference — never hide a real head.
   const canon=legendClasses();
@@ -1746,7 +1885,7 @@ function drawClusterLabels(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), groups={};
   for(const p of _mapPts){ const l=mapLabel(p); if(!l||l==='other') continue; (groups[l]=groups[l]||[]).push(p); }
   ctx.save(); ctx.font='700 14px "Cinzel Decorative",Georgia,serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  // label EVERY class that has points (all 42 aroma / 6 taste heads), not just the big ones
+  // label EVERY class that has points (all 164 aroma / 6 taste heads), not just the big ones
   for(const l in groups){ const pts=groups[l]; if(pts.length<3) continue;
     let sx=0,sy=0,n=0; for(const p of pts){ const x=_mapProj.px(p),y=_mapProj.py(p); if(x<-9000||!isFinite(x)) continue; sx+=x; sy+=y; n++; }
     if(!n) continue; sx/=n; sy/=n;

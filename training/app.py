@@ -177,7 +177,7 @@ def api_predict(q: Query):
     if not smi:
         return {"error": f"Couldn't resolve '{q.smiles}' to a structure. "
                          f"Enter a valid SMILES or a recognized compound name."}
-    out = P.predict(smi, include_aroma=False)
+    out = P.predict(smi, include_aroma=True)
     out["flavor_tags"] = _read_tags(smi, out)
     out["references"] = _references(smi)
     return out
@@ -1335,7 +1335,9 @@ def _precompute_design():
                              "gras": Chem.MolToInchiKey(cm).split("-")[0] in P._GRAS})
                 cnt.update([note])
         _DESIGN[:] = pool
-        _DESIGN_DESCS[:] = sorted(d for d, n in cnt.items() if n >= 5)
+        # Offer EVERY trained aroma head as a selectable note (even aroma-only ones with few
+        # food-safe carriers), plus any design note that has >=5 carriers.
+        _DESIGN_DESCS[:] = sorted(set(d for d, n in cnt.items() if n >= 5) | set(P._AROMA_MODELS))
     except Exception:  # noqa: BLE001 — no corpus/models; designer just stays empty
         pass
 
