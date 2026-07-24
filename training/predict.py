@@ -262,8 +262,30 @@ if _GRAS_FILE.exists():
 # Licence) or US 21 CFR (public-domain law). Regulatory facts are non-copyrightable (Feist);
 # no commercial compilation is used. Union into the same defensive "recognized food ingredient?"
 # signal so these read as food-cleared everywhere the SAF list does.
+def _foodsafe_label(fl, cfr):
+    """Compose an accurate, specific food-use label + jurisdiction from the open-gov citations.
+    Distinguishes true GRAS (21 CFR 182/184), FEMA GRAS (a FEMA number), an approved food additive
+    (21 CFR 172), and an EU-authorised flavouring (EU FL) — never a blanket 'GRAS'."""
+    fl, cfr = (fl or "").strip(), (cfr or "").strip()
+    refs = [r for r in (f"EU FL {fl}" if fl else "", cfr) if r]
+    juris = "US + EU" if (fl and cfr) else ("EU" if fl else ("US" if cfr else ""))
+    low = cfr.lower()
+    if "fema" in low:
+        term = "FEMA GRAS"
+    elif "182" in cfr or "184" in cfr:
+        term = "GRAS"
+    elif "172" in cfr:
+        term = "approved food additive"
+    elif fl:
+        term = "EU-authorised flavouring"
+    else:
+        term = "authorised food ingredient"
+    tag = f" ({juris} only)" if juris in ("US", "EU") else (f" ({juris})" if juris else "")
+    return f"{term} — {' & '.join(refs)}{tag}" if refs else term
+
+
 _FOODSAFE_FILE = Path("food_safe_supplement.csv")
-_FOODSAFE_BASIS = {}   # skeleton -> specific open-gov authority string (e.g. "EU FL 07.142")
+_FOODSAFE_BASIS = {}   # skeleton -> specific open-gov label (term + refs + jurisdiction)
 if _FOODSAFE_FILE.exists():
     import pandas as pd  # noqa: F811
     # dtype=str + keep_default_na=False so FL numbers keep leading zeros ("07.142", not 7.142)
@@ -277,9 +299,27 @@ if _FOODSAFE_FILE.exists():
         for _, _r in _fs.iterrows():
             _sk = str(_r.get("inchikey", "")).split("-")[0]
             _fl, _cfr = _clean(_r.get("eu_fl")), _clean(_r.get("us_cfr"))
-            _basis = f"EU FL {_fl}" if _fl else _cfr
-            if _sk and _basis:
-                _FOODSAFE_BASIS[_sk] = _basis
+            if _sk and (_fl or _cfr):
+                _FOODSAFE_BASIS[_sk] = _foodsafe_label(_fl, _cfr)
+
+# Bulk EU/GB flavourings Union List (gb_union_list.csv, ~2,200 authorised entries). The full
+# authorisation register from data.food.gov.uk (Open Government Licence v3 — commercial reuse
+# permitted); every AUTHORISED row is a food-cleared flavouring cited by its FL number. Union into
+# the food-use reference so the whole authorised list reads food-listed with a specific citation.
+# The FILE is a private data asset (gitignored); this LOADER is open framework.
+_GB_FILE = Path("gb_union_list.csv")
+if _GB_FILE.exists():
+    import pandas as pd  # noqa: F811
+    _gb = pd.read_csv(_GB_FILE, dtype=str, keep_default_na=False)
+    for _, _r in _gb.iterrows():
+        if str(_r.get("status", "")).strip().lower() != "authorised":
+            continue
+        _sk = str(_r.get("inchikey", "")).split("-")[0]
+        _fl = str(_r.get("fl", "")).strip()
+        if not _sk or not _fl:
+            continue
+        _GRAS.add(_sk)
+        _FOODSAFE_BASIS.setdefault(_sk, _foodsafe_label(_fl, ""))   # curated citation wins if present
 
 # Optional measured-property + dosing table. Data-gated like GRAS. Drop
 # properties.(parquet|csv) with an 'inchikey' column and any of:
@@ -383,9 +423,9 @@ def _gras_status(mol):
         return "no food-use reference loaded — not checked"
     ik = Chem.MolToInchiKey(mol).split("-")[0]
     if ik in _FOODSAFE_BASIS:
-        return f"listed as an authorised food flavouring ({_FOODSAFE_BASIS[ik]})"
+        return _FOODSAFE_BASIS[ik]                # e.g. "FEMA GRAS — FDA SAF (FEMA 3434) (US only)"
     if ik in _GRAS:
-        return "listed in the FDA Substances-Added-to-Food food-use reference"
+        return "listed in the FDA Substances-Added-to-Food food-use reference (US)"
     return "not in the food-use reference — unverified for food use"
 
 
@@ -757,6 +797,178 @@ def analyze_balance(ingredients):
     }
 
 
+# Canonical one-line odor-descriptor blurbs — the SINGLE source for the "what does this
+# note smell like" help text shown under each aroma bar (workbench), in /api/aroma &
+# /api/predict, and in the MCP server / skill output. Keep one entry per shipped head.
+AROMA_DESC = {
+    "odorless": "odorless — no documented smell (water, salts, most sugars, involatile solids); the aroma parallel to tasteless",
+    "pungent": "sharp / irritating — acrid bite",
+    "sweet": "sweet-smelling — indicative; clears the bar with odorless negatives, weaker at sweet-vs-other-sweet-odors",
+    "ammoniacal": "ammonia / amine — sharp, pungent",
+    "fruity": "ripe fruit — esters & lactones",
+    "ethereal": "light & volatile — fresh, solvent-like",
+    "phenolic": "phenolic / carbolic — phenol, cresols & alkylphenols",
+    "sulfurous": "eggy / alliaceous — sulfur volatiles",
+    "floral": "flowery — rose, jasmine, violet character",
+    "acidic": "acidic / vinegar — short-chain carboxylic acids (acetic family)",
+    "garlic": "allium — pungent sulfur",
+    "fishy": "amine / trimethylamine — marine",
+    "camphor": "camphoraceous — cooling, penetrating",
+    "fatty": "oily / tallowy — long-chain aldehydes & acids",
+    "almond": "marzipan — benzaldehyde, nutty-sweet",
+    "minty": "cooling mint — menthol / carvone family",
+    "spicy": "warm spice — eugenol / cinnamaldehyde / piperine / cuminaldehyde family",
+    "petroleum": "solvent / naphtha — hydrocarbon character",
+    "cherry": "cherry — benzaldehyde / almond-fruity aromatics",
+    "grassy": "grassy — mown hay, cis-3-hexenol",
+    "fresh": "clean / airy — light aldehydes & dihydromyrcenol",
+    "grape": "grape / foxy — anthranilate esters (methyl anthranilate)",
+    "berry": "berry — strawberry / raspberry furanones & esters",
+    "putrid": "putrid — decay / rotten off-note",
+    "orange": "sweet orange — limonene, decanal & orange esters",
+    "muguet": "muguet / lily-of-the-valley — hydroxycitronellal & floral aldehydes",
+    "waxy": "waxy / fatty — long-chain aldehydes, acids & alcohols",
+    "alcoholic": "boozy / ethanolic — spirituous",
+    "citrus": "lemon / orange peel — bright, zesty terpenes",
+    "herbal": "green-herb / medicinal — thymol, carvacrol, cineole",
+    "earthy": "soil / beetroot — geosmin-like",
+    "meaty": "savoury / cooked-meat — sulfur volatiles (furanthiols, thiazoles, methional)",
+    "musky": "musk — macrocyclic ketones / lactones",
+    "green": "green — fresh-cut leaf, grassy aldehydes",
+    "woody": "woody — cedar / sandalwood character",
+    "pine": "pine / resin — coniferous terpenes (α-pinene)",
+    "winey": "fermented / vinous — ethyl esters & lactate",
+    "burnt": "burnt / roasted — pyrolysis furanones & roast pyrazines",
+    "tropical": "tropical — pineapple / mango / passionfruit esters & thioesters",
+    "wintergreen": "wintergreen / teaberry — methyl salicylate & salicylate esters",
+    "lavender": "lavender — linalool & linalyl esters",
+    "rose": "rosy floral — geraniol / phenylethanol",
+    "nutty": "roasted nut / hazelnut — alkylpyrazines",
+    "anise": "anise / licorice — anethole & anisyl aromatics",
+    "cheesy": "cheesy / fermented — short & branched fatty acids",
+    "creamy": "creamy / milky — γ & δ dairy lactones",
+    "soapy": "soapy — C10–C12 fatty aldehydes & ketones",
+    "jasmine": "jasmine — jasmonoids (hedione, cis-jasmone) & floral esters",
+    "neroli": "orange-blossom / neroli — anthranilates & indole over a terpene-alcohol base",
+    "vanilla": "vanilla — vanillin & guaiacol-derived phenolic aldehydes",
+    "balsamic": "sweet-resinous balsam — benzyl / cinnamyl esters",
+    "smoky": "smoke / phenolic — guaiacol & alkylphenols",
+    "banana": "ripe banana — isoamyl acetate & branched esters",
+    "vegetable": "green vegetable — methoxypyrazines & sulfides",
+    "bready": "bread / toasted — pyrazines, pyrrolines & furfural",
+    "melon": "melon / cucumber — (E,Z)-nonadienals",
+    "cassis": "blackcurrant / cassis — sulfury cassis thiol & berry esters",
+    "fennel": "fennel / anise-spice — anethole & terpene spice",
+    "buttery": "butter / cream — vicinal diketones (diacetyl, acetoin)",
+    "coconut": "creamy coconut — γ / δ lactones (nonalactone, decalactone)",
+    "apple": "apple — green-fruity esters (ethyl 2-methylbutyrate, hexyl acetate)",
+    "coffee": "roasted coffee — furfurylthiols & roast pyrazines",
+    "peach": "peach — γ / δ lactones (undecalactone) & fruity esters",
+    "violet": "violet / orris — ionones & irones",
+    "ginger": "ginger — gingerol / zingerone / zingiberene",
+    "hay": "new-mown hay — dihydrocoumarin & hay lactones",
+    "tonka": "tonka / coumarinic — dihydrocoumarin, sweet-hay",
+    "caramel": "caramel — maltol / furaneol / cyclotene sugar-pyrolysis",
+    "rancid": "rancid — oxidized fat, stale off-note",
+    "onion": "alliaceous onion — di/propyl disulfides",
+    "medicinal": "phenolic / clove — antiseptic edge",
+    "honey": "sweet honey / beeswax — phenylacetic acid & esters",
+    "clove": "clove — eugenol / isoeugenol / alkyl-guaiacol phenylpropanoids",
+    "cinnamon": "cinnamon — cinnamaldehyde & esters",
+    "tarry": "tar / creosote — heavy smoky phenols (cresols, catechol)",
+    "pear": "pear — ethyl 2,4-decadienoate & light fruity esters",
+    "apricot": "apricot — γ-lactones & fruity esters",
+    "malty": "malty — Strecker aldehydes (2/3-methylbutanal)",
+    "marine": "marine / oceanic — sulfur volatiles & cucumber aldehydes",
+    "mushroom": "mushroom — C8 volatiles (1-octen-3-ol / -one)",
+    "cardamom": "cardamom — cineole & terpinyl spice terpenoids",
+    "plum": "plum / prune — dried-fruit lactones & esters",
+    "tea": "tea — linalool / ionone / damascenone leaf notes",
+    "elderflower": "elderflower — linalool / rose-oxide floral-green",
+    "cocoa": "cocoa / chocolate — pyrazines & malty Strecker aldehydes",
+    "aldehydic": "aldehydic — fatty-aldehyde sparkle (C8–C13 aldehydes)",
+    "animalic": "animalic — indolic / civet / castoreum (indole, skatole, muscone)",
+    "amber": "amber / ambergris — labdane & woody-amber (ambroxide, sclareolide)",
+    "leathery": "leathery — quinolines & alkylphenols (suede / birch-tar)",
+    "powdery": "powdery — soft orris / cosmetic (ionones, heliotropin, coumarin, musks)",
+    "resinous": "resinous / incense — sesquiterpenes & resin acids (labdanum, olibanum)",
+    "terpenic": "terpenic / turpentine — monoterpene hydrocarbons (pinenes, myrcene)",
+    "ozonic": "ozonic / aquatic — fresh sea-air (Calone, helional, melonal)",
+    "hyacinth": "hyacinth — green floral (phenylacetaldehyde family)",
+    "cooling": "cooling — physiological coolants (menthol, menthyl lactate, WS-agents)",
+    "metallic": "metallic — sharp blood / tin note (1-octen-3-one, epoxy-decenal)",
+    "lactonic": "lactonic — creamy γ/δ-lactones (structural class; overlaps coconut/peach/creamy)",
+    "popcorn": "popcorn / roasted-cereal — pyrazines & 2-acetylpyrroline",
+    "celery": "celery / lovage — phthalides (butylphthalide, sedanolide)",
+    "maple": "maple / fenugreek — sotolon & furanones (sweet-curry)",
+    "chamomile": "chamomile — fruity-herbal angelate & tiglate esters",
+    "tobacco": "tobacco — dry cured (megastigmatrienone, damascones)",
+    "carnation": "carnation — spicy clove-floral (eugenol / isoeugenol over floral)",
+    "mimosa": "mimosa — powdery-green anisic floral (anisaldehyde, heliotropin)",
+    "magnolia": "magnolia — fresh lemony-floral (linalool, citral, dihydromyrcenol)",
+    "narcissus": "narcissus — green-animalic floral (indole, p-cresol, cinnamic esters)",
+    "saffron": "saffron — safranal & carotenoid-degradation ketones (oxophorones)",
+    "gardenia": "gardenia — green-creamy white floral (styralyl acetate, cis-3-hexenyl esters)",
+    "ylang": "ylang-ylang — narcotic phenolic-floral (p-cresyl ethers, benzyl benzoate)",
+    "lilac": "lilac — soft floral (lilac aldehydes, terpineol, anisaldehyde)",
+    "osmanthus": "osmanthus — apricot-floral (ionones, damascones, lactones)",
+    "geranium": "geranium — rosy-green (geraniol, citronellol, rose oxide)",
+    "eucalyptus": "eucalyptus — cineole / camphoraceous terpenoids",
+    "corky": "corky / cork-taint — haloanisoles (TCA) & moldy phenols",
+    "violet_leaf": "violet leaf — green-cucumber (methyl octine carbonate, 2,6-nonadienal); distinct from powdery violet",
+    "fir": "fir / pine-needle — bornyl acetate & conifer terpenes",
+    "oakmoss": "oakmoss — mossy orcinol / orsellinate esters (fragrance; atranol restricted)",
+    "vetiver": "vetiver — earthy-woody sesquiterpenes (vetivones, khusimol)",
+    "patchouli": "patchouli — camphoraceous-woody (patchoulol, patchoulenes)",
+    "sandalwood": "sandalwood — creamy-woody santalols (narrow single-scaffold — AUROC inflated by small n)",
+    "cedarwood": "cedarwood — dry cedar (cedrol, cedrenes, thujopsene)",
+    "cognac": "cognac — fruity-fermented ethyl esters (heptanoate–laurate)",
+    "grapefruit": "grapefruit — citrus-thiol & nootkatone over limonene",
+    "bergamot": "bergamot — linalyl acetate / linalool citrus",
+    "mandarin": "mandarin / tangerine — sinensals over citrus terpenes",
+    "lime": "lime — citral & terpinen-4-ol citrus",
+    "yuzu": "yuzu — terpene-rich citrus (phellandrene, terpinolene)",
+    "honeysuckle": "honeysuckle — nectar floral (hotrienol, jasmine lactone, lilac aldehyde)",
+    "freesia": "freesia — soft ionone-green floral",
+    "cyclamen": "cyclamen — aquatic-green floral (cyclamen aldehyde)",
+    "linden": "linden / lime-blossom — honeyed floral (farnesol, decadienal); marginal (0.81)",
+    "coriander": "coriander / cilantro — linalool over fatty (2E)-alkenals",
+    "cumin": "cumin — cuminaldehyde & cymene terpenes",
+    "passionfruit": "passionfruit — tropical thiols & esters (mercaptohexanol, oxathiane)",
+    "rosemary": "rosemary — cineole / camphor / verbenone herb",
+    "black_pepper": "black pepper — rotundone & peppery sesquiterpenes",
+    "nutmeg": "nutmeg / mace — myristicin & terpene spice",
+    "sage": "sage — thujones, camphor & cineole",
+    "thyme": "thyme — thymol / carvacrol phenolic herb",
+    "oregano": "oregano / marjoram — carvacrol & thymol",
+    "mustard": "mustard / horseradish / wasabi — pungent isothiocyanates",
+    "pineapple": "pineapple — allyl & methylthio esters (tropical)",
+    "strawberry": "strawberry — furaneol & fruity esters; marginal (0.78)",
+    "raspberry": "raspberry — raspberry ketone, ionones & damascones",
+    "myrrh": "myrrh — furanosesquiterpenes (narrow single-scaffold — AUROC inflated by small n)",
+    "frankincense": "frankincense / olibanum — incensole & resin terpenes",
+    "fig": "fig — green-lactonic fruit (hexenals, decalactones); marginal (0.72)",
+    "mango": "mango — tropical (car-3-ene, terpinolene, lactones & esters)",
+    "turmeric": "turmeric — ar-turmerone & curcuma sesquiterpenes",
+    "davana": "davana — davanone & davana ether (fruity-balsamic; narrow scaffold)",
+    "costus": "costus — costunolide & sesquiterpene lactones",
+    "truffle": "truffle — dimethyl-polysulfides & dithiapentane (savoury-sulfurous)",
+    "clary_sage": "clary sage — sclareol / linalyl acetate (amber-herbal)",
+    "elemi": "elemi — elemol & elemicin (lemon-resinous)",
+    "labdanum": "labdanum / cistus — labdane amber-resins",
+    "styrax": "styrax / storax — cinnamate esters (sweet-balsamic)",
+    "opoponax": "opoponax — bisabolene & santalol resins",
+    "champaca": "champaca — magnolia-type floral (methyl anthranilate, ionones)",
+    "blueberry": "blueberry — fruity esters & cinnamates (ethyl 2-methylbutanoate)",
+    "guava": "guava — tropical sulfur-esters (3-sulfanylhexyl acetate) & green",
+    "tomato": "tomato — green-vegetal (cis-3-hexenal, 2-isobutylthiazole)",
+    "juniper": "juniper / gin — piney terpenes (pinene, myrcene, terpinen-4-ol)",
+    "hazelnut": "hazelnut — filbertone & roasted pyrazines (narrow — AUROC inflated by small n)",
+    "allspice": "allspice / pimento — eugenol & clove-spice terpenes",
+    "dill": "dill — carvone & dill ether",
+}
+
+
 @lru_cache(maxsize=8192)
 def predict_aroma(smiles, top_k=8, threshold=0.5):
     """Predicted odor descriptors from RandomForest heads trained on the PUBLIC-DOMAIN HSDB
@@ -776,11 +988,12 @@ def predict_aroma(smiles, top_k=8, threshold=0.5):
     for name, clf in _AROMA_MODELS.items():
         p = float(clf.predict_proba(fp)[0][1])
         preds.append({"odor": name, "score": round(p, 3), "confident": p >= threshold,
-                      "auroc": _AROMA_META.get(name, {}).get("auroc")})
+                      "auroc": _AROMA_META.get(name, {}).get("auroc"),
+                      "desc": AROMA_DESC.get(name)})
     preds.sort(key=lambda d: -d["score"])
     # Return EVERY head (like the taste meters list every taste), ranked, each flagged confident
-    # or not — so the read shows the full aroma profile across all 15 descriptor models, not just
-    # the ones that fired. `top` is the confident shortlist for compact tag uses elsewhere.
+    # or not — so the read shows the full aroma profile across all trained descriptor models, not
+    # just the ones that fired. `top` is the confident shortlist for compact tag uses elsewhere.
     confident = [d for d in preds if d["confident"]]
     return {"available": True, "predicted": True, "descriptors": preds,
             "top": (confident or preds[:3]), "any_confident": bool(confident),

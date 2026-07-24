@@ -17,7 +17,9 @@ extra aroma positives for the sparse descriptors identified in docs/AROMA-AUDIT.
 
 Usage: python build_aroma_supplement.py     # -> aroma_supplement.csv
 """
+import json
 import csv
+import os
 import sys
 
 from rdkit import Chem
@@ -84,35 +86,75 @@ CURATED = {
 }
 
 
+# Persistent resolution cache — makes the build DETERMINISTIC and network-independent. Without it,
+# every build re-queries PubChem for each un-hinted name, and any rate-limit/timeout silently drops
+# that molecule, churning the marginal (n~10) descriptor heads build-to-build. Cache once, reuse
+# forever; delete resolve_cache.json to force a re-fetch.
+_CACHE_PATH = "resolve_cache.json"
+try:
+    with open(_CACHE_PATH, encoding="utf-8") as _cf:
+        _RESOLVE_CACHE = json.load(_cf)
+except (OSError, ValueError):
+    _RESOLVE_CACHE = {}
+
+
 def resolve(name):
-    """name -> canonical SMILES via PubChem (authoritative), or None."""
+    """name -> canonical SMILES via PubChem (authoritative), or None. Cached persistently so the
+    build is deterministic and does not depend on live network reachability."""
     if Chem.MolFromSmiles(name):
         return Chem.MolToSmiles(Chem.MolFromSmiles(name))
+    if name in _RESOLVE_CACHE:
+        return _RESOLVE_CACHE[name]
+    smi = None
     try:
         import pubchempy as pcp
         hits = pcp.get_compounds(name, "name")
         if hits and hits[0].canonical_smiles:
             m = Chem.MolFromSmiles(hits[0].canonical_smiles)
-            return Chem.MolToSmiles(m) if m else None
-    except Exception:  # noqa: BLE001 — offline / not found; skip this entry
+            smi = Chem.MolToSmiles(m) if m else None
+    except Exception:  # noqa: BLE001 — offline / not found; leave uncached so a later online build can fill it
         return None
-    return None
+    if smi:  # only cache successful resolutions; misses stay retryable
+        _RESOLVE_CACHE[name] = smi
+        try:
+            with open(_CACHE_PATH, "w", encoding="utf-8") as _cf:
+                json.dump(_RESOLVE_CACHE, _cf, indent=0, sort_keys=True)
+        except OSError:
+            pass
+    return smi
+
+
+def _items():
+    """(descriptor, name, smiles_hint) for every curated + open-gov-sourced association. The sourced
+    additions (aroma_additions.csv) are kept as a data file because the set is large; each carries an
+    optional authoritative SMILES so tricky names resolve without a PubChem round-trip. Every sourced
+    molecule is open-government food-authorised (see food_safe_supplement.csv for its citation)."""
+    out = [(d, n, "") for d, names in CURATED.items() for n in names]
+    if os.path.exists("aroma_additions.csv"):
+        with open("aroma_additions.csv", newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                d, m = (r.get("descriptor") or "").strip(), (r.get("molecule") or "").strip()
+                if d and m:
+                    out.append((d, m, (r.get("smiles") or "").strip()))
+    return out
 
 
 def main():
     rows, seen, misses = [], set(), []
-    for descriptor, names in CURATED.items():
-        for name in names:
-            smi = resolve(name)
-            if not smi:
-                misses.append(f"{descriptor}:{name}")
-                continue
-            key = (descriptor, smi)
-            if key in seen:
-                continue
-            seen.add(key)
-            rows.append({"flavor": descriptor, "molecule": name, "smiles": smi,
-                         "category": "aroma-supplement"})
+    for descriptor, name, smi_hint in _items():
+        smi = smi_hint or resolve(name)
+        if smi:                                          # canonicalise so dedup + downstream keying match
+            m = Chem.MolFromSmiles(smi)
+            smi = Chem.MolToSmiles(m) if m else ""
+        if not smi:
+            misses.append(f"{descriptor}:{name}")
+            continue
+        key = (descriptor, smi)
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append({"flavor": descriptor, "molecule": name, "smiles": smi,
+                     "category": "aroma-supplement"})
     with open("aroma_supplement.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["flavor", "molecule", "smiles", "category"])
         w.writeheader()

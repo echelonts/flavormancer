@@ -47,8 +47,6 @@ pnpm-debug.log*
 *_models/
 odor_model/
 # ...but DO track the small, hand-curated input lists:
-!flavor_volatiles.csv
-!training/flavors.csv
 
 # ---- Secrets & local config ----
 .env
@@ -63,5 +61,9 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
-!training/aroma_supplement.csv
-!training/food_safe_supplement.csv
+
+# public schema samples (full curated data stays private — the moat)
+!training/samples/
+!training/samples/*.csv
+!training/samples/*.md
+training/resolve_cache.json
