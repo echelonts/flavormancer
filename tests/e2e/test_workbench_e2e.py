@@ -71,8 +71,11 @@ def test_formulation_studio_starter(page, base_url, needs_models):
 def test_compare_loads_and_loaders_clear(page, base_url, needs_models):
     _open(page, base_url)
     page.locator(".cmp-ex", has_text="vanillin vs").click()
-    page.wait_for_selector("#cmpResults .cmp-card:not(.loading) img", timeout=30000)
-    page.wait_for_timeout(500)
+    # wait for BOTH comparison cards to finish loading (not just the first) — the second can lag
+    # under load, so poll for the pair of non-loading cards with images rather than a fixed sleep
+    page.wait_for_function(
+        "document.querySelectorAll('#cmpResults .cmp-card:not(.loading) img').length === 2",
+        timeout=30000)
     assert page.locator("#cmpResults .cmp-card img:visible").count() == 2
     assert page.locator("#cmpResults .cmp-load:visible").count() == 0, "loaders must clear after load"
 
