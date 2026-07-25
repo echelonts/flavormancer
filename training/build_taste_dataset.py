@@ -35,6 +35,7 @@ verified databases beats having a model invent labels — model-guessed labels
 reintroduce exactly the unverified-data problem that weakened SuperSweet.)
 """
 
+import contextlib
 from pathlib import Path
 
 import numpy as np
@@ -57,10 +58,10 @@ def canon(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None, None
-    try:
-        return Chem.MolToInchiKey(mol), Chem.MolToSmiles(mol)
-    except Exception:
-        return None, None
+    result = (None, None)
+    with contextlib.suppress(Exception):
+        result = (Chem.MolToInchiKey(mol), Chem.MolToSmiles(mol))
+    return result
 
 
 def _find(df, candidates):
@@ -133,7 +134,7 @@ def parse_taste_column(val):
     pos, neg = set(), set()
     for tok in s.split("/"):
         tok = tok.strip()
-        negated = tok.startswith("non-") or tok.startswith("non ")
+        negated = tok.startswith(("non-", "non "))
         if negated:
             tok = tok[3:].lstrip("- ").strip()
         tok = " ".join(w for w in tok.split() if w not in _MODIFIERS).strip()

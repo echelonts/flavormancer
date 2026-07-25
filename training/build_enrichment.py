@@ -13,15 +13,14 @@ crawl fills in more names / MP / BP — the table just gets richer.
 
 Usage: python build_enrichment.py            # -> master_enrichment.parquet
 """
+import contextlib
 import glob
 
 import numpy as np
 import pandas as pd
-from rdkit import Chem
-from rdkit.Chem import Crippen, Descriptors, rdMolDescriptors
-from rdkit import RDLogger
-
 import predict as P
+from rdkit import Chem, RDLogger
+from rdkit.Chem import Crippen, Descriptors, rdMolDescriptors
 
 RDLogger.DisableLog("rdApp.*")
 _BASIC = ["sweet", "bitter", "umami", "sour", "salty"]
@@ -32,9 +31,10 @@ def _all_structures():
     for f in sorted(glob.glob("*.parquet")):
         if f in ("master_enrichment.parquet", "flavor_map.parquet"):
             continue
-        try:
+        d = None
+        with contextlib.suppress(Exception):
             d = pd.read_parquet(f)
-        except Exception:  # noqa: BLE001
+        if d is None:
             continue
         if "smiles" not in d.columns:
             continue
@@ -50,7 +50,7 @@ def _by_skel(path, cols):
     out = {}
     try:
         d = pd.read_parquet(path)
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 — table absent; return what we have
         return out
     if "inchikey" not in d.columns:
         return out
@@ -70,13 +70,14 @@ def _documented_isomer_rows(name_by_skel):
     from rdkit.Chem import Crippen, Descriptors, rdMolDescriptors
     try:
         import build_aroma_dataset as BA  # odor text -> descriptor tag
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 — optional module; degrade without odor tags
         BA = None
     docs = {}  # skeleton -> {full_ik: {smiles, odor?, taste?}}
     for path, col in (("odor_notes.parquet", "odor"), ("taste_notes.parquet", "taste")):
-        try:
+        d = None
+        with contextlib.suppress(Exception):
             d = pd.read_parquet(path)
-        except Exception:  # noqa: BLE001
+        if d is None:
             continue
         if col not in d.columns:
             continue
@@ -123,7 +124,7 @@ def _taste_by_skel():
     out = {}
     try:
         tm = pd.read_parquet("taste_master.parquet")
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 — table absent; return what we have
         return out
     for _, r in tm.iterrows():
         m = Chem.MolFromSmiles(str(r["smiles"]))

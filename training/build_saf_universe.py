@@ -22,10 +22,11 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else "saf_raw.xls"
 OUT = "saf_universe.parquet"
 _CAS = re.compile(r"^\d{2,7}-\d{2}-\d$")
 
-raw = open(SRC, "rb").read().decode("cp1252", errors="replace").splitlines()
+with open(SRC, "rb") as _f:
+    raw = _f.read().decode("cp1252", errors="replace").splitlines()
 hdr = next((i for i, line in enumerate(raw) if line.startswith("CAS Reg No")), 0)
 rows = list(csv.DictReader(StringIO("\n".join(raw[hdr:]))))
-cas_col, name_col = list(rows[0].keys())[0], "Substance"
+cas_col, name_col = next(iter(rows[0].keys())), "Substance"
 
 seen, cas_list = set(), []
 for r in rows:
@@ -42,7 +43,7 @@ def resolve(cas):
             hits = pcp.get_compounds(cas, "name")
             if hits and hits[0].smiles:
                 return hits[0].smiles
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 — PubChem miss/throttle; back off and retry
             time.sleep(0.5 * (attempt + 1))
     return None
 

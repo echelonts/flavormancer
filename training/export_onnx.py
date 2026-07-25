@@ -67,6 +67,7 @@ for path in sorted(SRC.glob("*_rf.joblib")):
     }
     print(f"{name:16} -> {out_path.name}  (validated, max diff {max_diff:.2e})")
 
-json.dump(manifest, open(OUT / "manifest.json", "w"), indent=2)
+with open(OUT / "manifest.json", "w") as _mf:
+    json.dump(manifest, _mf, indent=2)
 print(f"\nwrote {OUT}/manifest.json — input '{INPUT_NAME}', {FP_BITS}-bit Morgan r{FP_RADIUS}")
 print("The .NET TasteModelService reads this manifest; keep FP bits/radius in sync with predict.py.")

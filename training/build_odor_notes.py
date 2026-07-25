@@ -29,16 +29,16 @@ import urllib.parse
 from pathlib import Path
 
 import pandas as pd
-from rdkit import Chem
 
 # reuse the rate-limited fetcher + InChIKey->CID + molecule-set loader
 from build_properties import _BASE, _cid, _get, load_keys
+from rdkit import Chem
 
 # keep only public-domain sources; drop proprietary flavor databases outright
 PUBLIC_DOMAIN = ("hazardous substances data bank", "hsdb", "haz-map", "cameo chemicals")
 BLOCK = ("good scents", "goodscents", "tgsc", "leffingwell", "flavornet", "flavordb", "fema")
-_PPM_RE = re.compile(r"(\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*(ppb|ppm)", re.I)
-_LOW_RE = re.compile(r"threshold low:\s*(\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*\[?\s*(ppb|ppm)", re.I)
+_PPM_RE = re.compile(r"(\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*(ppb|ppm)", re.IGNORECASE)
+_LOW_RE = re.compile(r"threshold low:\s*(\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*\[?\s*(ppb|ppm)", re.IGNORECASE)
 
 
 def _pd_source(src):

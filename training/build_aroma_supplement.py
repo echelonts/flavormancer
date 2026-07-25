@@ -17,8 +17,8 @@ extra aroma positives for the sparse descriptors identified in docs/AROMA-AUDIT.
 
 Usage: python build_aroma_supplement.py     # -> aroma_supplement.csv
 """
-import json
 import csv
+import json
 import os
 import sys
 

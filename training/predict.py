@@ -43,6 +43,7 @@ Hard ceiling: it nails simple salts and honestly can't reach salt-enhancer
 peptides or non-ionic salty compounds (little data, weak structure-activity).
 """
 
+import contextlib
 import threading as _threading
 from functools import lru_cache
 from pathlib import Path
@@ -50,7 +51,13 @@ from pathlib import Path
 import joblib
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import Crippen, DataStructs, Descriptors, rdFingerprintGenerator, rdMolDescriptors
+from rdkit.Chem import (
+    Crippen,
+    DataStructs,
+    Descriptors,
+    rdFingerprintGenerator,
+    rdMolDescriptors,
+)
 
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
@@ -185,10 +192,8 @@ def _load_rf(path):
     Studio) instead of fighting joblib. Measured: ~3.8 s -> ~1.2 s per 24-head aroma read."""
     mdl = joblib.load(path)
     if hasattr(mdl, "n_jobs"):
-        try:
+        with contextlib.suppress(Exception):  # some wrapped estimators reject the set; harmless
             mdl.n_jobs = 1
-        except Exception:  # noqa: BLE001 — some wrapped estimators reject the set; harmless
-            pass
     return mdl
 
 
@@ -251,7 +256,7 @@ if _MASTER.exists():
 _GRAS = set()
 _GRAS_FILE = Path("gras_reference.parquet")
 if _GRAS_FILE.exists():
-    import pandas as pd  # noqa: F811
+    import pandas as pd
     _g = pd.read_parquet(_GRAS_FILE)
     if "inchikey" in _g.columns:
         _GRAS = {str(k).split("-")[0] for k in _g["inchikey"].dropna()}
@@ -287,7 +292,7 @@ def _foodsafe_label(fl, cfr):
 _FOODSAFE_FILE = Path("food_safe_supplement.csv")
 _FOODSAFE_BASIS = {}   # skeleton -> specific open-gov label (term + refs + jurisdiction)
 if _FOODSAFE_FILE.exists():
-    import pandas as pd  # noqa: F811
+    import pandas as pd
     # dtype=str + keep_default_na=False so FL numbers keep leading zeros ("07.142", not 7.142)
     # and empty cells read as "" rather than NaN.
     _fs = pd.read_csv(_FOODSAFE_FILE, dtype=str, keep_default_na=False)
@@ -309,7 +314,7 @@ if _FOODSAFE_FILE.exists():
 # The FILE is a private data asset (gitignored); this LOADER is open framework.
 _GB_FILE = Path("gb_union_list.csv")
 if _GB_FILE.exists():
-    import pandas as pd  # noqa: F811
+    import pandas as pd
     _gb = pd.read_csv(_GB_FILE, dtype=str, keep_default_na=False)
     for _, _r in _gb.iterrows():
         if str(_r.get("status", "")).strip().lower() != "authorised":
@@ -333,7 +338,7 @@ _PROP_COLS = ("odor_threshold_ppm", "fema_use_max_ppm", "boiling_point_c",
 for _ext in ("properties.parquet", "properties.csv"):
     _pf = Path(_ext)
     if _pf.exists():
-        import pandas as pd  # noqa: F811
+        import pandas as pd
         _pp = pd.read_parquet(_pf) if _ext.endswith("parquet") else pd.read_csv(_pf)
         if "inchikey" in _pp.columns:
             for _, _r in _pp.iterrows():
@@ -655,8 +660,10 @@ def stereoisomers(smiles, max_isomers=24):
     combinations, not just one R/S pair. Returns a list of {smiles (isomeric), inchikey, label,
     n_stereo}, capped at max_isomers so a molecule with many centers can't blow up. Empty when the
     molecule has no stereochemistry to vary."""
-    from rdkit.Chem.EnumerateStereoisomers import (EnumerateStereoisomers,
-                                                   StereoEnumerationOptions)
+    from rdkit.Chem.EnumerateStereoisomers import (
+        EnumerateStereoisomers,
+        StereoEnumerationOptions,
+    )
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return []
@@ -1063,7 +1070,7 @@ def _build_sub_index():
     fps, smis, tastes, feats = [], [], [], []
     if _MASTER.exists():
         import numpy as np
-        import pandas as pd  # noqa: F811
+        import pandas as pd
         m = pd.read_parquet(_MASTER)
         basic = [t for t in ("sweet", "bitter", "umami", "sour", "salty") if t in m.columns]
         for _, r in m.iterrows():
@@ -1190,10 +1197,8 @@ def _rxns():
         from rdkit.Chem import AllChem
         out = []
         for name, sm in _RXN_TEMPLATES:
-            try:
+            with contextlib.suppress(Exception):  # a template that won't parse is just skipped
                 out.append((name, AllChem.ReactionFromSmarts(sm)))
-            except Exception:  # noqa: BLE001 — a template that won't parse is just skipped
-                pass
         _RXNS = out
     return _RXNS
 
@@ -1209,16 +1214,18 @@ def reaction_products(smiles_list, max_products=12):
             for sj, mj in mols:
                 if si == sj:
                     continue
-                try:
+                runs = None
+                with contextlib.suppress(Exception):
                     runs = rxn.RunReactants((mi, mj))
-                except Exception:  # noqa: BLE001
+                if runs is None:
                     continue
                 for prods in runs:
                     for p in prods:
-                        try:
+                        smi = None
+                        with contextlib.suppress(Exception):  # template made an invalid product
                             Chem.SanitizeMol(p)
                             smi = Chem.MolToSmiles(p)
-                        except Exception:  # noqa: BLE001 — template made an invalid product
+                        if smi is None:
                             continue
                         pm = Chem.MolFromSmiles(smi)
                         if pm is None:

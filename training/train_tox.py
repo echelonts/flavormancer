@@ -58,7 +58,7 @@ for t in TASKS:
     if yd.sum() < 30:
         print(f"  {t:14s} too few positives — skip")
         continue
-    clf_args = dict(n_estimators=200, n_jobs=-1, random_state=42, class_weight="balanced")
+    clf_args = {"n_estimators": 200, "n_jobs": -1, "random_state": 42, "class_weight": "balanced"}
     auc = cross_val_score(RandomForestClassifier(**clf_args), Xd, yd, cv=5, scoring="roc_auc").mean()
     joblib.dump(RandomForestClassifier(**clf_args).fit(Xd, yd), OUT / f"{t}_rf.joblib")
     kept += 1

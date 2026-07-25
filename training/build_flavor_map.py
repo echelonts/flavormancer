@@ -12,6 +12,7 @@ resulting parquet, so UMAP is not required to run the demo).
 
 Usage: python build_flavor_map.py            # taste_master.parquet -> flavor_map.parquet
 """
+import contextlib
 import sys
 from pathlib import Path
 
@@ -38,7 +39,7 @@ def _tasteless_structs():
         tn = pd.read_parquet("taste_notes.parquet")
     except Exception:  # noqa: BLE001 — no documented-taste table
         return {}
-    neg = re.compile(r"\b(tasteless|no taste|without taste)", re.I)
+    neg = re.compile(r"\b(tasteless|no taste|without taste)", re.IGNORECASE)
     out = {}
     for smi, txt in zip(tn["smiles"], tn["taste"].astype(str)):
         if neg.search(txt):
@@ -85,9 +86,10 @@ def _all_structures():
     for f in sorted(glob.glob("*.parquet")):
         if f in ("flavor_map.parquet",):
             continue
-        try:
+        d = None
+        with contextlib.suppress(Exception):
             d = pd.read_parquet(f)
-        except Exception:  # noqa: BLE001
+        if d is None:
             continue
         if "smiles" not in d.columns:
             continue
@@ -136,7 +138,7 @@ if __name__ == "__main__":
                         "mw": mw, "logp": logp, "tpsa": tpsa})
     # dominant aroma descriptor per molecule (for the map's "color by aroma" mode) — guarded so
     # the map still builds without the aroma heads
-    try:
+    with contextlib.suppress(Exception):  # no aroma models; taste-only map
         import predict as P
         if P._AROMA_MODELS:
             heads = list(P._AROMA_MODELS.keys())
@@ -149,7 +151,7 @@ if __name__ == "__main__":
             # from the training set — so the molecules a head was TRAINED on surface as that head,
             # instead of being outshone by a commoner predicted aroma (why rare heads had no dots).
             doc = {}
-            try:
+            with contextlib.suppress(Exception):  # no training labels; predicted-only
                 at = pd.read_parquet("aroma_train.parquet")
                 hc = [h for h in heads if h in at.columns]
                 for _, r in at.iterrows():
@@ -157,8 +159,6 @@ if __name__ == "__main__":
                     pos = [h for h in hc if int(r.get(h, 0) or 0) == 1]
                     if ik and pos:
                         doc[ik] = pos
-            except Exception:  # noqa: BLE001 — no training labels; predicted-only
-                pass
             # rarity of each documented head (fewer molecules = more distinctive), so a molecule
             # documented for several aromas is shown as its RAREST one — this keeps low-population
             # heads (pine, rose, green…) from losing their molecules to a commoner co-documented
@@ -177,8 +177,6 @@ if __name__ == "__main__":
                         if prob[name][i] >= bp:
                             bp, best[i] = prob[name][i], name
             out["aroma_label"] = best
-    except Exception:  # noqa: BLE001 — no aroma models; taste-only map
-        pass
     out.to_parquet("flavor_map.parquet")
     print(f"flavor_map.parquet: {len(out)} points  "
           f"({', '.join(f'{t}={int((out.label == t).sum())}' for t in TASTES)}, "

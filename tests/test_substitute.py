@@ -3,9 +3,8 @@
 The ranking logic is tested against a hand-built in-memory index so it needs no data
 files; the .NET product (M6) mirrors this as a pgvector ANN query.
 """
-from rdkit import Chem
-
 import predict
+from rdkit import Chem
 
 
 def _canon(s):

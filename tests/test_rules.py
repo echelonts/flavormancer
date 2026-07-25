@@ -3,9 +3,8 @@
 These cover the rule layer the .NET product (M2) will port: sour/salty calls,
 allergen labeling, and the documented dangerous-mixture screen.
 """
-from rdkit import Chem
-
 import predict
+from rdkit import Chem
 
 
 def _mol(smiles):

@@ -17,8 +17,7 @@ import glob
 from pathlib import Path
 
 import pandas as pd
-from rdkit import Chem
-from rdkit import RDLogger
+from rdkit import Chem, RDLogger
 
 RDLogger.DisableLog("rdApp.*")
 

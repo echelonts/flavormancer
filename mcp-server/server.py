@@ -269,7 +269,7 @@ def list_stereoisomers(molecule: str) -> dict:
 
 
 @mcp.tool()
-def analyze_formulation(ingredients: list[dict], target: list[str] = [], processes: list[str] = []) -> dict:
+def analyze_formulation(ingredients: list[dict], target: list[str] | None = None, processes: list[str] | None = None) -> dict:
     """Read a whole formulation before you pour.
 
     ingredients: list of {"name": <name or SMILES>, "ppm": <optional dose>}.
@@ -280,11 +280,15 @@ def analyze_formulation(ingredients: list[dict], target: list[str] = [], process
     per note, an overpowering-component flag, a target gap analysis with food-safe add/cut
     suggestions, a documented-hazard screen, and honest data-gate notes.
     """
+    if processes is None:
+        processes = []
+    if target is None:
+        target = []
     return _analyze_formulation(ingredients, target, processes)
 
 
 @mcp.tool()
-def design_recipe(flavors: list[str] = [], notes: list[str] = [], food_safe: bool = True) -> dict:
+def design_recipe(flavors: list[str] | None = None, notes: list[str] | None = None, food_safe: bool = True) -> dict:
     """Design a STARTING formulation for a target profile — the inverse of analyze_formulation.
 
     Give target flavors (e.g. ["lemon"]) and/or aroma notes (e.g. ["citrus","fresh"]). Returns a
@@ -294,17 +298,25 @@ def design_recipe(flavors: list[str] = [], notes: list[str] = [], food_safe: boo
     through the analyzer so you see the predicted profile + gap. Doses are a bench starting point;
     calibrated dosing needs odor-threshold / panel data (a data-gate).
     """
+    if notes is None:
+        notes = []
+    if flavors is None:
+        flavors = []
     return _design_recipe(flavors, notes, food_safe)
 
 
 @mcp.tool()
-def design_recipe_csv(flavors: list[str] = [], notes: list[str] = [], food_safe: bool = True) -> str:
+def design_recipe_csv(flavors: list[str] | None = None, notes: list[str] | None = None, food_safe: bool = True) -> str:
     """Same as design_recipe, but returns the recipe as a CSV bench sheet (a string) instead of
     JSON — parity with the workbench's 'Export CSV' and the skill CLI's `design --csv`. Columns:
     ingredient, smiles, ppm, volatility, carries, dose_basis. Hand this straight to a formulator
     or drop it into a spreadsheet."""
     import csv as _csv
     import io as _io
+    if notes is None:
+        notes = []
+    if flavors is None:
+        flavors = []
     out = _design_recipe(flavors, notes, food_safe)
     if isinstance(out, dict) and out.get("error"):
         return "error," + str(out["error"])
@@ -320,20 +332,24 @@ def design_recipe_csv(flavors: list[str] = [], notes: list[str] = [], food_safe:
 
 
 @mcp.tool()
-def screen_mixture(ingredients: list[str], processes: list[str] = []) -> dict:
+def screen_mixture(ingredients: list[str], processes: list[str] | None = None) -> dict:
     """Screen a mixture of ingredients for DOCUMENTED food hazards (e.g. benzoate + ascorbate
     -> benzene), gated on process. Includes per-ingredient reads, a palette match, and
     indicative reaction products. Curated screen, NOT a reaction predictor or safety clearance.
     """
+    if processes is None:
+        processes = []
     return _screen_mixture(ingredients, processes)
 
 
 @mcp.tool()
-def predict_reactions(ingredients: list[str], processes: list[str] = []) -> dict:
+def predict_reactions(ingredients: list[str], processes: list[str] | None = None) -> dict:
     """Predict indicative reaction-template products for a set of ingredients (with each
     product's own predicted taste + aroma), plus any documented combination hazards.
     Template-based and indicative — not a claim the reaction proceeds.
     """
+    if processes is None:
+        processes = []
     return _predict_reactions(ingredients, processes)
 
 

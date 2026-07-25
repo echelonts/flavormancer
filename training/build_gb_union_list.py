@@ -20,7 +20,9 @@ DFG = "https://data.food.gov.uk/regulated-products/flavouring_authorisations/"
 
 # unique authorised flavourings by FL number
 auth = {}
-for r in csv.DictReader(open(SRC)):
+with open(SRC) as _f:
+    _rows = list(csv.DictReader(_f))
+for r in _rows:
     if "authorised" in r["Status"].lower():
         fl = r["FLno"].strip()
         if fl and fl not in auth:

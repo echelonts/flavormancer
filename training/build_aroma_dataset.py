@@ -186,7 +186,7 @@ VOCAB = {
     "boronia": ["boronia"],
     "angelica": ["angelica"],
 }
-PATS = {d: re.compile(r"\b(" + "|".join(k) + r")\b", re.I) for d, k in VOCAB.items()}
+PATS = {d: re.compile(r"\b(" + "|".join(k) + r")\b", re.IGNORECASE) for d, k in VOCAB.items()}
 
 
 def fold_flavors(rows, path="flavors.csv"):
