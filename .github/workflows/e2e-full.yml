@@ -25,7 +25,22 @@ jobs:
         run: |
           python -m pip install --quiet pytest playwright
           python -m playwright install chromium || true
-      - name: Full suite against the running app (all models loaded)
+      - name: Start a dedicated multi-worker test server
+        # A dedicated 4-worker server (the box is 32-core) so the 13 back-to-back Playwright
+        # tests don't queue behind a single worker and time out. Isolated on :8011 so it never
+        # disturbs the live demo app on :8000. Each worker loads its own copy of the models.
+        working-directory: training
+        run: |
+          nohup python -m uvicorn app:app --host 127.0.0.1 --port 8011 --workers 4 \
+            > /tmp/flavor-e2e-app.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8011/api/studio_terms >/dev/null && { echo "app up"; break; }
+            sleep 2
+          done
+      - name: Full suite against the multi-worker server (all models loaded)
         env:
-          FLAVORMANCER_URL: http://127.0.0.1:8000
+          FLAVORMANCER_URL: http://127.0.0.1:8011
         run: pytest tests/e2e -q
+      - name: Stop the test server
+        if: always()
+        run: pkill -f "uvicorn app:app.*8011" || true
