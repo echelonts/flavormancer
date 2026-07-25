@@ -18,18 +18,18 @@ instance) for the demo; deployment puts this behind login + per-user history, an
 prediction core doesn't change.
 """
 
+import contextlib
 import math
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 
+import predict as P  # the unified flavor read + substitution search
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from rdkit import Chem
-
-import predict as P  # the unified flavor read + substitution search
 
 app = FastAPI(title="Flavor Workbench (demo)")
 
@@ -39,22 +39,18 @@ def _load_name2smiles():
     PubChem round-trip. Built from master_enrichment.parquet (~8k named molecules) + the suggest
     CSV. Only genuinely-unknown names fall through to live PubChem in _resolve()."""
     idx = {}
-    try:
+    with contextlib.suppress(Exception):  # table absent / no pandas; live lookup still covers it
         import pandas as pd
         df = pd.read_parquet("master_enrichment.parquet")
         for nm, smi in zip(df["name"], df["smiles"]):
             if isinstance(nm, str) and isinstance(smi, str) and nm.strip() and smi.strip():
                 idx.setdefault(nm.strip().lower(), smi)
-    except Exception:  # noqa: BLE001 — table absent / no pandas; live lookup still covers it
-        pass
-    try:
+    with contextlib.suppress(Exception):  # no suggest file; fine
         import csv
         with open("flavor_volatiles.csv", encoding="utf-8") as fh:
             for r in csv.DictReader(fh):
                 if r.get("name") and r.get("smiles"):
                     idx.setdefault(r["name"].strip().lower(), r["smiles"])
-    except Exception:  # noqa: BLE001 — no suggest file; fine
-        pass
     return idx
 
 
@@ -72,13 +68,11 @@ def _resolve(text: str):
     hit = _NAME2SMILES.get(text.lower())
     if hit and Chem.MolFromSmiles(hit):
         return hit
-    try:
+    with contextlib.suppress(Exception):
         import pubchempy as pcp
         hits = pcp.get_compounds(text, "name")
         if hits and hits[0].canonical_smiles:
             return hits[0].canonical_smiles
-    except Exception:
-        pass
     return None
 
 
@@ -177,7 +171,7 @@ def api_predict(q: Query):
     if not smi:
         return {"error": f"Couldn't resolve '{q.smiles}' to a structure. "
                          f"Enter a valid SMILES or a recognized compound name."}
-    out = P.predict(smi, include_aroma=False)
+    out = P.predict(smi, include_aroma=True)
     out["flavor_tags"] = _read_tags(smi, out)
     out["references"] = _references(smi)
     return out
@@ -223,14 +217,12 @@ def _references(smi):
     refs = [{"label": "PubChem", "note": note,
              "url": f"https://pubchem.ncbi.nlm.nih.gov/#query={urllib.parse.quote(ik)}",
              "spectra": have}]
-    try:
+    with contextlib.suppress(Exception):  # InChI generation can fail on odd valences
         inchi = Chem.MolToInchi(mol)
         if inchi:
             refs.append({"label": "NIST WebBook", "note": "IR / MS spectra, GC retention index",
                          "url": "https://webbook.nist.gov/cgi/cbook.cgi?InChI="
                                 + urllib.parse.quote(inchi) + "&Units=SI"})
-    except Exception:  # noqa: BLE001 — InChI generation can fail on odd valences
-        pass
     return refs
 
 
@@ -264,13 +256,11 @@ def _aroma_tags(smi, k=3):
         return []
     rec = _ODOR_TABLE.get(Chem.MolToInchiKey(mol).split("-")[0])
     if rec and rec.get("odor"):
-        try:
+        with contextlib.suppress(Exception):  # vocab module missing; fall through to predicted
             from build_aroma_dataset import tag as _odor_tag
             found = sorted(_odor_tag(rec["odor"]))[:k]
             if found:
                 return [{"odor": t, "source": "found"} for t in found]
-        except Exception:  # noqa: BLE001 — vocab module missing; fall through to predicted
-            pass
     pa = P.predict_aroma(smi)
     return [{"odor": d["odor"], "source": "predicted"}
             for d in pa.get("descriptors", []) if d.get("confident")][:k]
@@ -284,13 +274,11 @@ def _aroma_tags_cheap(smi, precomputed, k=3):
     if mol is not None:
         rec = _ODOR_TABLE.get(Chem.MolToInchiKey(mol).split("-")[0])
         if rec and rec.get("odor"):
-            try:
+            with contextlib.suppress(Exception):  # vocab module missing; fall through to predicted
                 from build_aroma_dataset import tag as _odor_tag
                 found = sorted(_odor_tag(rec["odor"]))[:k]
                 if found:
                     return [{"odor": t, "source": "found"} for t in found]
-            except Exception:  # noqa: BLE001 — vocab module missing; fall through to predicted
-                pass
     return [{"odor": a, "source": "predicted"} for a in (precomputed or [])][:k]
 
 
@@ -355,10 +343,8 @@ def api_structure3d(q: Query):
         params.randomSeed = 42  # deterministic conformer
         if AllChem.EmbedMolecule(mol, params) != 0 and AllChem.EmbedMolecule(mol, AllChem.ETKDG()) != 0:
             return {"molblock": None}  # embedding failed (e.g. tricky cage/macrocycle)
-        try:
+        with contextlib.suppress(Exception):  # no MMFF params for some atoms; unoptimized still fine
             AllChem.MMFFOptimizeMolecule(mol)
-        except Exception:  # noqa: BLE001 — no MMFF params for some atoms; unoptimized still fine
-            pass
         return {"molblock": Chem.MolToMolBlock(mol)}
     except Exception:  # noqa: BLE001 — RDKit build without embedding etc.; degrade gracefully
         return {"molblock": None}
@@ -418,13 +404,14 @@ def api_card(q: str = "", dl: int = 0):
     name = common or (q[:1].upper() + q[1:] if q else smi)
 
     import io
+
     from PIL import Image, ImageDraw, ImageFont
     from rdkit.Chem.Draw import rdMolDraw2D
 
     def font(path, size):
         try:
             return ImageFont.truetype(path, size)
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 — font file missing; fall back to default
             return ImageFont.load_default()
     DJ = "/usr/share/fonts/truetype/dejavu/"
     f_title = font("static/headerfont.ttf", 46)
@@ -487,11 +474,9 @@ def api_card(q: str = "", dl: int = 0):
         dr = ImageDraw.Draw(img)
 
     # header
-    try:
+    with contextlib.suppress(Exception):
         emblem = Image.open("static/logo.png").convert("RGBA").resize((58, 58))
         img.paste(emblem, (40, 30), emblem)
-    except Exception:  # noqa: BLE001
-        pass
     dr.text((110, 30), "Flavormancer", font=f_title, fill=ink)
     dr.text((112, 82), "taste & aroma from chemical structure", font=f_tag, fill=cream)
     dr.line([40, 122, W - 40, 122], fill=(42, 50, 60), width=1)
@@ -527,7 +512,7 @@ def api_card(q: str = "", dl: int = 0):
     def cell(col, cy, label, v, color):
         cx = GX0 + int(col * colw)
         inner = int(colw) - 12
-        ptxt = f"{int(round(v * 100))}%"
+        ptxt = f"{round(v * 100)}%"
         pw = dr.textlength(ptxt, font=f_cell)
         lab = label
         while lab and dr.textlength(lab, font=f_cell) > inner - pw - 8:
@@ -590,16 +575,16 @@ def api_recipe_card(rc: RecipeCardQuery, dl: int = 0):
 
     SMILES/formula are recomputed server-side from each ingredient's structure, so the
     card is authoritative even though the recipe rows are posted from the client."""
-    from fastapi.responses import Response
-
     import io
+
+    from fastapi.responses import Response
     from PIL import Image, ImageDraw, ImageFont
     from rdkit.Chem.Draw import rdMolDraw2D
 
     def font(path, size):
         try:
             return ImageFont.truetype(path, size)
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 — font file missing; fall back to default
             return ImageFont.load_default()
     DJ = "/usr/share/fonts/truetype/dejavu/"
     f_title = font("static/headerfont.ttf", 46)
@@ -644,11 +629,9 @@ def api_recipe_card(rc: RecipeCardQuery, dl: int = 0):
         dr = ImageDraw.Draw(img)
 
     # header
-    try:
+    with contextlib.suppress(Exception):
         emblem = Image.open("static/logo.png").convert("RGBA").resize((58, 58))
         img.paste(emblem, (40, 30), emblem)
-    except Exception:  # noqa: BLE001
-        pass
     dr.text((110, 30), "Flavormancer", font=f_title, fill=ink)
     dr.text((112, 82), "taste & aroma from chemical structure", font=f_tag, fill=cream)
     dr.line([40, 122, W - 40, 122], fill=(42, 50, 60), width=1)
@@ -949,16 +932,13 @@ def _load_note_carriers():
     import csv
     m = {}
     for path in ("flavors.csv", "aroma_supplement.csv"):
-        try:
-            with open(path, encoding="utf-8") as fh:
-                for r in csv.DictReader(fh):
-                    note = (r.get("flavor") or "").strip().lower()
-                    smi = (r.get("smiles") or "").strip()
-                    nm = (r.get("molecule") or "").strip()
-                    if note and smi:
-                        m.setdefault(note, []).append((smi, nm or note))
-        except Exception:  # noqa: BLE001 — missing file / bad rows; just skip
-            pass
+        with contextlib.suppress(Exception), open(path, encoding="utf-8") as fh:  # missing file / bad rows; just skip
+            for r in csv.DictReader(fh):
+                note = (r.get("flavor") or "").strip().lower()
+                smi = (r.get("smiles") or "").strip()
+                nm = (r.get("molecule") or "").strip()
+                if note and smi:
+                    m.setdefault(note, []).append((smi, nm or note))
     return m
 
 
@@ -1091,18 +1071,14 @@ _FORMULATION_WARM = [
 def _prewarm_formulation():
     # Build the substitution index FIRST (the ~8k-row aroma batch) so the first neighbor search
     # never pays the one-time build; the lock in substitute() makes a concurrent request wait.
-    try:
+    with contextlib.suppress(Exception):  # best-effort
         P.substitute("CCO")
-    except Exception:  # noqa: BLE001 — best-effort
-        pass
     for n in _FORMULATION_WARM:
-        try:
+        with contextlib.suppress(Exception):  # best-effort warmup; a miss just means a cold first hit
             smi = _resolve(n)
             m = Chem.MolFromSmiles(smi) if smi else None
             if m is not None:
                 P.predict_aroma(Chem.MolToSmiles(m))
-        except Exception:  # noqa: BLE001 — best-effort warmup; a miss just means a cold first hit
-            pass
 
 
 threading.Thread(target=_prewarm_formulation, daemon=True).start()
@@ -1177,7 +1153,7 @@ def _precompute_top_lists():
     """Rank molecules for the landing-page browse lists — taste heads over the labeled set,
     aroma heads over the odor corpus. Model-derived: honest 'what the tool predicts'."""
     import pandas as pd
-    try:
+    with contextlib.suppress(Exception):  # no taste data; skip taste lists
         tm = pd.read_parquet("taste_master.parquet")
         for taste, clf in P._CLASSIFIERS.items():
             ranked = _rank(tm["smiles"], lambda X, c=clf: c.predict_proba(X)[:, 1])
@@ -1188,9 +1164,7 @@ def _precompute_top_lists():
             items = _named_top(salty)
             if items:
                 _TOP_LISTS["taste:salty"] = {"label": "Known salty", "items": items}
-    except Exception:  # noqa: BLE001 — no taste data; skip taste lists
-        pass
-    try:
+    with contextlib.suppress(Exception):  # no odor corpus / vocab; skip aroma lists
         # aroma lists use DOCUMENTED odor (ground truth), not model ranking: the public corpus
         # skews industrial, so ranking by a head surfaces confident-but-odd picks (cyanide under
         # "almond"). Documented examples are real, recognizable, and honest ("documented citrus").
@@ -1206,8 +1180,6 @@ def _precompute_top_lists():
         for d, items in by_desc.items():
             if len(items) >= 8:  # only offer descriptors with enough documented examples
                 _TOP_LISTS[f"aroma:{d}"] = {"label": f"Documented {d}", "items": items[:_TOP_N]}
-    except Exception:  # noqa: BLE001 — no odor corpus / vocab; skip aroma lists
-        pass
 # NB: the thread is started at the very end of the module, after _ODOR_TABLE is defined.
 
 
@@ -1289,12 +1261,11 @@ def _precompute_design():
     taste), with GRAS status — so the designer can rank food-safe molecules for a target flavor.
     Model inference is BATCHED (one vectorized call per head over all molecules) — per-molecule
     RandomForest calls over ~2.3k molecules would take minutes."""
-    try:
+    with contextlib.suppress(Exception):  # no corpus/models; designer just stays empty
         from collections import Counter
 
         import numpy as np
         import pandas as pd
-
         from build_aroma_dataset import tag as _odor_tag
         od = pd.read_parquet("odor_notes.parquet")
         rows = []  # (smiles, name, mol_skeleton, {documented tags})
@@ -1335,9 +1306,9 @@ def _precompute_design():
                              "gras": Chem.MolToInchiKey(cm).split("-")[0] in P._GRAS})
                 cnt.update([note])
         _DESIGN[:] = pool
-        _DESIGN_DESCS[:] = sorted(d for d, n in cnt.items() if n >= 5)
-    except Exception:  # noqa: BLE001 — no corpus/models; designer just stays empty
-        pass
+        # Offer EVERY trained aroma head as a selectable note (even aroma-only ones with few
+        # food-safe carriers), plus any design note that has >=5 carriers.
+        _DESIGN_DESCS[:] = sorted({d for d, n in cnt.items() if n >= 5} | set(P._AROMA_MODELS))
 
 
 def _fpvec(mol):
@@ -1395,7 +1366,7 @@ _FLAVOR_CATS = []     # [{category, flavors:[...]}] for the picker UI
 
 
 def _load_flavors(path="flavors.csv"):
-    try:
+    with contextlib.suppress(Exception):  # no csv; library just stays empty
         import csv
         from collections import OrderedDict
         p = Path(path)
@@ -1413,8 +1384,6 @@ def _load_flavors(path="flavors.csv"):
         _FLAVORS.clear()
         _FLAVORS.update(by_flavor)
         _FLAVOR_CATS[:] = [{"category": c, "flavors": fs} for c, fs in by_cat.items()]
-    except Exception:  # noqa: BLE001 — no csv; library just stays empty
-        pass
 
 
 _load_flavors()
@@ -1468,7 +1437,7 @@ def _design_tags(smi):
         if dm is not None and Chem.MolToInchiKey(dm).split("-")[0] == skel:
             return set(m["tags"])
     tags = set()                                        # else predict directly
-    try:
+    with contextlib.suppress(Exception):
         X = _fpvec(mol).reshape(1, -1)
         for name, clf in P._AROMA_MODELS.items():
             if clf.predict_proba(X)[0, 1] >= 0.5:
@@ -1477,8 +1446,6 @@ def _design_tags(smi):
             clf = P._CLASSIFIERS.get(t)
             if clf is not None and clf.predict_proba(X)[0, 1] >= 0.5:
                 tags.add(t)
-    except Exception:  # noqa: BLE001
-        pass
     return tags
 
 
@@ -1535,10 +1502,10 @@ def api_nl(q: str = ""):
     # match longest terms first so 'bubble gum' / 'green pea' win over 'gum' / 'green'
     hits = []
     for t in sorted(known, key=len, reverse=True):
-        if re.search(r"(?<![a-z])" + re.escape(t) + r"(?![a-z])", ql):
-            # skip a term wholly inside an already-matched longer term's span
-            if not any(t != h and t in h for h in hits):
-                hits.append(t)
+        # skip a term wholly inside an already-matched longer term's span
+        if re.search(r"(?<![a-z])" + re.escape(t) + r"(?![a-z])", ql) \
+                and not any(t != h and t in h for h in hits):
+            hits.append(t)
     # order them as they appear in the query, dedup
     seen, terms = set(), []
     for t in sorted(hits, key=lambda x: ql.find(x)):
@@ -1608,7 +1575,7 @@ def _load_enrichment():
 def _num(v):
     try:
         f = float(v)
-        return None if f != f else (int(f) if f == int(f) else round(f, 2))
+        return None if math.isnan(f) else (int(f) if f == int(f) else round(f, 2))
     except (TypeError, ValueError):
         return None
 
@@ -1732,7 +1699,7 @@ def _load_odor_table():
             if isinstance(odor, str):
                 rec["odor"] = odor
                 rec["odor_source"] = osrc if isinstance(osrc, str) else None
-            if isinstance(thr, (int, float)) and thr == thr:  # numeric and not NaN
+            if isinstance(thr, (int, float)) and not math.isnan(thr):  # numeric and not NaN
                 rec["threshold_ppm"] = float(thr)
                 rec["threshold_source"] = tsrc if isinstance(tsrc, str) else None
             if rec:
@@ -1750,22 +1717,18 @@ def _load_documented_full():
     (stereo included) so the stereoisomer explorer can surface enantiomer-specific documented
     sensory data (e.g. R- vs S-carvone) that the skeleton-keyed tables collapse together."""
     out = {}
-    try:
+    with contextlib.suppress(Exception):
         import pandas as pd
         od = pd.read_parquet("odor_notes.parquet")
         for ik, odor in zip(od["inchikey"], od["odor"]):
             if isinstance(ik, str) and isinstance(odor, str) and odor.strip():
                 out.setdefault(ik, {})["odor"] = odor.strip().split("\n")[0][:160]
-    except Exception:  # noqa: BLE001
-        pass
-    try:
+    with contextlib.suppress(Exception):
         import pandas as pd
         tn = pd.read_parquet("taste_notes.parquet")
         for ik, taste in zip(tn["inchikey"], tn["taste"]):
             if isinstance(ik, str) and isinstance(taste, str) and taste.strip():
                 out.setdefault(ik, {})["taste"] = taste.strip().split("\n")[0][:160]
-    except Exception:  # noqa: BLE001
-        pass
     return out
 
 

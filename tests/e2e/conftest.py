@@ -12,6 +12,7 @@ designed to be safe everywhere:
 Run the full suite on a box with models:  FLAVORMANCER_URL=http://127.0.0.1:8000 pytest tests/e2e
 Run just the model-free smoke tests:       pytest tests/e2e -m smoke
 """
+import contextlib
 import os
 import urllib.request
 
@@ -47,17 +48,27 @@ def base_url():
 
 @pytest.fixture(scope="session")
 def models_present(base_url):
-    """True when the server has trained taste/aroma models (a real read comes back numeric)."""
-    try:
-        import json
-        req = urllib.request.Request(base_url + "/api/predict", method="POST",
-                                     data=json.dumps({"smiles": "vanillin"}).encode(),
-                                     headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            d = json.load(r)
-        return isinstance(d.get("sweet"), (int, float))
-    except Exception:  # noqa: BLE001
-        return False
+    """True when the server has trained taste/aroma models (a real read comes back numeric).
+
+    Retries with backoff: this is a session-scoped gate for ALL model-dependent e2e tests, so a
+    single slow response (e.g. the box is busy loading models, or under load from the unit tests
+    that run first) must not spuriously skip the whole model-dependent suite. We poll until the
+    server answers a real read or the budget is exhausted.
+    """
+    import json
+    import time
+    deadline = time.monotonic() + 180  # poll for up to 3 min — covers a cold 160-head load under load
+    while time.monotonic() < deadline:
+        with contextlib.suppress(Exception):  # server busy/starting -> wait and retry
+            req = urllib.request.Request(base_url + "/api/predict", method="POST",
+                                         data=json.dumps({"smiles": "vanillin"}).encode(),
+                                         headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                d = json.load(r)
+            if isinstance(d.get("sweet"), (int, float)):
+                return True
+        time.sleep(3)
+    return False
 
 
 @pytest.fixture(scope="session")

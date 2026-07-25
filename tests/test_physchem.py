@@ -1,7 +1,6 @@
 """Physicochemical / stability / chemesthesis packs — exact-from-structure, model-independent."""
-from rdkit import Chem
-
 import predict
+from rdkit import Chem
 
 
 def test_physchem_benzene_mw():

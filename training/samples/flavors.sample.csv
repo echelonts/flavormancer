@@ -1,0 +1,13 @@
+flavor,molecule,smiles,category
+banana,isoamyl acetate,CC(=O)OCCC(C)C,fruit
+apple,ethyl 2-methylbutyrate,CCOC(=O)C(C)CC,fruit
+green apple,hexyl acetate,CCCCCCOC(C)=O,fruit
+pineapple,ethyl hexanoate,CCCCCC(=O)OCC,fruit
+pineapple,allyl hexanoate,C=CCOC(=O)CCCCC,fruit
+grape,methyl anthranilate,COC(=O)c1ccccc1N,fruit
+cherry,benzaldehyde,O=Cc1ccccc1,fruit
+peach,gamma-decalactone,CCCCCCC1CCC(=O)O1,fruit
+apricot,gamma-undecalactone,CCCCCCCC1CCC(=O)O1,fruit
+coconut,gamma-nonalactone,CCCCCC1CCC(=O)O1,fruit
+strawberry,furaneol,CC1=C(O)C(=O)C(C)O1,fruit
+strawberry,ethyl butyrate,CCCC(=O)OCC,fruit

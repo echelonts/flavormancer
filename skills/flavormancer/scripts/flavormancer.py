@@ -79,6 +79,7 @@ def cmd_read(a):
             "formula": names.get("formula"), "smiles": d.get("smiles"),
             "taste_probabilities": taste, "sour_rule": d.get("sour"), "salty_rule": d.get("salty"),
             "confident_aromas": [x["odor"] for x in desc if x.get("confident")],
+            "aroma_descriptions": {x["odor"]: x["desc"] for x in desc if x.get("desc")},
             "gras_status": (d.get("safety") or {}).get("gras_status"),
             "in_applicability_domain": (d.get("applicability") or {}).get("in_domain")}
 

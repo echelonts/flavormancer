@@ -37,10 +37,10 @@ from rdkit import Chem
 _UA = {"User-Agent": "flavormancer-build-properties/1.0"}
 _BASE = "https://pubchem.ncbi.nlm.nih.gov/rest"
 _TEMP_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*(?:to\s*(-?\d+(?:\.\d+)?)\s*)?°?\s*([CF])\b")
-_VP_RE = re.compile(r"(\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*(mm\s?hg|torr|kpa|hpa|pa|atm|bar)", re.I)
+_VP_RE = re.compile(r"(\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*(mm\s?hg|torr|kpa|hpa|pa|atm|bar)", re.IGNORECASE)
 _VP_TO_PA = {"mmhg": 133.322, "torr": 133.322, "kpa": 1000.0, "hpa": 100.0,
              "pa": 1.0, "atm": 101325.0, "bar": 100000.0}
-_PRESS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(mm\s?hg|torr|kpa|hpa|mbar|atm|bar)", re.I)
+_PRESS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(mm\s?hg|torr|kpa|hpa|mbar|atm|bar)", re.IGNORECASE)
 _P_TO_MMHG = {"mmhg": 1.0, "torr": 1.0, "kpa": 7.50062, "hpa": 0.750062,
               "mbar": 0.750062, "atm": 760.0, "bar": 750.062}
 
@@ -248,7 +248,7 @@ if __name__ == "__main__":
         # must count as done or they'd re-crawl forever alongside the newly-flagged rows.
         attempted = pd.Series(False, index=ex.index)
         if "fetched" in ex.columns:
-            attempted |= (ex["fetched"] == True)  # noqa: E712 — pandas mask
+            attempted |= (ex["fetched"] == True)
         if "common_name" in ex.columns:
             attempted |= ex["common_name"].notna()
         done = set(ex.loc[attempted, "inchikey"])

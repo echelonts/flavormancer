@@ -18,12 +18,11 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+from chemfeatures import descriptors as _desc
 from rdkit import Chem
 from rdkit.Chem import DataStructs, rdFingerprintGenerator
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
-
-from chemfeatures import descriptors as _desc
 
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)

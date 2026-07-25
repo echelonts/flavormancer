@@ -13,14 +13,13 @@ already have a SMILES (in structures.parquet or any dataset that already carries
 
 Usage: python build_structures.py            # all_molecules.parquet -> structures.parquet
 """
+import contextlib
 import glob
 from pathlib import Path
 
 import pandas as pd
-from rdkit import Chem
-from rdkit import RDLogger
-
-from build_properties import _cid, _get, _BASE
+from build_properties import _BASE, _cid, _get
+from rdkit import Chem, RDLogger
 
 RDLogger.DisableLog("rdApp.*")
 OUT = "structures.parquet"
@@ -30,9 +29,10 @@ def _known_keys():
     """Full InChIKeys we already have a structure for (from any dataset's SMILES, or a prior run)."""
     known = set()
     for f in glob.glob("*.parquet"):
-        try:
+        d = None
+        with contextlib.suppress(Exception):
             d = pd.read_parquet(f)
-        except Exception:  # noqa: BLE001
+        if d is None:
             continue
         if "smiles" in d.columns:
             for s in d["smiles"].dropna().unique():

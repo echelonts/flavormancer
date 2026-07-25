@@ -1,0 +1,9 @@
+molecule,cas,smiles,inchikey,odor,status,note
+globalide (habanolide),34902-57-3,O=C1CCCCCCCCCC=CCCCCO1,KFHHBWJZXNKNGE-UHFFFAOYSA-N,"musk, waxy",aroma-only,"macrocyclic musk; FEMA 4889 US-tentative only, no clean food clearance"
+coumarin,91-64-5,O=c1ccc2ccccc2o1,ZYGHJZDHTFUPRJ-UHFFFAOYSA-N,"sweet hay, tonka, vanilla",prohibited-food,banned as an added flavouring (21 CFR 189.130); still a famous aromatic
+safrole,94-59-7,C=CCc1ccc2c(c1)OCO2,ZMQAAUBTXCXRIC-UHFFFAOYSA-N,"sassafras, root-beer, warm-sweet",prohibited-food,banned carcinogen (21 CFR 189.180); handle with care
+methyleugenol,93-15-2,C=CCc1ccc(OC)c(OC)c1,ZYEMGPIYFIJGTP-UHFFFAOYSA-N,"clove, spice, warm",prohibited-food,delisted 21 CFR 172.515 (2018) + EU-restricted (genotoxic)
+estragole,140-67-0,C=CCc1ccc(OC)cc1,ZFMSMUAANRJZFM-UHFFFAOYSA-N,"anise, sweet-herbal",prohibited-food,"EU-prohibited added flavouring (Reg. 1334/2008 Annex III, genotoxic)"
+isovanillin,621-59-0,COc1ccc(C=O)cc1O,JVTZFYYHCGSXJV-UHFFFAOYSA-N,vanilla-type,aroma-only,no EU FL / CFR food clearance; isomer of vanillin
+musk ketone,81-14-1,CC(=O)c1cc([N+](=O)[O-])c([N+](=O)[O-])c(C(C)(C)C)c1C,GRTRUJWSRFTCIL-UHFFFAOYSA-N,sweet nitro-musk,aroma-only,nitro-musk fragrance; not food-authorised
+musk ambrette,83-66-9,COc1c([N+](=O)[O-])cc(C(C)(C)C)c(C)c1[N+](=O)[O-],HSWDCZSBXABAPP-UHFFFAOYSA-N,sweet musky-ambrette,aroma-only,"nitro-musk; GRAS revoked, fragrance-only"

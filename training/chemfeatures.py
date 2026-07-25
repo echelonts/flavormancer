@@ -39,7 +39,7 @@ def descriptors(mol):
     for i, (_, fn) in enumerate(DESC_FNS):
         try:
             v = float(fn(mol))
-            out[i] = v if v == v else 0.0  # NaN guard
+            out[i] = 0.0 if np.isnan(v) else v  # NaN guard
         except Exception:  # noqa: BLE001 — a descriptor that won't compute -> 0, keep the row usable
             out[i] = 0.0
     return out

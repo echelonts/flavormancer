@@ -11,6 +11,7 @@ Public-domain PubChem data; we cache locally, never rehost anything licensed.
 
     python build_iupac_backfill.py
 """
+import contextlib
 import json
 import time
 import urllib.parse
@@ -29,9 +30,10 @@ def _have_iupac_skeletons():
     """Skeletons that already have an IUPAC name (offline table + any prior backfill)."""
     have = set()
     for path, key in ((PROPS, "inchikey"), (OUT, "inchikey_skel")):
-        try:
+        df = None
+        with contextlib.suppress(Exception):  # file may not exist yet
             df = pd.read_parquet(path)
-        except Exception:  # noqa: BLE001 — file may not exist yet
+        if df is None:
             continue
         if "iupac_name" not in df.columns:
             continue
