@@ -239,6 +239,11 @@ if _AROMA_DIR.exists():
 # molecule is in our labeled set, we report the verified fact instead of a guess.
 _KNOWN = {}  # inchikey -> {taste: 1}
 _MASTER = Path("taste_master.parquet")
+# The neighbor / substitute reference set: the FULL molecule universe (every structure we know,
+# ~8.8k) so structural neighbors and profile substitutes can surface ANY molecule — e.g. ethyl
+# vanillin as the top vanillin substitute — not just the taste-labelled subset. Falls back to
+# taste_master when the enrichment table hasn't been built yet.
+_UNIVERSE = Path("master_enrichment.parquet")
 if _MASTER.exists():
     import pandas as pd
     _m = pd.read_parquet(_MASTER)
@@ -1061,57 +1066,99 @@ def _taste_profile(out):
 # tool (swap an expensive or supply-constrained ingredient for a close analogue,
 # with its known tastes shown). This is the clean Track-A core; the product
 # (Track B, #22) mirrors it as a pgvector ANN query over the same fingerprints.
-_SUB_INDEX = None  # lazily built: (fps, smiles, known_tastes, predicted_aromas)
+# lazily built: (fps, smiles, known_tastes, predicted_aromas, profiles, profile_dims)
+#   profiles: an (N x D) float32 matrix of predicted head SCORES — taste heads then aroma heads —
+#   the "flavor profile" vector used for profile-based substitutes (vs the fingerprint fps used for
+#   structural neighbors). profile_dims labels the columns.
+_SUB_INDEX = None
 _SUB_LOCK = _threading.Lock()  # guards the one-time index build against concurrent callers
+
+
+def _profile_heads():
+    """The ordered head list backing a flavor-profile vector: taste heads then aroma heads.
+    Same order is used at index-build and query time so the vectors line up."""
+    return sorted(_CLASSIFIERS), list(_AROMA_MODELS)
 
 
 def _build_sub_index():
     global _SUB_INDEX
+    import numpy as np
+    # Fast path: load the precomputed profile index (build_profile_index.py). The 170-head
+    # inference over ~8.8k molecules is slow (~3 min); the cache makes startup instant. We only
+    # rebuild the cheap Morgan fingerprints from SMILES on load.
+    cache = Path("profile_index.npz")
+    if cache.exists():
+        z = np.load(cache, allow_pickle=True)
+        smis = [str(s) for s in z["smiles"]]
+        tastes = [[t for t in str(s).split(",") if t.strip()] for s in z["taste_documented"]]
+        aromas = [[a for a in str(s).split(",") if a.strip()] for s in z["aromas"]]
+        fps = [_MORGAN.GetFingerprint(Chem.MolFromSmiles(s)) for s in smis]
+        _SUB_INDEX = (fps, smis, tastes, aromas, z["profiles"], list(z["dims"]))
+        return
     fps, smis, tastes, feats = [], [], [], []
-    if _MASTER.exists():
-        import numpy as np
+    profiles, profile_dims = None, []
+    src = _UNIVERSE if _UNIVERSE.exists() else _MASTER
+    if src.exists():
         import pandas as pd
-        m = pd.read_parquet(_MASTER)
+        m = pd.read_parquet(src)
         basic = [t for t in ("sweet", "bitter", "umami", "sour", "salty") if t in m.columns]
+        has_documented = "taste_documented" in m.columns  # enrichment: comma-separated string
+        seen_skel = set()
         for _, r in m.iterrows():
             mol = Chem.MolFromSmiles(str(r["smiles"]))
             if mol is None:
                 continue
+            skel = Chem.MolToInchiKey(mol).split("-")[0]
+            if skel in seen_skel:  # dedupe by connectivity so the universe doesn't repeat a molecule
+                continue
+            seen_skel.add(skel)
             fps.append(_MORGAN.GetFingerprint(mol))
             smis.append(Chem.MolToSmiles(mol))
-            tastes.append([t for t in basic if r.get(t) == 1])
+            if has_documented:
+                tastes.append([t for t in str(r.get("taste_documented") or "").split(",") if t.strip()])
+            else:
+                tastes.append([t for t in basic if r.get(t) == 1])
             feats.append(_feat(mol)[0])
-        # predicted aroma descriptors per molecule (batched over the 16 heads) — so the palette
-        # match can score aroma as well as taste, once, at first use
+        # One-time batched inference over the whole labeled set. We keep BOTH:
+        #   - the thresholded confident-aroma NAME list per molecule (for display / palette match)
+        #   - the full head-SCORE matrix (taste heads + aroma heads) for profile-based substitutes.
+        # Kept at n_jobs=1: a single big predict_proba is already vectorized C; joblib fan-out here
+        # thrashed under concurrency. Reusing this index is what makes the endpoints fast.
         aromas = [[] for _ in smis]
-        if _AROMA_MODELS and feats:
+        if feats:
             X = np.vstack(feats)
-            # One-time batch over the whole labeled set (~8k rows x 24 heads). Kept at n_jobs=1:
-            # a single big predict_proba is already vectorized C, and joblib fan-out here just
-            # thrashed under concurrency. Reusing these aromas is what makes the endpoint fast.
-            for name, clf in _AROMA_MODELS.items():
-                col = clf.predict_proba(X)[:, 1]
+            taste_heads, aroma_heads = _profile_heads()
+            cols = [_CLASSIFIERS[t].predict_proba(X)[:, 1] for t in taste_heads]
+            for name in aroma_heads:
+                col = _AROMA_MODELS[name].predict_proba(X)[:, 1]
+                cols.append(col)
                 for i in range(len(smis)):
                     if col[i] >= 0.5:
                         aromas[i].append(name)
+            profile_dims = [f"taste:{t}" for t in taste_heads] + [f"aroma:{a}" for a in aroma_heads]
+            profiles = np.column_stack(cols).astype("float32") if cols else None
     else:
         aromas = []
-    _SUB_INDEX = (fps, smis, tastes, aromas)
+    _SUB_INDEX = (fps, smis, tastes, aromas, profiles, profile_dims)
 
 
-def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
-    """Nearest-neighbor substitution: the k labeled molecules most structurally
-    similar to the query (Tanimoto over Morgan fingerprints), each with its known
-    tastes. The reformulation / cost-down tool — swap an ingredient for a close
-    analogue. Returns {'neighbors': [...]} ranked by similarity (self excluded)."""
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return {"error": f"unparseable SMILES: {smiles}"}
+def _ensure_sub_index():
     if _SUB_INDEX is None:  # double-checked lock: a request during the startup build waits for
         with _SUB_LOCK:      # that one build instead of kicking off a second (which would thrash cores)
             if _SUB_INDEX is None:
                 _build_sub_index()
-    fps, smis, tastes, _aromas = _SUB_INDEX
+
+
+def structural_neighbors(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
+    """STRUCTURAL neighbors: the k labeled molecules most structurally similar to the query
+    (Tanimoto over Morgan fingerprints), each with its known tastes. Structural look-alikes —
+    contrast with profile-based `substitutes` (taste/aroma-alikes). Returns {'neighbors': [...]}
+    ranked by similarity (self excluded)."""
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return {"error": f"unparseable SMILES: {smiles}"}
+    _ensure_sub_index()
+    fps, smis, tastes, _aromas, _profiles, _dims = _SUB_INDEX
     if not fps:
         return {"neighbors": [], "note": "no reference set loaded (taste_master.parquet absent)"}
     q = _MORGAN.GetFingerprint(mol)
@@ -1138,7 +1185,46 @@ def substitute(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
         if len(neighbors) >= k:
             break
     return {"query": self_smi, "neighbors": neighbors,
-            "basis": "Tanimoto / Morgan r2 2048-bit over labeled molecules"}
+            "basis": "structural — Tanimoto / Morgan r2 2048-bit over labeled molecules"}
+
+
+# back-compat alias: the endpoint / callers historically called this `substitute`
+substitute = structural_neighbors
+
+
+def substitutes(smiles: str, k: int = 8) -> dict:
+    """PROFILE-based substitutes: the k molecules whose predicted FLAVOR profile (taste + aroma
+    head scores) is closest to the query's — the drop-in reformulation list. A molecule that
+    *tastes and smells* like the target is a likely substitute regardless of its structure, so
+    this ranks by cosine similarity over the head-score vectors (not fingerprint distance).
+    Returns {'substitutes': [...]} ranked by profile match (self excluded)."""
+    import numpy as np
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return {"error": f"unparseable SMILES: {smiles}"}
+    _ensure_sub_index()
+    _fps, smis, tastes, aromas, profiles, _dims = _SUB_INDEX
+    if profiles is None or not len(smis):
+        return {"substitutes": [], "note": "no reference set / models loaded"}
+    x = _feat(mol)
+    taste_heads, aroma_heads = _profile_heads()
+    qv = np.array([_CLASSIFIERS[t].predict_proba(x)[0, 1] for t in taste_heads]
+                  + [_AROMA_MODELS[a].predict_proba(x)[0, 1] for a in aroma_heads], dtype="float32")
+    qn = qv / (float(np.linalg.norm(qv)) + 1e-9)
+    pn = profiles / (np.linalg.norm(profiles, axis=1, keepdims=True) + 1e-9)
+    sims = pn @ qn
+    self_skel = Chem.MolToInchiKey(mol).split("-")[0]
+    subs = []
+    for i in np.argsort(-sims):
+        ni = Chem.MolFromSmiles(smis[i])
+        if ni is None or Chem.MolToInchiKey(ni).split("-")[0] == self_skel:
+            continue
+        subs.append({"smiles": smis[i], "profile_match": round(float(sims[i]), 3),
+                     "known_tastes": tastes[i], "aromas": aromas[i] if i < len(aromas) else []})
+        if len(subs) >= k:
+            break
+    return {"query": Chem.MolToSmiles(mol), "substitutes": subs,
+            "basis": "profile — cosine over predicted taste + aroma head scores"}
 
 
 def palette_match(tastes, aromas=None, k=5):
@@ -1150,7 +1236,7 @@ def palette_match(tastes, aromas=None, k=5):
     predicted descriptors."""
     if _SUB_INDEX is None:
         _build_sub_index()
-    _, smis, tlist, alist = _SUB_INDEX
+    _, smis, tlist, alist, _profiles, _dims = _SUB_INDEX
     t_target, a_target = set(tastes or []), set(aromas or [])
     if not (t_target or a_target) or not smis:
         return {"target": {"tastes": sorted(t_target), "aromas": sorted(a_target)}, "matches": []}

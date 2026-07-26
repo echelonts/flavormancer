@@ -300,6 +300,24 @@ def api_neighbors(q: Query):
     return res
 
 
+@app.post("/api/substitutes")
+def api_substitutes(q: Query):
+    """Profile-based substitutes: molecules whose predicted taste+aroma head scores line up
+    closest with the query — the taste/smell-alikes (vs /api/neighbors' structural look-alikes)."""
+    smi = _resolve(q.smiles)
+    if not smi:
+        return {"substitutes": []}
+    res = P.substitutes(smi, k=q.k)
+    for n in res.get("substitutes", []):  # same enrichment as neighbors: structure + names + aroma + GRAS
+        n["svg"] = _svg(n["smiles"], 132, 96)
+        nm = _names(n["smiles"])
+        n["name"], n["iupac"] = nm[0], nm[1]
+        n["aroma"] = _aroma_tags_cheap(n["smiles"], n.pop("aromas", []))
+        _m = Chem.MolFromSmiles(n["smiles"])
+        n["gras"] = bool(_m is not None and Chem.MolToInchiKey(_m).split("-")[0] in P._GRAS)
+    return res
+
+
 @app.post("/api/names")
 def api_names(q: Query):
     """Common (PubChem Title) + IUPAC names for the queried molecule."""

@@ -96,8 +96,15 @@ def _read_full(molecule: str) -> dict:
     return d
 
 
-def _find_substitutes(molecule: str, k: int) -> dict:
+def _find_structural_neighbors(molecule: str, k: int) -> dict:
     r = _post("/api/neighbors", {"smiles": molecule, "k": k})
+    if r.status_code != 200:
+        return {"error": f"structural-neighbor search failed (HTTP {r.status_code})"}
+    return _strip(r.json())
+
+
+def _find_substitutes(molecule: str, k: int) -> dict:
+    r = _post("/api/substitutes", {"smiles": molecule, "k": k})
     if r.status_code != 200:
         return {"error": f"substitute search failed (HTTP {r.status_code})"}
     return _strip(r.json())
@@ -253,10 +260,21 @@ def read_full(molecule: str) -> dict:
 
 @mcp.tool()
 def find_substitutes(molecule: str, k: int = 8) -> dict:
-    """Find the k structurally-nearest molecules (drop-in swaps / reformulation candidates)
-    to the given molecule, each with its similarity and known tastes.
+    """Find the k best SUBSTITUTES — molecules whose predicted taste+aroma PROFILE is closest to
+    the given molecule (cosine over the head scores). These are the drop-in swaps: a molecule that
+    tastes and smells like the target, regardless of structure (e.g. ethyl vanillin for vanillin).
+    Each with its profile_match, known tastes, and aromas.
     """
     return _find_substitutes(molecule, k)
+
+
+@mcp.tool()
+def find_structural_neighbors(molecule: str, k: int = 8) -> dict:
+    """Find the k STRUCTURAL neighbors — molecules most similar in structure (Tanimoto / Morgan
+    fingerprint) to the given molecule. Structural look-alikes (contrast find_substitutes, which
+    matches by taste+aroma profile). Each with its similarity and known tastes.
+    """
+    return _find_structural_neighbors(molecule, k)
 
 
 @mcp.tool()
