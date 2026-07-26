@@ -80,8 +80,11 @@ is tagged by how it was derived**, so nothing reads as more certain than its sou
   acrylamide, ethyl carbamate, furan, and more) and an OAV dosing-balance analysis
   that flags the component about to overpower a blend (quantitative when threshold
   tables are loaded).
-- **Substitution search** — nearest-neighbor lookup over the labeled set for
-  reformulation and cost-down ("find me a molecule that behaves like this one").
+- **Substitutes & structural neighbors** — two nearest-neighbor searches over the whole
+  molecule universe for reformulation and cost-down: **substitutes** rank by *taste + aroma
+  profile* match (a molecule that tastes and smells like the target — e.g. ethyl vanillin for
+  vanillin — regardless of structure), while **structural neighbors** rank by Tanimoto/Morgan
+  structure similarity (the look-alikes).
 - **Flavor Studio** — one hub to pick any mix of everyday **flavors** (banana,
   saffron, pumpkin, bubble gum…) *and* **notes** (citrus, floral…) → ranked food-safe
   molecules + drop-in swaps. A flavor *is* a set of notes, so they live in one picker.

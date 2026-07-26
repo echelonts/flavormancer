@@ -948,7 +948,7 @@
         <li data-step="names"><span class="ls-dot"></span> Names (common / IUPAC)</li>
         <li data-step="structure"><span class="ls-dot"></span> 2D structure</li>
         <li data-step="structure3d"><span class="ls-dot"></span> 3D conformer</li>
-        <li data-step="neighbors"><span class="ls-dot"></span> Substitution candidates</li>
+        <li data-step="neighbors"><span class="ls-dot"></span> Neighbors &amp; substitutes</li>
       </ul>
     </div>
     <div id="molBody">
@@ -974,8 +974,13 @@
       <div class="chips" id="chips"></div>
     </div>
     <div class="card">
-      <h2>Substitution candidates</h2>
-      <p class="card-sub">Structurally similar molecules you could swap in — each with its known tastes.</p>
+      <h2>Substitutes</h2>
+      <p class="card-sub">Closest <b>taste + aroma profile</b> — the drop-in swaps (a match by how it tastes &amp; smells, not by structure).</p>
+      <div id="substitutes"></div>
+    </div>
+    <div class="card">
+      <h2>Structural neighbors</h2>
+      <p class="card-sub">Similar <b>structure</b> (Tanimoto / Morgan) — look-alikes, each with its known tastes.</p>
       <div id="neighbors"></div>
     </div>
   </div>
@@ -1006,7 +1011,7 @@
     lookup-only, sour is a rule. Tox-assay flags are <b>indicative, caution-only</b>
     (Tox21 in-vitro models) — never a determination. Quantitative dosing / odor-activity
     needs odor-threshold tables (licensed or customer data), so it stays qualitative here.
-    Substitutions rank by structural similarity (Tanimoto). Aroma isn't in the public
+    Substitutes rank by taste+aroma profile match; structural neighbors rank by Tanimoto similarity. Aroma isn't in the public
     demo — it trains on your data, on-prem. Results are leads for the bench, not verdicts.
   </p>
     </div>
@@ -1374,9 +1379,10 @@ async function run(){
   document.querySelectorAll('#loaderSteps li').forEach(li=>{ li.classList.remove('done'); li.classList.add('active'); });
   $('loaderTitle').textContent='Brewing the flavor read…';
   try{
-    const [p, n, s, nm, ar, s3] = await Promise.all([
+    const [p, n, sub, s, nm, ar, s3] = await Promise.all([
       post('/api/predict',{smiles:text}).then(r=>{stepDone('predict');return r;}),
       post('/api/neighbors',{smiles:text, k:8}).then(r=>{stepDone('neighbors');return r;}),
+      post('/api/substitutes',{smiles:text, k:8}),
       post('/api/structure',{smiles:text}).then(r=>{stepDone('structure');return r;}),
       post('/api/names',{smiles:text}).then(r=>{stepDone('names');return r;}),
       post('/api/aroma',{smiles:text}).then(r=>{stepDone('aroma');return r;}),
@@ -1384,7 +1390,7 @@ async function run(){
     ]);
     if(p.error){ throw new Error(p.error); }
     $('molLoader').style.display='none'; $('molBody').style.display='block';
-    render(p, n.neighbors||[], (s&&s.svg)||null, nm||{});
+    render(p, n.neighbors||[], (s&&s.svg)||null, nm||{}, (sub&&sub.substitutes)||[]);
     renderAroma(ar||{});
     setStructure3D((s3&&s3.molblock)||null);
     $('molModal').scrollTop=0;
@@ -1397,7 +1403,28 @@ async function run(){
   }
 }
 
-function render(p, neighbors, svg, names){
+// render one neighbor/substitute list into `el`; scoreKey is 'similarity' (structural) or
+// 'profile_match' (substitutes), both 0-1 shown as a % match.
+function renderNeighborList(el, list, scoreKey, emptyMsg){
+  if(!list.length){ el.innerHTML = `<div class="empty">${emptyMsg}</div>`; return; }
+  el.innerHTML = list.map((x,i)=>`
+      <div class="neighbor" data-smi="${x.smiles}" title="Click to analyze this molecule">
+        <div class="nb-structwrap">
+          <div class="nb-struct" id="${el.id}s${i}">${x.svg||''}</div>
+        </div>
+        <div class="nb-info">
+          <div class="nb-name">${x.name||'—'}${x.gras?'<span class="nb-gras" title="Listed in a food-use reference (FDA Substances-Added-to-Food / EU flavourings) — a listing flag, not a GRAS or safety clearance">Food-listed</span>':''}</div>
+          ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
+          <div class="s">${x.smiles}</div>
+          <div class="kt">${x.known_tastes.length?x.known_tastes.map(t=>`<span class="tchip" style="background:${TASTE_COLORS[t]||'var(--muted)'}">${t}</span>`).join(''):'<span class="muted">no known taste</span>'}</div>
+          ${(x.aroma&&x.aroma.length)?`<div class="nb-aroma" title="aroma (found = documented, else predicted •)">${x.aroma.map(a=>`<span class="atag" style="color:${aromaColor(a.odor)};border-color:${aromaColor(a.odor)}44">${a.odor}${a.source==='predicted'?' •':''}</span>`).join('')}</div>`:''}
+        </div>
+        <div class="sim">${Math.round((x[scoreKey]||0)*100)}% match</div>
+      </div>`).join('');
+}
+
+function render(p, neighbors, svg, names, substitutes){
+  substitutes = substitutes||[];
   names = names || {};
   $('structure').innerHTML = svg || '';
   const common = names.common || '', iupac = names.iupac || '';
@@ -1471,27 +1498,12 @@ function render(p, neighbors, svg, names){
   if(inDomain && p.multitaste) c.push(chip('multi', true, 'var(--aroma)', 'multi-taste'));
   $('chips').innerHTML = c.join('');
 
-  // neighbors
-  if(!neighbors.length){
-    $('neighbors').innerHTML = '<div class="empty">Build taste_master.parquet to enable substitution search.</div>';
-  }else{
-    window._nbrs = neighbors;  // for the per-card 3D toggle handler
-    $('neighbors').innerHTML = neighbors.map((x,i)=>`
-      <div class="neighbor" data-smi="${x.smiles}" title="Click to analyze this molecule">
-        <div class="nb-structwrap">
-          <div class="nb-struct" id="nbs${i}">${x.svg||''}</div>
-          ${_has3D?`<button type="button" class="mini-3d nb-3d" data-i="${i}" data-m="2d">3D</button>`:''}
-        </div>
-        <div class="nb-info">
-          <div class="nb-name">${x.name||'—'}${x.gras?'<span class="nb-gras" title="Listed in a food-use reference (FDA Substances-Added-to-Food / EU flavourings) — a listing flag, not a GRAS or safety clearance">Food-listed</span>':''}</div>
-          ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
-          <div class="s">${x.smiles}</div>
-          <div class="kt">${x.known_tastes.length?x.known_tastes.map(t=>`<span class="tchip" style="background:${TASTE_COLORS[t]||'var(--muted)'}">${t}</span>`).join(''):'<span class="muted">no known taste</span>'}</div>
-          ${(x.aroma&&x.aroma.length)?`<div class="nb-aroma" title="aroma (found = documented, else predicted •)">${x.aroma.map(a=>`<span class="atag" style="color:${aromaColor(a.odor)};border-color:${aromaColor(a.odor)}44">${a.odor}${a.source==='predicted'?' •':''}</span>`).join('')}</div>`:''}
-        </div>
-        <div class="sim">${Math.round(x.similarity*100)}% match</div>
-      </div>`).join('');
-  }
+  // substitutes (taste+aroma profile match) and structural neighbors (Tanimoto)
+  window._nbrs = neighbors;  // for the per-card 3D toggle handler
+  renderNeighborList($('substitutes'), substitutes, 'profile_match',
+    'No profile match available (build the profile index).');
+  renderNeighborList($('neighbors'), neighbors, 'similarity',
+    'Build the reference set to enable structural neighbors.');
 
   renderBehavior(p);
   $('results').style.display='grid'; $('behaviorCard').style.display='block'; $('aromaCard').style.display='block'; $('footnote').style.display='block';
@@ -1672,14 +1684,11 @@ go.addEventListener('click', run);
 q.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
 document.querySelectorAll('.tour-chip').forEach(b=> b.addEventListener('click', ()=>{ q.value=b.dataset.q; run(); }));
 // substitution card: 3D toggle button, rotate-in-place (no analyze), or click card -> analyze
-$('neighbors').addEventListener('click', e=>{
-  const btn = e.target.closest('.mini-3d');
-  if(btn){ e.stopPropagation(); const i=+btn.dataset.i; const x=(window._nbrs||[])[i]||{};
-    cardToggle3D(btn, $('nbs'+i), x.smiles, x.svg||''); return; }
+['neighbors','substitutes'].forEach(id => $(id).addEventListener('click', e=>{
   if(e.target.closest('.nb-struct.is3d')) return;  // rotating the 3D model, not analyzing
   const nb = e.target.closest('.neighbor');
   if(nb && nb.dataset.smi){ q.value = nb.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
-});
+}));
 
 // --- rich typeahead dropdown (structure + names + SMILES) on any input ---
 function attachRichSuggest(input, onPick){

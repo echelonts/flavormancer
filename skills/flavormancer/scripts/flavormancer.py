@@ -118,6 +118,12 @@ def cmd_flavor(a):
 
 
 def cmd_substitutes(a):
+    # profile-based swaps: closest taste+aroma head-score match (e.g. ethyl vanillin for vanillin)
+    return _req("/api/substitutes", "POST", {"smiles": a.molecule, "k": a.k})
+
+
+def cmd_structural_neighbors(a):
+    # structural look-alikes: Tanimoto / Morgan nearest neighbors
     return _req("/api/neighbors", "POST", {"smiles": a.molecule, "k": a.k})
 
 
@@ -188,9 +194,12 @@ def main():
     mol("read").set_defaults(fn=cmd_read)
     mol("read-full").set_defaults(fn=cmd_read_full)
     mol("stereoisomers").set_defaults(fn=cmd_stereoisomers)
-    s = mol("substitutes")
+    s = mol("substitutes")   # taste+aroma profile match (the drop-in swaps)
     s.add_argument("-k", type=int, default=8)
     s.set_defaults(fn=cmd_substitutes)
+    s = mol("structural-neighbors")   # Tanimoto structural look-alikes
+    s.add_argument("-k", type=int, default=8)
+    s.set_defaults(fn=cmd_structural_neighbors)
 
     s = sub.add_parser("formulate")
     s.add_argument("ingredients", nargs="+")

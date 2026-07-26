@@ -67,3 +67,4 @@ Thumbs.db
 !training/samples/*.csv
 !training/samples/*.md
 training/resolve_cache.json
+training/profile_index.npz
