@@ -177,6 +177,7 @@
   .kt{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
   .rx-from{font-size:10px;color:var(--muted);line-height:1.3;margin-top:3px}
   .kt .tchip{font-size:10px;font-weight:600;padding:1px 8px;border-radius:20px;color:#10140F;text-transform:capitalize}
+  .kt .tchip.pred{background:transparent!important;border:1px solid;font-weight:500}
   .kt .muted{color:var(--muted);font-size:11px}
   .browse{margin:22px 0 4px;border:1px solid #2C6E74;border-radius:12px;padding:15px 18px;background:linear-gradient(180deg,#15211F,#181D24)}
   .browse-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-2);margin:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -1416,7 +1417,7 @@ function renderNeighborList(el, list, scoreKey, emptyMsg){
           <div class="nb-name">${x.name||'—'}${x.gras?'<span class="nb-gras" title="Listed in a food-use reference (FDA Substances-Added-to-Food / EU flavourings) — a listing flag, not a GRAS or safety clearance">Food-listed</span>':''}</div>
           ${x.iupac?`<div class="nb-iupac">${x.iupac}</div>`:''}
           <div class="s">${x.smiles}</div>
-          <div class="kt">${x.known_tastes.length?x.known_tastes.map(t=>`<span class="tchip" style="background:${TASTE_COLORS[t]||'var(--muted)'}">${t}</span>`).join(''):'<span class="muted">no known taste</span>'}</div>
+          <div class="kt">${(()=>{const doc=(x.known_tastes||[]).map(t=>`<span class="tchip" style="background:${TASTE_COLORS[t]||'var(--muted)'}">${t}</span>`);const pred=(x.predicted_tastes||[]).filter(t=>!(x.known_tastes||[]).includes(t)).map(t=>`<span class="tchip pred" style="color:${TASTE_COLORS[t]||'var(--muted)'};border-color:${TASTE_COLORS[t]||'var(--muted)'}" title="predicted taste (model)">${t} •</span>`);return [...doc,...pred].join('')||'<span class="muted">no taste read</span>';})()}</div>
           ${(x.aroma&&x.aroma.length)?`<div class="nb-aroma" title="aroma (found = documented, else predicted •)">${x.aroma.map(a=>`<span class="atag" style="color:${aromaColor(a.odor)};border-color:${aromaColor(a.odor)}44">${a.odor}${a.source==='predicted'?' •':''}</span>`).join('')}</div>`:''}
         </div>
         <div class="sim">${Math.round((x[scoreKey]||0)*100)}% match</div>
