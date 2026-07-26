@@ -1149,6 +1149,17 @@ def _ensure_sub_index():
                 _build_sub_index()
 
 
+def _predicted_tastes_at(profiles, i):
+    """The PREDICTED taste heads (score >= 0.5) for reference-set row i, from the profile matrix.
+    Lets neighbor / substitute cards show a taste read even when nothing is *documented* — the
+    taste columns are the first len(_CLASSIFIERS) of the profile vector. Marked predicted in the UI."""
+    if profiles is None:
+        return []
+    taste_heads = sorted(_CLASSIFIERS)
+    row = profiles[i]
+    return [t for j, t in enumerate(taste_heads) if float(row[j]) >= 0.5]
+
+
 def structural_neighbors(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
     """STRUCTURAL neighbors: the k labeled molecules most structurally similar to the query
     (Tanimoto over Morgan fingerprints), each with its known tastes. Structural look-alikes —
@@ -1158,7 +1169,7 @@ def structural_neighbors(smiles: str, k: int = 8, min_similarity: float = 0.0) -
     if mol is None:
         return {"error": f"unparseable SMILES: {smiles}"}
     _ensure_sub_index()
-    fps, smis, tastes, _aromas, _profiles, _dims = _SUB_INDEX
+    fps, smis, tastes, _aromas, profiles, _dims = _SUB_INDEX
     if not fps:
         return {"neighbors": [], "note": "no reference set loaded (taste_master.parquet absent)"}
     q = _MORGAN.GetFingerprint(mol)
@@ -1179,6 +1190,7 @@ def structural_neighbors(smiles: str, k: int = 8, min_similarity: float = 0.0) -
             continue
         neighbors.append({"smiles": smis[i], "similarity": round(float(sims[i]), 3),
                           "known_tastes": tastes[i],
+                          "predicted_tastes": _predicted_tastes_at(profiles, i),
                           # confident aromas precomputed once in the index — reused so the
                           # endpoint never re-runs the 24 aroma heads per neighbor (8x ~1.3s saved)
                           "aromas": _aromas[i] if i < len(_aromas) else []})
@@ -1220,7 +1232,8 @@ def substitutes(smiles: str, k: int = 8) -> dict:
         if ni is None or Chem.MolToInchiKey(ni).split("-")[0] == self_skel:
             continue
         subs.append({"smiles": smis[i], "profile_match": round(float(sims[i]), 3),
-                     "known_tastes": tastes[i], "aromas": aromas[i] if i < len(aromas) else []})
+                     "known_tastes": tastes[i], "predicted_tastes": _predicted_tastes_at(profiles, i),
+                     "aromas": aromas[i] if i < len(aromas) else []})
         if len(subs) >= k:
             break
     return {"query": Chem.MolToSmiles(mol), "substitutes": subs,
