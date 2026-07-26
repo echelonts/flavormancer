@@ -722,6 +722,30 @@ class MixtureQuery(BaseModel):
     processes: list[str] = []
 
 
+class BlendQuery(BaseModel):
+    ingredients: list[str]
+    weights: list[float] = []
+    k: int = 6
+
+
+@app.post("/api/mixture_to_molecule")
+def api_mixture_to_molecule(b: BlendQuery):
+    """Collapse a blend to single equivalent molecules: the dose-weighted mean taste+aroma
+    profile of the components, then the molecules whose own profile is closest."""
+    smis = [s for s in (_resolve(x) for x in b.ingredients) if s]
+    if not smis:
+        return {"equivalents": []}
+    res = P.mixture_to_molecule(smis, weights=b.weights or None, k=b.k)
+    for n in res.get("equivalents", []):  # enrich like neighbors/substitutes
+        n["svg"] = _svg(n["smiles"], 132, 96)
+        nm = _names(n["smiles"])
+        n["name"], n["iupac"] = nm[0], nm[1]
+        n["aroma"] = _aroma_tags_cheap(n["smiles"], n.pop("aromas", []))
+        _m = Chem.MolFromSmiles(n["smiles"])
+        n["gras"] = bool(_m is not None and Chem.MolToInchiKey(_m).split("-")[0] in P._GRAS)
+    return res
+
+
 @app.post("/api/mixture")
 def api_mixture(m: MixtureQuery):
     """Per-ingredient reads + documented-hazard screen + a single-molecule palette match."""

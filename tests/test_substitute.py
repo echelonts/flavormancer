@@ -36,3 +36,16 @@ def test_substitute_ranks_by_similarity(monkeypatch):
     # similarities come back sorted descending
     sims = [n["similarity"] for n in neighbors]
     assert sims == sorted(sims, reverse=True)
+
+
+def test_mixture_to_molecule_graceful_without_profiles(monkeypatch):
+    # no profile matrix -> a clean error, never a crash / real (slow) index build
+    monkeypatch.setattr(predict, "_SUB_INDEX", ([], [], [], [], None, []))
+    out = predict.mixture_to_molecule(["CCO", "CCCO"])
+    assert "error" in out
+
+
+def test_mixture_to_molecule_rejects_all_bad(monkeypatch):
+    monkeypatch.setattr(predict, "_SUB_INDEX", ([], [], [], [], None, []))
+    out = predict.mixture_to_molecule(["nope", "xyz"])
+    assert "error" in out

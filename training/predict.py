@@ -1240,6 +1240,49 @@ def substitutes(smiles: str, k: int = 8) -> dict:
             "basis": "profile — cosine over predicted taste + aroma head scores"}
 
 
+def mixture_to_molecule(smiles_list: list, weights: list | None = None, k: int = 6) -> dict:
+    """Collapse a blend into a single equivalent molecule: average the components' taste+aroma
+    profile vectors (dose-weighted if weights given) into one target profile, then return the k
+    molecules whose own profile is closest — 'one molecule that tastes and smells like the whole
+    blend'. The inverse of a recipe: instead of many ingredients, find the single closest match."""
+    import numpy as np
+    _ensure_sub_index()
+    _fps, smis, tastes, aromas, profiles, _dims = _SUB_INDEX
+    if profiles is None or not len(smis):
+        return {"error": "no profile index / reference set"}
+    taste_heads, aroma_heads = _profile_heads()
+    comps = []
+    for smi in smiles_list or []:
+        m = Chem.MolFromSmiles(smi)
+        if m is None:
+            continue
+        x = _feat(m)
+        v = np.array([_CLASSIFIERS[t].predict_proba(x)[0, 1] for t in taste_heads]
+                     + [_AROMA_MODELS[a].predict_proba(x)[0, 1] for a in aroma_heads], dtype="float32")
+        comps.append((Chem.MolToSmiles(m), v))
+    if not comps:
+        return {"error": "no parseable components"}
+    w = np.array((weights or [1.0] * len(comps))[:len(comps)], dtype="float32")
+    w = w / (float(w.sum()) + 1e-9)
+    target = np.average(np.vstack([v for _, v in comps]), axis=0, weights=w).astype("float32")
+    in_skel = {Chem.MolToInchiKey(Chem.MolFromSmiles(s)).split("-")[0] for s, _ in comps}
+    qn = target / (float(np.linalg.norm(target)) + 1e-9)
+    pn = profiles / (np.linalg.norm(profiles, axis=1, keepdims=True) + 1e-9)
+    sims = pn @ qn
+    out = []
+    for i in np.argsort(-sims):
+        ni = Chem.MolFromSmiles(smis[i])
+        if ni is None or Chem.MolToInchiKey(ni).split("-")[0] in in_skel:
+            continue
+        out.append({"smiles": smis[i], "profile_match": round(float(sims[i]), 3),
+                    "known_tastes": tastes[i], "predicted_tastes": _predicted_tastes_at(profiles, i),
+                    "aromas": aromas[i] if i < len(aromas) else []})
+        if len(out) >= k:
+            break
+    return {"components": [s for s, _ in comps], "equivalents": out,
+            "basis": "cosine of each candidate to the dose-weighted mean blend profile"}
+
+
 def palette_match(tastes, aromas=None, k=5):
     """Single molecules that best resemble a target flavor PALETTE — taste labels AND aroma
     descriptors — scored by the mean of taste-Jaccard and aroma-Jaccard over the labeled set

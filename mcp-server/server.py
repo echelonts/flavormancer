@@ -145,6 +145,14 @@ def _screen_mixture(ingredients: list, processes: list) -> dict:
     return _strip(r.json())
 
 
+def _mixture_to_molecule(ingredients: list, weights: list, k: int) -> dict:
+    r = _post("/api/mixture_to_molecule",
+              {"ingredients": ingredients, "weights": weights or [], "k": k})
+    if r.status_code != 200:
+        return {"error": f"mixture->molecule failed (HTTP {r.status_code})"}
+    return _strip(r.json())
+
+
 def _predict_reactions(ingredients: list, processes: list) -> dict:
     r = _post("/api/mixture", {"ingredients": ingredients, "processes": processes or []})
     if r.status_code != 200:
@@ -369,6 +377,17 @@ def predict_reactions(ingredients: list[str], processes: list[str] | None = None
     if processes is None:
         processes = []
     return _predict_reactions(ingredients, processes)
+
+
+@mcp.tool()
+def mixture_to_molecule(ingredients: list[str], weights: list[float] | None = None,
+                        k: int = 6) -> dict:
+    """Collapse a blend into a single equivalent molecule: average the components' predicted
+    taste+aroma PROFILE (dose-weighted if weights given) and return the k single molecules whose
+    own profile is closest — one molecule that tastes and smells like the whole blend. The inverse
+    of a recipe. Each with its profile_match, tastes, and aromas.
+    """
+    return _mixture_to_molecule(ingredients, weights or [], k)
 
 
 @mcp.tool()
