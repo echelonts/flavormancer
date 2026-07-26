@@ -108,6 +108,13 @@ def cmd_reactions(a):
     return {k: d.get(k) for k in ("reactions", "active_hazards", "conditional_hazards")}
 
 
+def cmd_collapse(a):
+    # collapse a blend into single equivalent molecules (dose-weighted taste+aroma profile match)
+    w = [float(x) for x in a.weights] if a.weights else []
+    return _req("/api/mixture_to_molecule", "POST",
+                {"ingredients": a.ingredients, "weights": w, "k": a.k})
+
+
 def cmd_notes(a):
     return _req("/api/studio", params={"terms": ",".join(a.notes),
                                        "gras": 0 if a.any_source else 1, "limit": a.limit})
@@ -212,6 +219,12 @@ def main():
         s.add_argument("ingredients", nargs="+")
         s.add_argument("--process", action="append")
         s.set_defaults(fn=fn)
+
+    s = sub.add_parser("collapse")   # blend -> single equivalent molecule (taste+aroma profile)
+    s.add_argument("ingredients", nargs="+")
+    s.add_argument("--weights", nargs="*", help="optional per-ingredient dose weights")
+    s.add_argument("-k", type=int, default=6)
+    s.set_defaults(fn=cmd_collapse)
 
     s = sub.add_parser("notes")
     s.add_argument("notes", nargs="+")

@@ -2419,8 +2419,34 @@ $('formGo').addEventListener('click', async ()=>{
     const r=await post('/api/formulation',{ingredients:rows, processes:procs, target:[..._formTarget]});
     $('formResults').innerHTML=renderFormulation(r);
     const fill=$('formResults').querySelectorAll('.fprof-fill'); requestAnimationFrame(()=>fill.forEach(f=>f.style.width=f.dataset.w));
+    // collapse the blend -> the single molecule(s) whose taste+aroma profile matches the whole
+    const ing=(r.ingredients||[]).filter(i=>i.smiles);
+    if(ing.length>=2){ try{
+      const eq=await post('/api/mixture_to_molecule',{ingredients:ing.map(i=>i.smiles), weights:ing.map(i=>+i.ppm||1), k:5});
+      $('formResults').insertAdjacentHTML('beforeend', renderEquivalents(eq));
+    }catch(_){} }
   }catch(e){ $('formResults').innerHTML='<div class="err">'+e.message+'</div>'; }
   finally{ $('formGo').disabled=false; $('formGo').textContent='Analyze formulation'; }
+});
+function renderEquivalents(eq){
+  const list=(eq&&eq.equivalents)||[];
+  if(!list.length) return '';
+  return '<div class="bsub" style="margin-top:18px">Single-molecule equivalent <span style="font-weight:400;color:var(--muted)">— one molecule whose <b>taste + aroma profile</b> matches the whole blend (a possible drop-in for the mix). Flavor = taste + aroma.</span></div>'+
+    '<div id="equivList">'+list.map(x=>`
+      <div class="neighbor" data-smi="${formEsc(x.smiles)}" title="Click to analyze this molecule">
+        <div class="nb-structwrap"><div class="nb-struct">${x.svg||''}</div></div>
+        <div class="nb-info">
+          <div class="nb-name">${formEsc(x.name||'—')}${x.gras?'<span class="nb-gras" title="Listed in a food-use reference — a listing flag, not a clearance">Food-listed</span>':''}</div>
+          ${x.iupac?`<div class="nb-iupac">${formEsc(x.iupac)}</div>`:''}
+          <div class="s">${formEsc(x.smiles)}</div>
+          ${(x.aroma&&x.aroma.length)?`<div class="nb-aroma">${x.aroma.map(a=>`<span class="atag" style="color:${aromaColor(a.odor)};border-color:${aromaColor(a.odor)}44">${a.odor}${a.source==='predicted'?' •':''}</span>`).join('')}</div>`:''}
+        </div>
+        <div class="sim">${Math.round((x.profile_match||0)*100)}% match</div>
+      </div>`).join('')+'</div>';
+}
+$('formResults').addEventListener('click', e=>{
+  const nb=e.target.closest('#equivList .neighbor');
+  if(nb && nb.dataset.smi){ q.value=nb.dataset.smi; window.scrollTo({top:0,behavior:'smooth'}); run(); }
 });
 function renderFormulation(r){
   if(r.error) return '<div class="err">'+formEsc(r.error)+(r.unresolved&&r.unresolved.length?' (couldn\'t resolve: '+r.unresolved.map(formEsc).join(', ')+')':'')+'</div>';
