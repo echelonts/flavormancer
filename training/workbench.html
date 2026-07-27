@@ -2090,7 +2090,7 @@ function updateAxisKey(){
 }
 
 function draw2D(){
-  const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=18;
+  const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=40;  // roomier margin so the UMAP cloud never jams the frame
   ctx.clearRect(0,0,W,H);
   const px=p=>(pad+p.x*(W-2*pad))*_v2.s+_v2.ox, py=p=>(H-pad-p.y*(H-2*pad))*_v2.s+_v2.oy;
   drawDensity(ctx, p=>({x:px(p),y:py(p)}));
@@ -2116,7 +2116,10 @@ function drawProps(){
     // out-of-range points are clamped to the edge (a handful of polymers/lipids).
     const pct=(arr,q)=>{ const a=arr.filter(v=>v!=null).sort((x,y)=>x-y); return a[Math.floor(q*(a.length-1))]; };
     const mws=_mapPts.map(p=>p.mw), lps=_mapPts.map(p=>p.logp);
-    _propDom={mwMax:Math.ceil(pct(mws,0.98)/50)*50, lpMin:Math.floor(pct(lps,0.01)), lpMax:Math.ceil(pct(lps,0.99))};
+    // Extend each axis ~8% past the (near-full) data range so points sit at their TRUE position with
+    // headroom instead of piling up clamped on the frame edge — "give the axes more length".
+    const mwHi=pct(mws,0.995), lpLo=pct(lps,0.005), lpHi=pct(lps,0.995), lpPad=Math.max(0.5,(lpHi-lpLo)*0.08);
+    _propDom={mwMax:Math.ceil((mwHi*1.08)/50)*50, lpMin:Math.floor(lpLo-lpPad), lpMax:Math.ceil(lpHi+lpPad)};
   }
   const {mwMax,lpMin,lpMax}=_propDom;
   const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2160,9 +2163,11 @@ function draw3D(){
   if(props && !_prop3){  // real-axis 3D: MW × logP × TPSA, normalized to the unit cube
     const pc=(a,q)=>{ const s=a.filter(v=>v!=null).sort((x,y)=>x-y); return s[Math.floor(q*(s.length-1))]; };
     const mw=_mapPts.map(p=>p.mw), lp=_mapPts.map(p=>p.logp), tp=_mapPts.map(p=>p.tpsa);
-    // domain to the 96th percentile so the bulk of molecules fills the cube (the handful of
-    // heavy/greasy outliers clamp to the far faces rather than stretching the whole scale).
-    _prop3={mwMax:pc(mw,.96)||1, lpMin:pc(lp,.03), lpMax:pc(lp,.96), tpMax:pc(tp,.96)||1};
+    // domain out to ~99.5th percentile + ~8% headroom so points sit at their true cube position with
+    // room, instead of a wall of outliers clamped flat on the far faces ("more length on the axes").
+    const lpLo=pc(lp,.005), lpHi=pc(lp,.995), lpPad=Math.max(0.5,(lpHi-lpLo)*0.08);
+    _prop3={mwMax:(pc(mw,.995)||1)*1.08, lpMin:Math.floor(lpLo-lpPad), lpMax:Math.ceil(lpHi+lpPad),
+            tpMax:(pc(tp,.995)||1)*1.08};
   }
   const cl=(v)=>Math.max(0,Math.min(1,v));
   const coord=p=>{
