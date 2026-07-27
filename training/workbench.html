@@ -556,8 +556,22 @@
   #flavorMap{width:100%;height:auto;display:block}  /* fill the content width like the rest of the page */
   /* smooth reveal for result cards */
   @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  #results .card,#behaviorCard,#aromaCard{animation:fadeUp .28s ease both}
-  #behaviorCard{animation-delay:.04s;margin-top:18px}#aromaCard{animation-delay:.08s}
+  #results .card{animation:fadeUp .28s ease both}
+  /* dashboard modal: read+heads on top (2-col wide), then behavior, then the two swap sections */
+  #results{display:flex;flex-direction:column;gap:16px}
+  .modal-top{display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);gap:16px;align-items:start}
+  .heads-card{display:flex;flex-direction:column;gap:13px}
+  .head-group{border-top:1px solid var(--line);padding-top:11px}
+  .head-group:first-of-type{border-top:none;padding-top:0}
+  .hg-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:baseline;gap:8px}
+  .hg-hint{font-size:10px;letter-spacing:.02em;text-transform:none;color:var(--muted);opacity:.7}
+  #aromaPreview{max-height:340px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px}
+  #aromaPreview::-webkit-scrollbar{width:8px}#aromaPreview::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  /* the two swap lists fill their box (bounded + internal scroll) so no wasted whitespace */
+  .swap-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+  .swap-grid .card{display:flex;flex-direction:column;min-height:360px;max-height:70vh}
+  .swap-grid .card .nb-list{flex:1 1 auto;min-height:0;max-height:none}
+  @media(max-width:820px){ .modal-top{grid-template-columns:1fr} .swap-grid{grid-template-columns:1fr} .swap-grid .card{max-height:none} }
   /* mobile */
   @media(max-width:640px){
     header{padding:22px 14px 18px}
@@ -978,7 +992,9 @@
     <div id="molBody">
   <div id="err" class="err" style="display:none"></div>
 
-  <div class="grid" id="results" style="display:none">
+  <div id="results" style="display:none">
+   <!-- top row: the molecule's own read — structure/identity on the left, all its head bars on the right -->
+   <div class="modal-top">
     <div class="card">
       <h2>Flavor read</h2>
       <div class="struct-toggle" id="structToggle" style="display:none">
@@ -994,9 +1010,32 @@
       <div id="domainBanner" class="domain-banner" style="display:none"></div>
       <div id="flavorTags" class="flavor-tags"></div>
       <div id="references" class="references"></div>
-      <div id="meters"></div>
-      <div class="chips" id="chips"></div>
     </div>
+    <div class="card heads-card">
+      <h2>Heads</h2>
+      <div class="head-group">
+        <div class="hg-label">Taste <span class="hg-hint">6 trained heads</span></div>
+        <div id="meters"></div>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="head-group" id="aromaGroup">
+        <div class="hg-label">Aroma <span class="hg-hint">164 trained heads</span></div>
+        <div id="aromaPreview" style="display:none"></div>
+        <p class="aroma-note">Predicted from structure by RandomForest heads on <b>public-domain</b> HSDB
+        odor data — the same stack as taste, so aroma is predicted for <b>any</b> molecule. This is
+        <b>presence/absence</b> (which notes apply), validated per head (CV-AUROC); a scored
+        <b>intensity</b> map needs expert panel data, trained on-prem on your data.</p>
+      </div>
+    </div>
+   </div>
+
+   <div class="card" id="behaviorCard">
+    <h2>Behavior &amp; safety</h2>
+    <div id="behavior"></div>
+   </div>
+
+   <!-- two DISTINCT swap sections so the difference is obvious; each fills its box and scrolls -->
+   <div class="swap-grid">
     <div class="card">
       <h2>Substitutes <span id="subCount" class="nb-count"></span></h2>
       <p class="card-sub">Closest <b>taste + aroma profile</b> — the drop-in swaps (a match by how it tastes &amp; smells, not by structure).</p>
@@ -1004,28 +1043,10 @@
     </div>
     <div class="card">
       <h2>Structural neighbors <span id="nbCount" class="nb-count"></span></h2>
-      <p class="card-sub">Similar <b>structure</b> (Tanimoto / Morgan) — look-alikes, each with its known tastes.</p>
+      <p class="card-sub">Similar <b>structure</b> (Tanimoto / Morgan) — look-alikes, each with its known tastes <b>and smells</b>.</p>
       <div id="neighbors" class="nb-list"></div>
     </div>
-  </div>
-
-  <div class="card" id="behaviorCard" style="display:none">
-    <h2>Behavior &amp; safety</h2>
-    <div id="behavior"></div>
-  </div>
-
-  <div class="card aroma-card" id="aromaCard" style="display:none">
-    <h2>Aroma</h2>
-    <div id="aromaPreview" style="display:none;margin-bottom:14px"></div>
-    <div class="aroma-lead">Odor descriptors are <b>predicted</b> from structure; <b>intensity</b> comes with <b>your</b> data.</div>
-    <p class="aroma-note">The predicted descriptors above come from RandomForest heads trained
-    on <b>public-domain</b> odor data (HSDB), the same stack as the taste engine — so aroma is
-    predicted for <b>any</b> molecule, not just ones with a documented entry. This is
-    <b>presence/absence</b> (which notes apply), validated per descriptor (CV-AUROC). A
-    <b>scored intensity</b> map — how strong each note is — needs expert-labeled panel data,
-    trained <b>on-premise, on your licensed or in-house data</b>, never leaving your firewall.</p>
-    <p class="aroma-note" style="margin-top:8px">A more robust <b>open-source academic
-    edition</b> — trained on richer research odor data (the GS-LF set) — is coming soon.</p>
+   </div>
   </div>
 
   <p class="note" id="footnote" style="display:none">
@@ -1463,7 +1484,7 @@ async function run(){
   }catch(e){
     stopLoaderCantrips();
     $('molLoader').style.display='none'; $('molBody').style.display='block';
-    $('results').style.display='none'; $('behaviorCard').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
+    $('results').style.display='none'; $('footnote').style.display='none';
     $('err').textContent = e.message; $('err').style.display='block';
   }finally{
     go.disabled=false; go.textContent='Read flavor';
@@ -1574,7 +1595,7 @@ function render(p, neighbors, svg, names, substitutes){
     'Build the reference set to enable structural neighbors.', $('nbCount'));
 
   renderBehavior(p);
-  $('results').style.display='grid'; $('behaviorCard').style.display='block'; $('aromaCard').style.display='block'; $('footnote').style.display='block';
+  $('results').style.display='block'; $('footnote').style.display='block';
   // animate bar fills
   requestAnimationFrame(()=>document.querySelectorAll('.fill')
     .forEach(f=>f.style.width=f.dataset.w+'%'));
@@ -1673,6 +1694,7 @@ async function exploreStereo(smiles){
 
 function renderAroma(ar){
   const box=$('aromaPreview');
+  const grp=$('aromaGroup'); if(grp) grp.style.display = (!ar || !ar.available) ? 'none' : 'block';
   if(!ar || !ar.available){ box.style.display='none'; return; }
   let html='';
   const pred = ar.predicted;
