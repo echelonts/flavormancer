@@ -203,6 +203,24 @@ if __name__ == "__main__":
         r["taste_predicted"] = ",".join(t for t in ("sweet", "bitter", "umami")
                                         if r[f"p_{t}"] >= 0.5)
 
+    # predicted mouthfeel (chemesthesis) + tox — stored per molecule so the browsable universe grid is
+    # complete (taste + aroma + mouthfeel + safety). tox is CAUTION-ONLY (in-vitro assay activity), and
+    # NEITHER mouthfeel here nor tox is part of the substitute-match profile vector — display only.
+    for name, clf in sorted(P._MOUTHFEEL_MODELS.items()):
+        col = clf.predict_proba(X)[:, 1]
+        for i, r in enumerate(rows):
+            r[f"mf_{name}"] = round(float(col[i]), 3)
+    # tox heads were trained on the BARE 2048-bit Morgan fingerprint (_fp), not the _feat block the
+    # taste/aroma/mouthfeel heads use — build a separate matrix so the feature width matches.
+    xtox = np.vstack([P._fp(Chem.MolFromSmiles(s))[0] for s in smis])
+    tox_cols = {}
+    for name, clf in sorted(P._TOX_MODELS.items()):
+        tox_cols[name] = clf.predict_proba(xtox)[:, 1]
+    for i, r in enumerate(rows):
+        for name, col in tox_cols.items():
+            r[f"tox_{name}"] = round(float(col[i]), 3)
+        r["tox_flags"] = ",".join(n for n, col in tox_cols.items() if col[i] >= 0.5)  # assays firing >=0.5
+
     # first-class rows for stereoisomers that differ in documented odor/taste
     name_by_skel = {sk: (props.get(sk, {}).get("common_name") or props.get(sk, {}).get("iupac_name"))
                     for sk in structs}

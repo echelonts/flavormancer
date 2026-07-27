@@ -42,30 +42,62 @@ _WARMING_OPEN = {"/api/status", "/healthz", "/favicon.ico"}
 
 _WARMING_HTML = """<!doctype html><html lang=en><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>Flavormancer — warming up</title>
+<link rel=icon type=image/png href="/static/favicon.png">
 <meta http-equiv=refresh content=15>
 <style>
- :root{--brand:#7C5CBF;--brand2:#2BC4C4;--cream:#F0E6CF;--ink:#0B0F14;--muted:#9BA6B0}
+ @font-face{font-family:'Cinzel Decorative';src:url('/static/wordmark.ttf') format('truetype');font-weight:700;font-display:swap}
+ @font-face{font-family:'Grenze Gotisch';src:url('/static/headerfont.ttf') format('truetype');font-weight:700;font-display:swap}
+ :root{--brand-1:#8A6BE0;--brand-2:#2BC4C4;--accent:#E0913C;--cream:#D9AB74;--ink:#0B0F14;--muted:#9BA6B0}
  *{box-sizing:border-box}html,body{margin:0;height:100%}
- body{background:radial-gradient(1200px 600px at 50% -10%,#141a24,#0B0F14 60%);color:var(--cream);
+ body{background:radial-gradient(1200px 640px at 50% -12%,#161d29,#080B10 62%);color:var(--cream);
    font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px}
- .box{max-width:440px;width:100%;text-align:center}
- .flask{width:96px;height:96px;margin:0 auto 18px;display:block}
- .ring{transform-origin:50% 50%;animation:spin 1.5s linear infinite}
- @keyframes spin{to{transform:rotate(360deg)}}
- h1{font-family:'Cinzel Decorative',Georgia,serif;font-size:22px;letter-spacing:.06em;margin:0 0 6px}
- .sub{color:var(--muted);font-size:13.5px;margin:0 0 20px}
- .bar{height:10px;border-radius:6px;background:#1b2430;overflow:hidden;border:1px solid #2a3644}
- .fill{height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--brand),var(--brand2));transition:width .5s ease}
+ .box{max-width:460px;width:100%;text-align:center}
+ header{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:6px}
+ header img{width:54px;height:54px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
+ .wordmark{font-family:'Grenze Gotisch','Cinzel Decorative',Georgia,serif;font-size:38px;line-height:1;
+   letter-spacing:.02em;background:linear-gradient(100deg,#8A6BE0,#4E84C8 46%,#2BC4C4);-webkit-background-clip:text;
+   background-clip:text;color:transparent;margin:2px 0 0}
+ .tagline{font-family:'Cinzel Decorative',Georgia,serif;font-size:12.5px;letter-spacing:.05em;color:var(--muted)}
+ .flask{width:150px;height:150px;margin:14px auto 6px;display:block}
+ .loader-ring{transform-origin:70px 70px;animation:ringspin 1.15s linear infinite}
+ @keyframes ringspin{to{transform:rotate(360deg)}}
+ .bub{opacity:0;transform-box:fill-box;transform-origin:center;animation:bub 1.7s ease-in infinite}
+ .b1{animation-delay:0s}.b2{animation-delay:.5s}.b3{animation-delay:.9s}.b4{animation-delay:1.3s}
+ @keyframes bub{0%{opacity:0;transform:translateY(6px) scale(.4)}20%{opacity:.9}100%{opacity:0;transform:translateY(-18px) scale(.95)}}
+ .wisp{stroke-dasharray:5 9;transform-box:fill-box;transform-origin:bottom;animation:wisp 2.2s linear infinite,wispRise 3.4s ease-in-out infinite}
+ .w1{opacity:.85;animation-delay:0s,0s}.w2{opacity:.6;animation-delay:.5s,.4s}
+ .w3{opacity:.55;animation-delay:1s,.9s}.w4{opacity:.5;animation-delay:1.5s,1.3s}
+ @keyframes wisp{to{stroke-dashoffset:-28}}
+ @keyframes wispRise{0%,100%{transform:translateY(2px) scaleY(.96)}50%{transform:translateY(-2px) scaleY(1.02)}}
+ h1{font-family:'Cinzel Decorative',Georgia,serif;font-size:18px;letter-spacing:.06em;color:var(--cream);margin:2px 0 4px}
+ .sub{color:var(--muted);font-size:13px;margin:0 0 20px}
+ .bar{height:10px;border-radius:6px;background:#141b26;overflow:hidden;border:1px solid #2a3644}
+ .fill{height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--brand-1),var(--brand-2));transition:width .5s ease}
  .stat{display:flex;justify-content:space-between;margin-top:10px;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
- .cantrip{margin-top:18px;min-height:1.2em;font-family:'Cinzel Decorative',Georgia,serif;font-size:12.5px;color:var(--brand2);opacity:.9}
- @media(prefers-reduced-motion:reduce){.ring{animation:none}}
+ .cantrip{margin-top:18px;min-height:1.2em;font-family:'Cinzel Decorative',Georgia,serif;font-size:12.5px;color:var(--brand-2);opacity:.9}
+ @media(prefers-reduced-motion:reduce){.loader-ring,.bub,.wisp{animation:none}}
 </style></head><body>
 <div class=box>
+ <header>
+   <img src="/static/logo.png" alt="">
+   <div class=wordmark>Flavormancer</div>
+   <div class=tagline>taste &amp; aroma prediction from chemical structure</div>
+ </header>
  <svg class=flask viewBox="0 0 140 140" aria-hidden=true>
    <defs><linearGradient id=g x1=0 y1=0 x2=1 y2=1><stop offset=0 stop-color=#7C5CBF /><stop offset=1 stop-color=#2BC4C4 /></linearGradient></defs>
-   <circle class=ring cx=70 cy=70 r=60 fill=none stroke="url(#g)" stroke-width=3 stroke-linecap=round stroke-dasharray="70 300"/>
-   <path d="M58 44 h24 v14 l16 34 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 l16 -34 z" fill="rgba(43,196,196,.12)" stroke="url(#g)" stroke-width=3 stroke-linejoin=round/>
+   <circle cx=70 cy=70 r=62 fill=none stroke="url(#g)" stroke-width=3 opacity=.55 />
+   <circle class=loader-ring cx=70 cy=70 r=62 fill=none stroke="url(#g)" stroke-width=3 stroke-linecap=round stroke-dasharray="80 320"/>
+   <path d="M58 44 h24 v14 l16 34 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 l16 -34 z" fill="rgba(43,196,196,.10)" stroke="url(#g)" stroke-width=3 stroke-linejoin=round/>
    <path d="M56 44 h28" stroke="url(#g)" stroke-width=3.4 stroke-linecap=round/>
+   <path d="M50.5 74 L89.5 74 L98 92 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 Z" fill="url(#g)" opacity=.72 />
+   <circle class="bub b1" cx=64 cy=90 r=2.4 fill=#EAF6F4 /><circle class="bub b2" cx=73 cy=93 r=1.8 fill=#EAF6F4 />
+   <circle class="bub b3" cx=77 cy=87 r=2.1 fill=#EAF6F4 /><circle class="bub b4" cx=68 cy=95 r=1.5 fill=#EAF6F4 />
+   <g fill=none stroke-linecap=round>
+     <path class="wisp w1" d="M69 72 C63 64 75 58 69 50 C63 43 77 36 70 28 C65 22 73 16 69 9" stroke=#D9AB74 stroke-width=2.4 />
+     <path class="wisp w2" d="M63 71 C57 64 69 59 62 52 C56 46 66 40 62 33 C59 28 64 24 62 19" stroke=#2BC4C4 stroke-width=2 />
+     <path class="wisp w3" d="M76 71 C82 64 70 59 77 52 C83 46 73 41 77 34 C79 30 75 26 77 22" stroke=#8A6BE0 stroke-width=2 />
+     <path class="wisp w4" d="M70 73 C66 68 74 63 70 57 C67 52 72 48 70 43" stroke=#D9AB74 stroke-width=1.7 />
+   </g>
  </svg>
  <h1>Warming the cauldron…</h1>
  <p class=sub>Summoning the flavor &amp; aroma heads into memory. This happens once, at startup.</p>
