@@ -25,11 +25,12 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 
-import predict as P  # the unified flavor read + substitution search
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from rdkit import Chem
+
+import predict as P  # the unified flavor read + substitution search
 
 app = FastAPI(title="Flavor Workbench (demo)")
 
@@ -162,7 +163,8 @@ def _name_local(smi):
 
 class Query(BaseModel):
     smiles: str
-    k: int = 8
+    k: int = 50  # a generous cap; neighbors/substitutes return every match above a similarity floor
+                 # (up to k), so the UI scrolls the qualifying set instead of a fixed short list
 
 
 @app.post("/api/predict")
@@ -287,7 +289,7 @@ def api_neighbors(q: Query):
     smi = _resolve(q.smiles)
     if not smi:
         return {"neighbors": []}
-    res = P.substitute(smi, k=q.k)
+    res = P.substitute(smi, k=q.k, min_similarity=0.30)  # every structural look-alike above the floor
     for n in res.get("neighbors", []):  # enrich each candidate: structure + names + aroma + GRAS
         n["svg"] = _svg(n["smiles"], 132, 96)
         nm = _names(n["smiles"])
@@ -307,7 +309,7 @@ def api_substitutes(q: Query):
     smi = _resolve(q.smiles)
     if not smi:
         return {"substitutes": []}
-    res = P.substitutes(smi, k=q.k)
+    res = P.substitutes(smi, k=q.k, min_match=0.45)  # every taste/aroma-alike above the floor
     for n in res.get("substitutes", []):  # same enrichment as neighbors: structure + names + aroma + GRAS
         n["svg"] = _svg(n["smiles"], 132, 96)
         nm = _names(n["smiles"])
@@ -1115,12 +1117,17 @@ def _prewarm_formulation():
     # never pays the one-time build; the lock in substitute() makes a concurrent request wait.
     with contextlib.suppress(Exception):  # best-effort
         P.substitute("CCO")
+        # Warm the PROFILE path too: builds the normalized reference matrix (_profiles_unit, the
+        # 8k×170 renormalization) once here instead of on the first /api/substitutes.
+        P.substitutes("CCO")
     for n in _FORMULATION_WARM:
         with contextlib.suppress(Exception):  # best-effort warmup; a miss just means a cold first hit
             smi = _resolve(n)
             m = Chem.MolFromSmiles(smi) if smi else None
             if m is not None:
-                P.predict_aroma(Chem.MolToSmiles(m))
+                canon = Chem.MolToSmiles(m)
+                P.predict_aroma(canon)   # fills the shared 164-head aroma cache
+                P.substitutes(canon)     # taste heads + profile cosine, so the demo chips are instant
 
 
 threading.Thread(target=_prewarm_formulation, daemon=True).start()
@@ -1308,6 +1315,7 @@ def _precompute_design():
 
         import numpy as np
         import pandas as pd
+
         from build_aroma_dataset import tag as _odor_tag
         od = pd.read_parquet("odor_notes.parquet")
         rows = []  # (smiles, name, mol_skeleton, {documented tags})

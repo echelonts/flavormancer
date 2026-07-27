@@ -162,6 +162,12 @@
   .tox-code{font-size:9.5px;opacity:.62;letter-spacing:.02em}
   .chip[title]{cursor:help}
   .chip.on{color:#fff;border-color:transparent}
+  /* scroll the qualifying set (every match above the similarity floor) instead of a fixed few;
+     ~5 rows tall, then scroll. A subtle fade at the bottom hints there's more below. */
+  .nb-list{max-height:430px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px}
+  .nb-list::-webkit-scrollbar{width:8px}
+  .nb-list::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  .nb-count{font-family:var(--mono);font-size:12px;font-weight:400;color:var(--muted);margin-left:6px}
   .neighbor{display:flex;align-items:center;gap:12px;
     padding:11px 0;border-bottom:1px solid var(--line)}
   .neighbor:last-child{border-bottom:none}
@@ -944,12 +950,14 @@
       </svg>
       <div class="loader-title" id="loaderTitle">Brewing the flavor read…</div>
       <ul class="loader-steps" id="loaderSteps">
-        <li data-step="predict"><span class="ls-dot"></span> Taste models + chemistry</li>
-        <li data-step="aroma"><span class="ls-dot"></span> Aroma descriptors</li>
+        <li data-step="predict"><span class="ls-dot"></span> Taste heads + chemistry + safety</li>
+        <li data-step="aroma"><span class="ls-dot"></span> Aroma — 164 odor heads</li>
         <li data-step="names"><span class="ls-dot"></span> Names (common / IUPAC)</li>
         <li data-step="structure"><span class="ls-dot"></span> 2D structure</li>
         <li data-step="structure3d"><span class="ls-dot"></span> 3D conformer</li>
-        <li data-step="neighbors"><span class="ls-dot"></span> Neighbors &amp; substitutes</li>
+        <li data-step="substitutes"><span class="ls-dot"></span> Substitutes — taste + aroma match</li>
+        <li data-step="neighbors"><span class="ls-dot"></span> Structural neighbors — Tanimoto</li>
+        <li data-step="render"><span class="ls-dot"></span> Rendering the flavor card</li>
       </ul>
     </div>
     <div id="molBody">
@@ -975,14 +983,14 @@
       <div class="chips" id="chips"></div>
     </div>
     <div class="card">
-      <h2>Substitutes</h2>
+      <h2>Substitutes <span id="subCount" class="nb-count"></span></h2>
       <p class="card-sub">Closest <b>taste + aroma profile</b> — the drop-in swaps (a match by how it tastes &amp; smells, not by structure).</p>
-      <div id="substitutes"></div>
+      <div id="substitutes" class="nb-list"></div>
     </div>
     <div class="card">
-      <h2>Structural neighbors</h2>
+      <h2>Structural neighbors <span id="nbCount" class="nb-count"></span></h2>
       <p class="card-sub">Similar <b>structure</b> (Tanimoto / Morgan) — look-alikes, each with its known tastes.</p>
-      <div id="neighbors"></div>
+      <div id="neighbors" class="nb-list"></div>
     </div>
   </div>
 
@@ -1382,18 +1390,22 @@ async function run(){
   try{
     const [p, n, sub, s, nm, ar, s3] = await Promise.all([
       post('/api/predict',{smiles:text}).then(r=>{stepDone('predict');return r;}),
-      post('/api/neighbors',{smiles:text, k:8}).then(r=>{stepDone('neighbors');return r;}),
-      post('/api/substitutes',{smiles:text, k:8}),
+      post('/api/neighbors',{smiles:text}).then(r=>{stepDone('neighbors');return r;}),
+      post('/api/substitutes',{smiles:text}).then(r=>{stepDone('substitutes');return r;}),
       post('/api/structure',{smiles:text}).then(r=>{stepDone('structure');return r;}),
       post('/api/names',{smiles:text}).then(r=>{stepDone('names');return r;}),
       post('/api/aroma',{smiles:text}).then(r=>{stepDone('aroma');return r;}),
       post('/api/structure3d',{smiles:text}).then(r=>{stepDone('structure3d');return r;})
     ]);
     if(p.error){ throw new Error(p.error); }
-    $('molLoader').style.display='none'; $('molBody').style.display='block';
+    // build the (heavy) DOM into the still-hidden body while the loader shows a 'Rendering' step,
+    // so the spinners never finish before the card is actually ready to reveal
     render(p, n.neighbors||[], (s&&s.svg)||null, nm||{}, (sub&&sub.substitutes)||[]);
     renderAroma(ar||{});
     setStructure3D((s3&&s3.molblock)||null);
+    stepDone('render');
+    await new Promise(requestAnimationFrame);  // let the paint flush so the swap is seamless
+    $('molLoader').style.display='none'; $('molBody').style.display='block';
     $('molModal').scrollTop=0;
   }catch(e){
     $('molLoader').style.display='none'; $('molBody').style.display='block';
@@ -1406,7 +1418,8 @@ async function run(){
 
 // render one neighbor/substitute list into `el`; scoreKey is 'similarity' (structural) or
 // 'profile_match' (substitutes), both 0-1 shown as a % match.
-function renderNeighborList(el, list, scoreKey, emptyMsg){
+function renderNeighborList(el, list, scoreKey, emptyMsg, countEl){
+  if(countEl) countEl.textContent = list.length ? `${list.length} match${list.length===1?'':'es'}` : '';
   if(!list.length){ el.innerHTML = `<div class="empty">${emptyMsg}</div>`; return; }
   el.innerHTML = list.map((x,i)=>`
       <div class="neighbor" data-smi="${x.smiles}" title="Click to analyze this molecule">
@@ -1502,9 +1515,9 @@ function render(p, neighbors, svg, names, substitutes){
   // substitutes (taste+aroma profile match) and structural neighbors (Tanimoto)
   window._nbrs = neighbors;  // for the per-card 3D toggle handler
   renderNeighborList($('substitutes'), substitutes, 'profile_match',
-    'No profile match available (build the profile index).');
+    'No profile match available (build the profile index).', $('subCount'));
   renderNeighborList($('neighbors'), neighbors, 'similarity',
-    'Build the reference set to enable structural neighbors.');
+    'Build the reference set to enable structural neighbors.', $('nbCount'));
 
   renderBehavior(p);
   $('results').style.display='grid'; $('behaviorCard').style.display='block'; $('aromaCard').style.display='block'; $('footnote').style.display='block';

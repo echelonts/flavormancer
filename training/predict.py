@@ -982,6 +982,37 @@ AROMA_DESC = {
 
 
 @lru_cache(maxsize=8192)
+def _aroma_scores_canon(canon):
+    """Run all 164 descriptor forests for a CANONICAL SMILES and return {head: score}."""
+    m = Chem.MolFromSmiles(canon)
+    if m is None or not _AROMA_MODELS:
+        return None
+    fp = _feat(m)
+    return {name: round(float(clf.predict_proba(fp)[0][1]), 3)
+            for name, clf in _AROMA_MODELS.items()}
+
+
+def _aroma_scores(smiles):
+    """The expensive part of the aroma read: all 164 descriptor forests → {head: score}. Keyed on
+    the CANONICAL SMILES (not threshold/top_k, not the raw string) so every caller shares one
+    computation per molecule regardless of how they spelled it — predict_aroma, _query_profile
+    (substitutes) and the /api/aroma endpoint all collapse to the same cache entry instead of each
+    re-running 164 forests (that double/mismatched inference was the ~6 s /api/substitutes).
+
+    In-corpus molecules skip the forests entirely: their 164 scores are read straight off the
+    precomputed profile index (built at startup) — the same numbers, ~40 s cheaper on a cold hit."""
+    m = Chem.MolFromSmiles(smiles)
+    if m is None or not _AROMA_MODELS:
+        return None
+    row = _index_row(m)
+    if row is not None:
+        profiles, dims = _SUB_INDEX[4], _SUB_INDEX[5]
+        return {d.split(":", 1)[1]: round(float(profiles[row][j]), 3)
+                for j, d in enumerate(dims) if d.startswith("aroma:")}
+    return _aroma_scores_canon(Chem.MolToSmiles(m))
+
+
+@lru_cache(maxsize=8192)
 def predict_aroma(smiles, top_k=8, threshold=0.5):
     """Predicted odor descriptors from RandomForest heads trained on the PUBLIC-DOMAIN HSDB
     odor corpus (see docs/AROMA.md). Returns the descriptors the model scores above threshold,
@@ -989,19 +1020,16 @@ def predict_aroma(smiles, top_k=8, threshold=0.5):
     corpus carries no intensity), not a scored intensity map — honest about that ceiling; a
     stronger intensity model needs licensed (PMP 2001) or customer panel data. Returns
     available:False until the heads are trained into aroma_models/ (train_aroma.py)."""
-    m = Chem.MolFromSmiles(smiles)
-    if m is None:
+    if Chem.MolFromSmiles(smiles) is None:
         return {"error": f"unparseable SMILES: {smiles}"}
-    if not _AROMA_MODELS:
+    scores = _aroma_scores(smiles)
+    if scores is None:
         return {"available": False,
                 "note": "aroma model not trained here — build with train_aroma.py"}
-    fp = _feat(m)
-    preds = []
-    for name, clf in _AROMA_MODELS.items():
-        p = float(clf.predict_proba(fp)[0][1])
-        preds.append({"odor": name, "score": round(p, 3), "confident": p >= threshold,
-                      "auroc": _AROMA_META.get(name, {}).get("auroc"),
-                      "desc": AROMA_DESC.get(name)})
+    preds = [{"odor": name, "score": p, "confident": p >= threshold,
+              "auroc": _AROMA_META.get(name, {}).get("auroc"),
+              "desc": AROMA_DESC.get(name)}
+             for name, p in scores.items()]
     preds.sort(key=lambda d: -d["score"])
     # Return EVERY head (like the taste meters list every taste), ranked, each flagged confident
     # or not — so the read shows the full aroma profile across all trained descriptor models, not
@@ -1149,15 +1177,75 @@ def _ensure_sub_index():
                 _build_sub_index()
 
 
+_PN_CACHE = {}
+_SKEL2ROW = {}
+
+
+def _index_row(mol):
+    """Row of `mol` in the profile index (matched by connectivity skeleton), or None if the
+    molecule isn't in the reference corpus. In-corpus molecules can reuse their PRECOMPUTED
+    170-head profile (built once at index build / startup) instead of re-running 164 forests at
+    query time — that inference is ~40 s cold on a novel molecule and was the real /api/substitutes
+    and include_aroma cost. The precomputed row is the SAME model output, just paid up front."""
+    _ensure_sub_index()
+    smis, profiles = _SUB_INDEX[1], _SUB_INDEX[4]
+    if profiles is None or not smis:
+        return None
+    key = id(smis)
+    table = _SKEL2ROW.get(key)
+    if table is None:
+        table = {}
+        for i, s in enumerate(smis):
+            mi = Chem.MolFromSmiles(s)
+            if mi is not None:
+                table.setdefault(Chem.MolToInchiKey(mi).split("-")[0], i)
+        _SKEL2ROW.clear()  # one live index at a time; don't leak on rebuild
+        _SKEL2ROW[key] = table
+    return table.get(Chem.MolToInchiKey(mol).split("-")[0])
+
+
+def _profiles_unit(profiles):
+    """L2-normalized rows of the reference profile matrix, computed once and reused (the query
+    cosine is then just a matmul). Keyed on the matrix's identity so it rebuilds only if the
+    index is rebuilt — paying this at index build / prewarm, not on every /api/substitutes."""
+    import numpy as np
+    key = id(profiles)
+    pn = _PN_CACHE.get(key)
+    if pn is None:
+        pn = profiles / (np.linalg.norm(profiles, axis=1, keepdims=True) + 1e-9)
+        _PN_CACHE.clear()  # only ever one live index; don't leak on rebuild
+        _PN_CACHE[key] = pn
+    return pn
+
+
+def _query_profile(mol):
+    """The 170-dim taste+aroma profile vector for a query molecule, in the index column order
+    (taste heads then aroma heads). Reuses the memoized predict_aroma so it shares the aroma
+    cache with /api/aroma instead of re-running all 164 forests inline (that made /api/substitutes
+    ~9 s; this drops it to the aroma cost, paid once per molecule)."""
+    import numpy as np
+    row = _index_row(mol)
+    if row is not None:
+        return np.asarray(_SUB_INDEX[4][row], dtype="float32")  # precomputed 170-head profile
+    taste_heads, aroma_heads = _profile_heads()
+    x = _feat(mol)
+    tvals = [float(_CLASSIFIERS[t].predict_proba(x)[0, 1]) for t in taste_heads]  # 6 heads, cheap
+    ascore = _aroma_scores(Chem.MolToSmiles(mol)) or {}  # memoized 164-head core, shared with /api/aroma
+    avals = [float(ascore.get(a, 0.0)) for a in aroma_heads]
+    return np.array(tvals + avals, dtype="float32")
+
+
 def _predicted_tastes_at(profiles, i):
-    """The PREDICTED taste heads (score >= 0.5) for reference-set row i, from the profile matrix.
-    Lets neighbor / substitute cards show a taste read even when nothing is *documented* — the
-    taste columns are the first len(_CLASSIFIERS) of the profile vector. Marked predicted in the UI."""
+    """The PREDICTED taste read for reference-set row i, from the profile matrix — the top few
+    taste heads by score (not a hard >=0.5 cut, which mostly surfaced only 'bitter'). There are
+    only 6 taste heads, so we return the top 3 that carry any signal (>= 0.2), highest first, to
+    give a fuller taste picture. The taste columns are the first len(_CLASSIFIERS) of the vector."""
     if profiles is None:
         return []
     taste_heads = sorted(_CLASSIFIERS)
     row = profiles[i]
-    return [t for j, t in enumerate(taste_heads) if float(row[j]) >= 0.5]
+    scored = sorted(((float(row[j]), t) for j, t in enumerate(taste_heads)), reverse=True)
+    return [t for s, t in scored[:3] if s >= 0.2]
 
 
 def structural_neighbors(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
@@ -1204,12 +1292,13 @@ def structural_neighbors(smiles: str, k: int = 8, min_similarity: float = 0.0) -
 substitute = structural_neighbors
 
 
-def substitutes(smiles: str, k: int = 8) -> dict:
-    """PROFILE-based substitutes: the k molecules whose predicted FLAVOR profile (taste + aroma
+def substitutes(smiles: str, k: int = 8, min_match: float = 0.0) -> dict:
+    """PROFILE-based substitutes: the molecules whose predicted FLAVOR profile (taste + aroma
     head scores) is closest to the query's — the drop-in reformulation list. A molecule that
     *tastes and smells* like the target is a likely substitute regardless of its structure, so
     this ranks by cosine similarity over the head-score vectors (not fingerprint distance).
-    Returns {'substitutes': [...]} ranked by profile match (self excluded)."""
+    Returns every match with profile_match >= min_match (ranked, self excluded), capped at k so
+    callers can scroll the qualifying set rather than a fixed count."""
     import numpy as np
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
@@ -1218,16 +1307,14 @@ def substitutes(smiles: str, k: int = 8) -> dict:
     _fps, smis, tastes, aromas, profiles, _dims = _SUB_INDEX
     if profiles is None or not len(smis):
         return {"substitutes": [], "note": "no reference set / models loaded"}
-    x = _feat(mol)
-    taste_heads, aroma_heads = _profile_heads()
-    qv = np.array([_CLASSIFIERS[t].predict_proba(x)[0, 1] for t in taste_heads]
-                  + [_AROMA_MODELS[a].predict_proba(x)[0, 1] for a in aroma_heads], dtype="float32")
+    qv = _query_profile(mol)
     qn = qv / (float(np.linalg.norm(qv)) + 1e-9)
-    pn = profiles / (np.linalg.norm(profiles, axis=1, keepdims=True) + 1e-9)
-    sims = pn @ qn
+    sims = _profiles_unit(profiles) @ qn
     self_skel = Chem.MolToInchiKey(mol).split("-")[0]
     subs = []
     for i in np.argsort(-sims):
+        if sims[i] < min_match:  # sorted descending — nothing further qualifies
+            break
         ni = Chem.MolFromSmiles(smis[i])
         if ni is None or Chem.MolToInchiKey(ni).split("-")[0] == self_skel:
             continue
@@ -1250,16 +1337,12 @@ def mixture_to_molecule(smiles_list: list, weights: list | None = None, k: int =
     _fps, smis, tastes, aromas, profiles, _dims = _SUB_INDEX
     if profiles is None or not len(smis):
         return {"error": "no profile index / reference set"}
-    taste_heads, aroma_heads = _profile_heads()
     comps = []
     for smi in smiles_list or []:
         m = Chem.MolFromSmiles(smi)
         if m is None:
             continue
-        x = _feat(m)
-        v = np.array([_CLASSIFIERS[t].predict_proba(x)[0, 1] for t in taste_heads]
-                     + [_AROMA_MODELS[a].predict_proba(x)[0, 1] for a in aroma_heads], dtype="float32")
-        comps.append((Chem.MolToSmiles(m), v))
+        comps.append((Chem.MolToSmiles(m), _query_profile(m)))
     if not comps:
         return {"error": "no parseable components"}
     w = np.array((weights or [1.0] * len(comps))[:len(comps)], dtype="float32")

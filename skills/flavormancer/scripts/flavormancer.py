@@ -202,10 +202,10 @@ def main():
     mol("read-full").set_defaults(fn=cmd_read_full)
     mol("stereoisomers").set_defaults(fn=cmd_stereoisomers)
     s = mol("substitutes")   # taste+aroma profile match (the drop-in swaps)
-    s.add_argument("-k", type=int, default=8)
+    s.add_argument("-k", type=int, default=25, help="max results (every match above a profile floor)")
     s.set_defaults(fn=cmd_substitutes)
     s = mol("structural-neighbors")   # Tanimoto structural look-alikes
-    s.add_argument("-k", type=int, default=8)
+    s.add_argument("-k", type=int, default=25, help="max results (every match above a similarity floor)")
     s.set_defaults(fn=cmd_structural_neighbors)
 
     s = sub.add_parser("formulate")
