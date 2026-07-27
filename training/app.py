@@ -25,14 +25,95 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from rdkit import Chem
 
 import predict as P  # the unified flavor read + substitution search
 
 app = FastAPI(title="Flavor Workbench (demo)")
+
+# --- warming-up gate -------------------------------------------------------------------------
+# Model heads load on a background thread (predict._load_all_models) so uvicorn binds instantly.
+# Until they're ready we serve a friendly self-refreshing page (HTML nav) / a clean 503 (API),
+# instead of the old ~34 s startup 502. /api/status and /healthz stay open so the page can poll.
+_WARMING_OPEN = {"/api/status", "/healthz", "/favicon.ico"}
+
+_WARMING_HTML = """<!doctype html><html lang=en><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1"><title>Flavormancer — warming up</title>
+<meta http-equiv=refresh content=15>
+<style>
+ :root{--brand:#7C5CBF;--brand2:#2BC4C4;--cream:#F0E6CF;--ink:#0B0F14;--muted:#9BA6B0}
+ *{box-sizing:border-box}html,body{margin:0;height:100%}
+ body{background:radial-gradient(1200px 600px at 50% -10%,#141a24,#0B0F14 60%);color:var(--cream);
+   font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px}
+ .box{max-width:440px;width:100%;text-align:center}
+ .flask{width:96px;height:96px;margin:0 auto 18px;display:block}
+ .ring{transform-origin:50% 50%;animation:spin 1.5s linear infinite}
+ @keyframes spin{to{transform:rotate(360deg)}}
+ h1{font-family:'Cinzel Decorative',Georgia,serif;font-size:22px;letter-spacing:.06em;margin:0 0 6px}
+ .sub{color:var(--muted);font-size:13.5px;margin:0 0 20px}
+ .bar{height:10px;border-radius:6px;background:#1b2430;overflow:hidden;border:1px solid #2a3644}
+ .fill{height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--brand),var(--brand2));transition:width .5s ease}
+ .stat{display:flex;justify-content:space-between;margin-top:10px;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+ .cantrip{margin-top:18px;min-height:1.2em;font-family:'Cinzel Decorative',Georgia,serif;font-size:12.5px;color:var(--brand2);opacity:.9}
+ @media(prefers-reduced-motion:reduce){.ring{animation:none}}
+</style></head><body>
+<div class=box>
+ <svg class=flask viewBox="0 0 140 140" aria-hidden=true>
+   <defs><linearGradient id=g x1=0 y1=0 x2=1 y2=1><stop offset=0 stop-color=#7C5CBF /><stop offset=1 stop-color=#2BC4C4 /></linearGradient></defs>
+   <circle class=ring cx=70 cy=70 r=60 fill=none stroke="url(#g)" stroke-width=3 stroke-linecap=round stroke-dasharray="70 300"/>
+   <path d="M58 44 h24 v14 l16 34 a6 6 0 0 1 -5.5 8.4 h-45 a6 6 0 0 1 -5.5 -8.4 l16 -34 z" fill="rgba(43,196,196,.12)" stroke="url(#g)" stroke-width=3 stroke-linejoin=round/>
+   <path d="M56 44 h28" stroke="url(#g)" stroke-width=3.4 stroke-linecap=round/>
+ </svg>
+ <h1>Warming the cauldron…</h1>
+ <p class=sub>Summoning the flavor &amp; aroma heads into memory. This happens once, at startup.</p>
+ <div class=bar><div class=fill id=fill></div></div>
+ <div class=stat><span id=count>Loading models…</span><span id=eta></span></div>
+ <div class=cantrip id=cantrip>Stoking the athanor…</div>
+</div>
+<script>
+ var CANTRIPS=['Stoking the athanor…','Unrolling the aroma grimoire…','Awakening the descriptor heads…',
+   'Charging the olfactory runes…','Tempering the taste engines…','Aligning the flavor lattice…','Distilling first essences…'];
+ var ci=0;setInterval(function(){ci=(ci+1)%CANTRIPS.length;document.getElementById('cantrip').textContent=CANTRIPS[ci];},5000);
+ function poll(){
+   fetch('/api/status',{cache:'no-store'}).then(function(r){return r.json();}).then(function(s){
+     if(s.ready){location.reload();return;}
+     var t=s.total||0,l=s.loaded||0,pct=t?Math.round(l/t*100):0;
+     document.getElementById('fill').style.width=pct+'%';
+     document.getElementById('count').textContent=t?(l+' / '+t+' heads summoned'):'Discovering heads…';
+     var eta='';
+     if(l>0&&t>l&&s.elapsed){var per=s.elapsed/l;eta='~'+Math.max(1,Math.round(per*(t-l)))+'s remaining';}
+     document.getElementById('eta').textContent=eta;
+   }).catch(function(){}).finally(function(){setTimeout(poll,1000);});
+ }
+ poll();
+</script></body></html>"""
+
+
+@app.get("/api/status")
+def api_status():
+    """Model-load progress for the warming-up page (loaded/total heads, phase, ready, elapsed)."""
+    return P.load_status()
+
+
+@app.get("/healthz")
+def healthz():
+    """Liveness/readiness for systemd + proxies: ok once the process is up, ready once models load."""
+    return {"ok": True, "ready": P.MODELS_READY.is_set()}
+
+
+@app.middleware("http")
+async def _warming_gate(request: Request, call_next):
+    if not P.MODELS_READY.is_set() and request.url.path not in _WARMING_OPEN:
+        wants_html = request.method == "GET" and (
+            request.url.path == "/" or "text/html" in request.headers.get("accept", ""))
+        if wants_html:
+            return HTMLResponse(_WARMING_HTML, status_code=503, headers={"Retry-After": "5"})
+        return JSONResponse({"warming": True, **P.load_status()}, status_code=503,
+                            headers={"Retry-After": "5"})
+    return await call_next(request)
 
 
 def _load_name2smiles():
@@ -318,6 +399,14 @@ def api_substitutes(q: Query):
         _m = Chem.MolFromSmiles(n["smiles"])
         n["gras"] = bool(_m is not None and Chem.MolToInchiKey(_m).split("-")[0] in P._GRAS)
     return res
+
+
+@app.post("/api/precomputed")
+def api_precomputed(q: Query):
+    """Fast check: is this molecule's profile already in the index (instant read) or does it need a
+    fresh 170-head compute? Lets the UI show a 'conjuring a fresh reading' note for novel molecules."""
+    smi = _resolve(q.smiles)
+    return {"precomputed": bool(smi and P.is_precomputed(smi))}
 
 
 @app.post("/api/names")
@@ -1095,6 +1184,7 @@ _IUPAC = {}  # smiles -> IUPAC name, filled in the background (PubChem, cached)
 
 
 def _precompute_iupac():
+    P.MODELS_READY.wait()  # don't compete with the model load for cores
     for _, s in _SUGGEST:
         _IUPAC[s] = _names(s)[1]
 
@@ -1113,6 +1203,7 @@ _FORMULATION_WARM = [
 
 
 def _prewarm_formulation():
+    P.MODELS_READY.wait()  # the heads must be loaded before we can warm anything with them
     # Build the substitution index FIRST (the ~8k-row aroma batch) so the first neighbor search
     # never pays the one-time build; the lock in substitute() makes a concurrent request wait.
     with contextlib.suppress(Exception):  # best-effort
@@ -1793,6 +1884,7 @@ def _documented_by_full(inchikey):
 # start the landing-page precompute now that every table it reads (_NAME_TABLE, _ODOR_TABLE,
 # the models) is defined — starting it earlier would race those globals into NameErrors
 def _precompute_all():
+    P.MODELS_READY.wait()  # both precomputes run head inference; wait for the load to finish
     _precompute_top_lists()
     _precompute_design()
 

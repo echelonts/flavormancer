@@ -44,7 +44,10 @@ peptides or non-ionic salty compounds (little data, weak structure-activity).
 """
 
 import contextlib
+import os
 import threading as _threading
+import time as _time
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 
@@ -197,42 +200,102 @@ def _load_rf(path):
     return mdl
 
 
-# load whatever classifier heads exist (sweet/bitter/umami...) + intensity
-_CLASSIFIERS = {}
-_INTENSITY = None
-_TASTE_META = {}  # taste -> {auroc, ...} from taste_models/manifest.json (held-out score)
-if TASTE.exists():
-    for p in TASTE.glob("*_rf.joblib"):
-        name = p.stem.replace("_rf", "")
-        if name == "sweet_intensity":
-            _INTENSITY = _load_rf(p)
-        else:
-            _CLASSIFIERS[name] = _load_rf(p)
-    _tm = TASTE / "manifest.json"
-    if _tm.exists():
-        import json as _json
-        _TASTE_META = _json.loads(_tm.read_text())
-
-# Caution-only toxicity-assay heads (Tox21, public domain). Loaded if trained.
-# INDICATIVE in-vitro signals — never a toxicity determination.
-_TOX_MODELS = {}
+# Model heads are loaded on a BACKGROUND THREAD at import (see _load_all_models below) so that
+# `import predict` returns immediately and the web server can bind its port right away, showing a
+# friendly "warming up" page while the ~180 forests (628 MB) load — instead of a 34 s startup 502.
+# The load is fanned out across cores (joblib.load releases the GIL), which also cuts the wall time.
+_CLASSIFIERS = {}          # sweet/bitter/umami/... taste heads
+_INTENSITY = None          # sweet-intensity regressor
+_TASTE_META = {}           # taste -> {auroc, ...} from taste_models/manifest.json (held-out score)
+_TOX_MODELS = {}           # Tox21 caution-only assay heads (INDICATIVE, never a determination)
 _TOX_DIR = Path("tox_models")
-if _TOX_DIR.exists():
-    for p in _TOX_DIR.glob("*_rf.joblib"):
-        _TOX_MODELS[p.stem.replace("_rf", "")] = _load_rf(p)
-
-# Odor-descriptor heads (public-domain HSDB corpus, presence/absence). Loaded if trained.
-# Real, commercial-clean aroma predictions — NOT intensity (see docs/AROMA.md).
-_AROMA_MODELS = {}
+_AROMA_MODELS = {}         # HSDB odor-descriptor heads (presence/absence; NOT intensity)
 _AROMA_META = {}
 _AROMA_DIR = Path("aroma_models")
-if _AROMA_DIR.exists():
-    for p in _AROMA_DIR.glob("*_clf.joblib"):
-        _AROMA_MODELS[p.stem.replace("_clf", "")] = _load_rf(p)
+
+MODELS_READY = _threading.Event()  # set once every head is loaded; the app gates requests on this
+_INFER_POOL = None  # shared thread pool for fanning a novel-molecule read across cores (lazy)
+
+
+def _infer_pool():
+    """A process-wide thread pool for parallel head inference on novel molecules. Sized to ~3/4 of
+    the box (env FLAVORMANCER_INFER_WORKERS overrides) so a fresh 170-head read rips across cores
+    (~40 s -> a couple of seconds). Shared, so many concurrent novel reads share one bounded pool
+    instead of each spawning its own — in-corpus reads never touch it (they hit the index)."""
+    global _INFER_POOL
+    if _INFER_POOL is None:
+        env = os.environ.get("FLAVORMANCER_INFER_WORKERS")
+        workers = int(env) if env else max(4, min(24, int((os.cpu_count() or 8) * 3 / 4)))
+        _INFER_POOL = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="infer")
+    return _INFER_POOL
+# live progress for the warming-up page: how many heads are loaded, and the phase label
+LOAD_PROGRESS = {"loaded": 0, "total": 0, "phase": "starting", "ready": False, "started": None}
+
+
+def load_status():
+    """Snapshot of the model-load progress for the warming-up page: loaded/total heads, phase,
+    ready flag, and seconds elapsed since loading began (for a client-side ETA)."""
+    with _LOAD_LOCK:
+        s = dict(LOAD_PROGRESS)
+    started = s.pop("started", None)
+    s["elapsed"] = round(_time.monotonic() - started, 1) if started else 0.0
+    s["ready"] = MODELS_READY.is_set()
+    return s
+_LOAD_LOCK = _threading.Lock()
+
+
+def _load_all_models():
+    """Discover and load every trained head (taste + tox + aroma), updating LOAD_PROGRESS as each
+    lands, then set MODELS_READY. Runs on a daemon thread from import so the port binds instantly.
+
+    Loading is SERIAL on purpose: joblib.load is dominated by GIL-bound Python unpickling, so a
+    thread pool only adds contention (measured ~34 s serial vs ~86 s across 14 threads). The win
+    from cores comes at INFERENCE time (predict_proba releases the GIL) — see _aroma_scores_canon."""
+    jobs = []  # (kind, name, path)
+    if TASTE.exists():
+        jobs += [("taste", p.stem.replace("_rf", ""), p) for p in TASTE.glob("*_rf.joblib")]
+    if _TOX_DIR.exists():
+        jobs += [("tox", p.stem.replace("_rf", ""), p) for p in _TOX_DIR.glob("*_rf.joblib")]
+    if _AROMA_DIR.exists():
+        jobs += [("aroma", p.stem.replace("_clf", ""), p) for p in _AROMA_DIR.glob("*_clf.joblib")]
+    with _LOAD_LOCK:
+        LOAD_PROGRESS["total"] = len(jobs)
+        LOAD_PROGRESS["phase"] = "loading models"
+        LOAD_PROGRESS["started"] = _time.monotonic()
+
+    for kind, name, p in jobs:
+        mdl = _load_rf(p)
+        if kind == "taste":
+            if name == "sweet_intensity":
+                globals()["_INTENSITY"] = mdl
+            else:
+                _CLASSIFIERS[name] = mdl
+        elif kind == "tox":
+            _TOX_MODELS[name] = mdl
+        else:
+            _AROMA_MODELS[name] = mdl
+        with _LOAD_LOCK:
+            LOAD_PROGRESS["loaded"] += 1
+    # manifests (small JSON, load after the heads)
+    import json as _json
+    _tm = TASTE / "manifest.json"
+    if _tm.exists():
+        globals()["_TASTE_META"] = _json.loads(_tm.read_text())
     _mf = _AROMA_DIR / "manifest.json"
     if _mf.exists():
-        import json as _json
-        _AROMA_META = _json.loads(_mf.read_text()).get("descriptors", {})
+        globals()["_AROMA_META"] = _json.loads(_mf.read_text()).get("descriptors", {})
+    with _LOAD_LOCK:
+        LOAD_PROGRESS["phase"] = "ready"
+        LOAD_PROGRESS["ready"] = True
+    MODELS_READY.set()
+
+
+# Kick off loading in the background. Set FLAVORMANCER_BLOCKING_LOAD=1 (tests, CLI, batch jobs) to
+# load synchronously instead, so code that runs right after import can rely on the models being present.
+if os.environ.get("FLAVORMANCER_BLOCKING_LOAD") == "1":
+    _load_all_models()
+else:
+    _threading.Thread(target=_load_all_models, name="model-loader", daemon=True).start()
 
 # Known-label lookup: ground truth for molecules we actually have data on. This
 # is how the salty/sour data works as a FLAG without a model — if a queried
@@ -988,8 +1051,14 @@ def _aroma_scores_canon(canon):
     if m is None or not _AROMA_MODELS:
         return None
     fp = _feat(m)
-    return {name: round(float(clf.predict_proba(fp)[0][1]), 3)
-            for name, clf in _AROMA_MODELS.items()}
+    # Fan the 164 forests across cores — each predict_proba releases the GIL, so this turns the
+    # ~40 s serial read (the only remaining cost, for genuinely novel/out-of-corpus molecules) into
+    # a couple of seconds. In-corpus molecules never reach here (they read the precomputed index row).
+    def _score(it):
+        name, clf = it
+        return name, round(float(clf.predict_proba(fp)[0][1]), 3)
+
+    return dict(_infer_pool().map(_score, list(_AROMA_MODELS.items())))
 
 
 def _aroma_scores(smiles):
@@ -1202,6 +1271,14 @@ def _index_row(mol):
         _SKEL2ROW.clear()  # one live index at a time; don't leak on rebuild
         _SKEL2ROW[key] = table
     return table.get(Chem.MolToInchiKey(mol).split("-")[0])
+
+
+def is_precomputed(smiles):
+    """True if this molecule's full taste+aroma profile is already in the index (an instant read),
+    False if it's out-of-corpus and the 170 heads have to run fresh (the slower path). Used by the
+    UI to decide whether to show the 'conjuring a fresh reading' note while a read brews."""
+    mol = Chem.MolFromSmiles(smiles or "")
+    return mol is not None and _index_row(mol) is not None
 
 
 def _profiles_unit(profiles):
