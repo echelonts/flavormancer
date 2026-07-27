@@ -238,6 +238,18 @@
   .map-key b{color:var(--ink)}
   .map-canvas-wrap{position:relative;width:100%;overflow-x:auto}
   #flavorMap{max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:crosshair}
+  /* reusable branded loading overlay for the flavor map + enrichment grid (first-open feedback) */
+  .load-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;background:var(--surface);border-radius:8px;z-index:5;text-align:center;padding:20px}
+  .load-overlay.done{opacity:0;pointer-events:none;transition:opacity .35s ease}
+  .load-ring{width:38px;height:38px;border-radius:50%;border:3px solid var(--line);
+    border-top-color:var(--brand-2);border-right-color:var(--brand-1);animation:loadspin .8s linear infinite}
+  @keyframes loadspin{to{transform:rotate(360deg)}}
+  .load-lbl{font-family:'Cinzel Decorative',Georgia,serif;font-size:13.5px;letter-spacing:.04em;color:var(--cream)}
+  .load-sub{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:-4px}
+  .et-loading{display:flex;align-items:center;justify-content:center;gap:12px}
+  .et-loading .load-ring{width:22px;height:22px;border-width:2.5px}
+  @media(prefers-reduced-motion:reduce){.load-ring{animation:none}}
   .map-tip{position:absolute;pointer-events:none;background:#1c2620;color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-150%);box-shadow:0 4px 14px rgba(0,0,0,.4)}
   .map-tip .tip-coord{font-family:var(--mono);font-size:10px;color:#9FE8D8}
   .neighbor .s{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all}
@@ -884,6 +896,9 @@
         <button type="button" id="mapReset" class="map-reset">Reset view</button>
       </div>
       <div class="map-canvas-wrap"><canvas id="flavorMap" width="1440" height="760"></canvas>
+        <div id="mapLoad" class="load-overlay"><div class="load-ring"></div>
+          <div class="load-lbl">Charting the flavor map…</div>
+          <div class="load-sub">placing every molecule in flavor space</div></div>
         <div id="mapTip" class="map-tip" style="display:none"></div></div>
       <div id="mapAxisKey" class="map-axis-key"></div>
       <div class="map-key">Each dot is a molecule; <b>nearby dots are structurally similar</b>.
@@ -1961,12 +1976,21 @@ function mapLegendRender(){
 }
 
 async function loadMap(){
-  const cv=$('flavorMap'), ctx=cv.getContext('2d');
-  ctx.fillStyle='#8a938c'; ctx.font='13px sans-serif'; ctx.fillText('Loading…',12,22);
-  const d=await getJSON('/api/map'); _mapPts=d.points||[];
-  if(!_mapPts.length){ ctx.clearRect(0,0,cv.width,cv.height); ctx.fillText('Map not built yet (build_flavor_map.py).',12,22); return; }
-  mapLegendRender();
-  _mapReady=true; attachMapEvents(cv); drawMap();
+  const cv=$('flavorMap'), ctx=cv.getContext('2d'), ov=$('mapLoad');
+  if(ov){ ov.classList.remove('done'); }  // show the branded overlay while the (~2 MB) map loads
+  try{
+    const d=await getJSON('/api/map'); _mapPts=d.points||[];
+    if(!_mapPts.length){
+      if(ov){ ov.querySelector('.load-ring').style.display='none';
+              ov.querySelector('.load-lbl').textContent='Map not built yet';
+              ov.querySelector('.load-sub').textContent='run build_flavor_map.py'; }
+      return;
+    }
+    mapLegendRender();
+    _mapReady=true; attachMapEvents(cv); drawMap();
+  } finally {
+    if(ov && _mapReady) ov.classList.add('done');  // fade the overlay out once the map is drawn
+  }
 }
 function drawMap(){ _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D()); if(_showLabels) drawClusterLabels(); updateAxisKey(); }
 let _showLabels=true, _showClusters=true;
@@ -2305,6 +2329,9 @@ function etCell(c, r){
 }
 async function loadEnrich(){
   $('enrichHead').querySelectorAll('.th-ar').forEach(s=> s.textContent = s.dataset.k===_enSort ? (_enDesc?'▼':'▲') : '');
+  const cols = _enCols.length || 1;
+  $('enrichBody').innerHTML = `<tr><td colspan="${cols}" style="padding:26px"><div class="et-loading"><span class="load-ring"></span>`
+    + `<span class="load-lbl">Loading the molecule universe…</span></div></td></tr>`;  // feedback while fetching
   const d = await getJSON(`/api/enrichment?q=${encodeURIComponent(_enQ)}&sort=${_enSort}&desc=${_enDesc?1:0}&offset=${_enOffset}&limit=${EN_PAGE}`);
   const tot=d.total||0;
   $('enrichBody').innerHTML = (d.rows||[]).map(r=>`<tr data-smi="${r.smiles.replace(/"/g,'&quot;')}">`+_enCols.map(c=>etCell(c,r)).join('')+'</tr>').join('') || `<tr><td colspan="${_enCols.length}" class="et-mut" style="padding:16px">No molecules match.</td></tr>`;
