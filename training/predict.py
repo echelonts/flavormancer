@@ -225,7 +225,9 @@ def _infer_pool():
     global _INFER_POOL
     if _INFER_POOL is None:
         env = os.environ.get("FLAVORMANCER_INFER_WORKERS")
-        workers = int(env) if env else max(4, min(24, int((os.cpu_count() or 8) * 3 / 4)))
+        # ~3/4 of the box's cores (leaving headroom for the web server), derived from the actual
+        # cpu count — scales from a 4-core laptop (3 workers) to a 32-core server (24), no fixed cap.
+        workers = int(env) if env else max(2, (os.cpu_count() or 4) * 3 // 4)
         _INFER_POOL = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="infer")
     return _INFER_POOL
 # live progress for the warming-up page: how many heads are loaded, and the phase label
@@ -291,8 +293,12 @@ def _load_all_models():
 
 
 # Kick off loading in the background. Set FLAVORMANCER_BLOCKING_LOAD=1 (tests, CLI, batch jobs) to
-# load synchronously instead, so code that runs right after import can rely on the models being present.
-if os.environ.get("FLAVORMANCER_BLOCKING_LOAD") == "1":
+# load synchronously instead. Set FLAVORMANCER_NO_MODELS=1 to skip loading entirely — for tools that
+# only need featurization (_feat / _MORGAN), like the parallel index builder, which loads each head
+# in its own worker process rather than in this parent.
+if os.environ.get("FLAVORMANCER_NO_MODELS") == "1":
+    pass
+elif os.environ.get("FLAVORMANCER_BLOCKING_LOAD") == "1":
     _load_all_models()
 else:
     _threading.Thread(target=_load_all_models, name="model-loader", daemon=True).start()
@@ -1173,8 +1179,9 @@ _SUB_LOCK = _threading.Lock()  # guards the one-time index build against concurr
 
 def _profile_heads():
     """The ordered head list backing a flavor-profile vector: taste heads then aroma heads.
-    Same order is used at index-build and query time so the vectors line up."""
-    return sorted(_CLASSIFIERS), list(_AROMA_MODELS)
+    Both sorted by name so the order is deterministic — the parallel index builder derives the
+    same order straight from the head filenames without loading a single model."""
+    return sorted(_CLASSIFIERS), sorted(_AROMA_MODELS)
 
 
 def _build_sub_index():

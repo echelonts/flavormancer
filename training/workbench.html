@@ -559,13 +559,17 @@
   #results .card{animation:fadeUp .28s ease both}
   /* dashboard modal: read+heads on top (2-col wide), then behavior, then the two swap sections */
   #results{display:flex;flex-direction:column;gap:16px}
-  .modal-top{display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);gap:16px;align-items:start}
+  /* left column (read + behavior stacked) and the tall Heads card share equal height */
+  .modal-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:stretch}
+  .modal-left{display:flex;flex-direction:column;gap:16px;min-width:0}
   .heads-card{display:flex;flex-direction:column;gap:13px}
+  /* aroma group grows to fill the Heads card down to the height of the left column, scrolling inside */
+  #aromaGroup{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
   .head-group{border-top:1px solid var(--line);padding-top:11px}
   .head-group:first-of-type{border-top:none;padding-top:0}
   .hg-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:baseline;gap:8px}
   .hg-hint{font-size:10px;letter-spacing:.02em;text-transform:none;color:var(--muted);opacity:.7}
-  #aromaPreview{max-height:340px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px}
+  #aromaPreview{flex:1 1 auto;min-height:150px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px}
   #aromaPreview::-webkit-scrollbar{width:8px}#aromaPreview::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
   /* the two swap lists fill their box (bounded + internal scroll) so no wasted whitespace */
   .swap-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
@@ -995,7 +999,9 @@
   <div id="results" style="display:none">
    <!-- top row: the molecule's own read — structure/identity on the left, all its head bars on the right -->
    <div class="modal-top">
-    <div class="card">
+    <!-- left column: the molecule read, with Behavior & safety stacked beneath it -->
+    <div class="modal-left">
+     <div class="card">
       <h2>Flavor read</h2>
       <div class="struct-toggle" id="structToggle" style="display:none">
         <button type="button" id="btn2d" class="st-tab on">2D</button>
@@ -1010,6 +1016,11 @@
       <div id="domainBanner" class="domain-banner" style="display:none"></div>
       <div id="flavorTags" class="flavor-tags"></div>
       <div id="references" class="references"></div>
+     </div>
+     <div class="card" id="behaviorCard">
+      <h2>Behavior &amp; safety</h2>
+      <div id="behavior"></div>
+     </div>
     </div>
     <div class="card heads-card">
       <h2>Heads</h2>
@@ -1027,11 +1038,6 @@
         <b>intensity</b> map needs expert panel data, trained on-prem on your data.</p>
       </div>
     </div>
-   </div>
-
-   <div class="card" id="behaviorCard">
-    <h2>Behavior &amp; safety</h2>
-    <div id="behavior"></div>
    </div>
 
    <!-- two DISTINCT swap sections so the difference is obvious; each fills its box and scrolls -->
@@ -1510,6 +1516,7 @@ function renderNeighborList(el, list, scoreKey, emptyMsg, countEl){
         </div>
         <div class="sim">${Math.round((x[scoreKey]||0)*100)}% match</div>
       </div>`).join('');
+  el.scrollTop = 0;  // always show the top (best) matches first, not mid-list
 }
 
 function render(p, neighbors, svg, names, substitutes){
