@@ -23,12 +23,13 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-from chemfeatures import descriptors as _desc
 from rdkit import Chem
 from rdkit.Chem import DataStructs, rdFingerprintGenerator
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
+
+from chemfeatures import descriptors as _desc
 
 BASIC = ["sweet", "bitter", "umami", "sour", "salty", "tasteless"]
 # Salty now ALSO trains as an INDICATIVE head (CV-AUROC ~0.96 once the PubChem documented-

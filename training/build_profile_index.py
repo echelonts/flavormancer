@@ -37,6 +37,7 @@ SRC = "master_enrichment.parquet"
 OUT = "profile_index.npz"
 TASTE_DIR = Path("taste_models")
 AROMA_DIR = Path("aroma_models")
+MOUTHFEEL_DIR = Path("mouthfeel_models")
 
 
 def _score_shard(args):
@@ -54,13 +55,15 @@ def _score_shard(args):
 
 
 def _heads():
-    """(taste_names, aroma_names, ordered [(name, path), ...]) derived straight from the head files,
-    in the SAME sorted order predict._profile_heads() uses — no models loaded here."""
+    """(taste, aroma, mouthfeel names, ordered [(name, path), ...]) derived straight from the head
+    files, in the SAME sorted order predict._profile_heads() uses — no models loaded here."""
     taste = sorted(p.stem[:-3] for p in TASTE_DIR.glob("*_rf.joblib") if p.stem != "sweet_intensity_rf")
     aroma = sorted(p.stem[:-4] for p in AROMA_DIR.glob("*_clf.joblib"))
+    mouth = sorted(p.stem[:-4] for p in MOUTHFEEL_DIR.glob("*_clf.joblib")) if MOUTHFEEL_DIR.exists() else []
     files = ([(n, str(TASTE_DIR / f"{n}_rf.joblib")) for n in taste]
-             + [(n, str(AROMA_DIR / f"{n}_clf.joblib")) for n in aroma])
-    return taste, aroma, files
+             + [(n, str(AROMA_DIR / f"{n}_clf.joblib")) for n in aroma]
+             + [(n, str(MOUTHFEEL_DIR / f"{n}_clf.joblib")) for n in mouth])
+    return taste, aroma, mouth, files
 
 
 def main():
@@ -80,13 +83,13 @@ def main():
         feats.append(P._feat(mol)[0])
     x = np.vstack(feats).astype("float32")
 
-    taste, aroma, head_files = _heads()
+    taste, aroma, mouth, head_files = _heads()
     # a batch job — saturate the box: one worker per core, but never more workers than there are
     # heads to score (extra processes would just sit idle). Scales 4-core -> 4, 32-core -> 32.
     n_cores = os.cpu_count() or 4
     workers = int(os.environ.get("FLAVORMANCER_INDEX_WORKERS") or max(2, min(len(head_files), n_cores)))
-    print(f"{len(smis)} unique structures — {len(taste)}+{len(aroma)} heads across {workers} processes...",
-          flush=True)
+    print(f"{len(smis)} unique structures — {len(taste)}+{len(aroma)}+{len(mouth)} heads "
+          f"across {workers} processes...", flush=True)
 
     with tempfile.TemporaryDirectory() as tmp:
         x_path = str(Path(tmp) / "X.npy")
@@ -98,7 +101,7 @@ def main():
             for part in ex.map(_score_shard, [(x_path, s) for s in shards if s]):
                 scores.update(part)
 
-    order = taste + aroma
+    order = taste + aroma + mouth
     profiles = np.column_stack([scores[n] for n in order]).astype("float32")
     aromas = [[] for _ in smis]
     for n in aroma:
@@ -106,7 +109,8 @@ def main():
         for i in range(len(smis)):
             if col[i] >= 0.5:
                 aromas[i].append(n)
-    dims = [f"taste:{t}" for t in taste] + [f"aroma:{a}" for a in aroma]
+    dims = ([f"taste:{t}" for t in taste] + [f"aroma:{a}" for a in aroma]
+            + [f"mouthfeel:{h}" for h in mouth])
     tmp_out = "profile_index.building.npz"  # write then atomically replace so the live index is never half-written
     np.savez_compressed(
         tmp_out,

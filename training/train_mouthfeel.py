@@ -1,16 +1,15 @@
 """
-train_aroma.py — multi-label odor-descriptor CLASSIFIERS on Morgan fingerprints.
+train_mouthfeel.py — MOUTHFEEL / chemesthesis CLASSIFIERS on Morgan fingerprints.
 
-Reads aroma_train.parquet (build_aroma_dataset.py: public-domain HSDB odor text keyword-
-normalized to presence/absence descriptor labels). Trains one RandomForest classifier per
-descriptor that has enough positives, reports HONEST 5-fold CV AUROC, and keeps only the
-descriptors that clear a minimum AUROC. Saves the kept heads to aroma_models/ + a manifest.
+The mouthfeel analogue of train_aroma.py / train_taste.py: one RandomForest per trigeminal
+descriptor (warming / astringent / tingling) trained on mouthfeel_train.parquet
+(build_mouthfeel_dataset.py). Same honest bar — >=10 positives AND 5-fold CV-AUROC >= 0.70 — so a
+head only ships if the sensation is actually learnable from structure. Kept heads + their CV-AUROC
+go to mouthfeel_models/ (its own dir, independent of aroma/taste), loaded and tagged 'mouthfeel'
+by predict.py. Same modeling stack as the other modalities; positives are curated public-domain
+structure->sensation facts (see build_mouthfeel_supplement.py), not intensity.
 
-This is the same modeling stack as taste (Morgan FP + RandomForest), but PRESENCE/ABSENCE
-per descriptor (the free text carries no intensity). It's the commercial-clean, public-domain
-aroma read; a stronger intensity model still needs licensed/customer panel data.
-
-Usage: python train_aroma.py
+Usage: python train_mouthfeel.py
 """
 import json
 from pathlib import Path
@@ -27,10 +26,9 @@ from chemfeatures import descriptors as _desc
 
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
-MIN_POS = 10       # enough positives for a 5-fold estimate; small-n heads still must clear the
-                   # AUROC bar below, and each ship with its honest CV-AUROC shown in the UI
-MIN_AUROC = 0.70   # below this the descriptor isn't learnable from structure -> don't ship it
-OUT = Path("aroma_models")
+MIN_POS = 10       # enough positives for a 5-fold estimate; still must clear the AUROC bar below
+MIN_AUROC = 0.70   # below this the sensation isn't learnable from structure -> don't ship it
+OUT = Path("mouthfeel_models")
 OUT.mkdir(exist_ok=True)
 for s in OUT.glob("*_clf.joblib"):
     s.unlink()
@@ -46,7 +44,7 @@ def fp(smiles):
     return np.concatenate([arr, _desc(m)])  # fingerprint + physicochemical block (chemfeatures.py)
 
 
-df = pd.read_parquet("aroma_train.parquet")
+df = pd.read_parquet("mouthfeel_train.parquet")
 descriptors = [c for c in df.columns if c not in ("inchikey", "smiles")]
 feats, keep = [], []
 for i, s in enumerate(df["smiles"]):
@@ -57,13 +55,14 @@ for i, s in enumerate(df["smiles"]):
 X = np.array(feats)
 df = df.iloc[keep].reset_index(drop=True)
 
-print(f"training odor-descriptor classifiers on {len(df)} molecules "
+print(f"training mouthfeel/chemesthesis classifiers on {len(df)} molecules "
       f"(min {MIN_POS} positives, keep CV-AUROC >= {MIN_AUROC}):")
 manifest = {"fp_bits": FP_BITS, "fp_radius": FP_RADIUS, "descriptors": {}}
 for d in sorted(descriptors, key=lambda c: -int(df[c].sum())):
     y = df[d].values.astype(int)
     npos = int(y.sum())
     if npos < MIN_POS:
+        print(f"  {d:12s} n_pos={npos:4d}  -> skip (below {MIN_POS})")
         continue
     clf = RandomForestClassifier(n_estimators=400, n_jobs=-1, random_state=42,
                                  class_weight="balanced")
@@ -76,4 +75,4 @@ for d in sorted(descriptors, key=lambda c: -int(df[c].sum())):
     print(f"  {d:12s} n_pos={npos:4d}  CV-AUROC={auroc:.3f}  -> {flag}")
 
 (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
-print(f"\nkept {len(manifest['descriptors'])} descriptor heads -> aroma_models/ (+ manifest.json)")
+print(f"\nkept {len(manifest['descriptors'])} mouthfeel heads -> mouthfeel_models/ (+ manifest.json)")

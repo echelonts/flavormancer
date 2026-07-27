@@ -17,8 +17,9 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
-from build_properties import _BASE, _cid, _get, load_keys
 from rdkit import RDLogger
+
+from build_properties import _BASE, _cid, _get, load_keys
 
 RDLogger.DisableLog("rdApp.*")
 OUT = "spectra.parquet"

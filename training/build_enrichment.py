@@ -18,9 +18,10 @@ import glob
 
 import numpy as np
 import pandas as pd
-import predict as P
 from rdkit import Chem, RDLogger
 from rdkit.Chem import Crippen, Descriptors, rdMolDescriptors
+
+import predict as P
 
 RDLogger.DisableLog("rdApp.*")
 _BASIC = ["sweet", "bitter", "umami", "sour", "salty"]
@@ -138,6 +139,14 @@ def _taste_by_skel():
 
 if __name__ == "__main__":
     structs = _all_structures()
+    # fold in curated supplement molecules (aroma + mouthfeel + flavors) — CSVs the parquet glob
+    # misses — so EVERY unique molecule we train on is accounted for in the universe (map/index/pickers)
+    for _csv in ("aroma_supplement.csv", "mouthfeel_supplement.csv", "flavors.csv"):
+        with contextlib.suppress(Exception):
+            for _smi in pd.read_csv(_csv)["smiles"].dropna():
+                _m = Chem.MolFromSmiles(str(_smi))
+                if _m is not None:
+                    structs.setdefault(Chem.MolToInchiKey(_m).split("-")[0], Chem.MolToSmiles(_m))
     props = _by_skel("properties.parquet",
                      ["common_name", "iupac_name", "melting_point_c", "boiling_point_c"])
     taste_doc = _taste_by_skel()

@@ -213,6 +213,9 @@ _TOX_DIR = Path("tox_models")
 _AROMA_MODELS = {}         # HSDB odor-descriptor heads (presence/absence; NOT intensity)
 _AROMA_META = {}
 _AROMA_DIR = Path("aroma_models")
+_MOUTHFEEL_MODELS = {}     # trigeminal/chemesthesis heads (warming/astringent/tingling), own modality
+_MOUTHFEEL_META = {}
+_MOUTHFEEL_DIR = Path("mouthfeel_models")
 
 MODELS_READY = _threading.Event()  # set once every head is loaded; the app gates requests on this
 _INFER_POOL = None  # shared thread pool for fanning a novel-molecule read across cores (lazy)
@@ -261,6 +264,8 @@ def _load_all_models():
         jobs += [("tox", p.stem.replace("_rf", ""), p) for p in _TOX_DIR.glob("*_rf.joblib")]
     if _AROMA_DIR.exists():
         jobs += [("aroma", p.stem.replace("_clf", ""), p) for p in _AROMA_DIR.glob("*_clf.joblib")]
+    if _MOUTHFEEL_DIR.exists():
+        jobs += [("mouthfeel", p.stem.replace("_clf", ""), p) for p in _MOUTHFEEL_DIR.glob("*_clf.joblib")]
     with _LOAD_LOCK:
         LOAD_PROGRESS["total"] = len(jobs)
         LOAD_PROGRESS["phase"] = "loading models"
@@ -275,6 +280,8 @@ def _load_all_models():
                 _CLASSIFIERS[name] = mdl
         elif kind == "tox":
             _TOX_MODELS[name] = mdl
+        elif kind == "mouthfeel":
+            _MOUTHFEEL_MODELS[name] = mdl
         else:
             _AROMA_MODELS[name] = mdl
         with _LOAD_LOCK:
@@ -290,6 +297,9 @@ def _load_all_models():
     _txf = _TOX_DIR / "manifest.json"
     if _txf.exists():
         globals()["_TOX_META"] = _json.loads(_txf.read_text()).get("assays", {})
+    _mff = _MOUTHFEEL_DIR / "manifest.json"
+    if _mff.exists():
+        globals()["_MOUTHFEEL_META"] = _json.loads(_mff.read_text()).get("descriptors", {})
     with _LOAD_LOCK:
         LOAD_PROGRESS["phase"] = "ready"
         LOAD_PROGRESS["ready"] = True
@@ -1183,15 +1193,15 @@ _SUB_LOCK = _threading.Lock()  # guards the one-time index build against concurr
 
 
 def _profile_heads():
-    """The ordered head list backing a flavor-profile vector: taste heads then aroma heads.
-    Both sorted by name so the order is deterministic — the parallel index builder derives the
-    same order straight from the head filenames without loading a single model."""
-    return sorted(_CLASSIFIERS), sorted(_AROMA_MODELS)
+    """The ordered head list backing a flavor-profile vector: taste, then aroma, then mouthfeel —
+    each sorted by name so the order is deterministic (the parallel index builder derives the same
+    order straight from the head filenames without loading a single model)."""
+    return sorted(_CLASSIFIERS), sorted(_AROMA_MODELS), sorted(_MOUTHFEEL_MODELS)
 
 
-# Chemesthesis (mouthfeel) descriptors that are ALSO trained as aroma heads — surfaced under BOTH
-# categories (just as 'sweet' is both a taste and an aroma head). This set grows as dedicated
-# mouthfeel heads (tingling / astringent / warming / numbing) are trained.
+# Aroma heads that ALSO belong to mouthfeel — surfaced under BOTH categories (just as 'sweet' is
+# both a taste and an aroma head). cooling & pungent are trained on the odor corpus but are genuine
+# chemesthesis sensations; warming/astringent/tingling are their own mouthfeel_models heads.
 _MOUTHFEEL_HEADS = {"cooling", "pungent"}
 
 
@@ -1199,7 +1209,7 @@ def head_catalog():
     """Every model head grouped by category (taste / aroma / mouthfeel / safety) with its held-out
     AUROC where known. Categories are TAGS, not buckets — a head can appear in more than one (e.g.
     cooling is aroma + mouthfeel). Powers the modal Heads card and the library category pickers."""
-    taste_heads, aroma_heads = _profile_heads()
+    taste_heads, aroma_heads, mouthfeel_heads = _profile_heads()
 
     def _taste_auroc(t):
         meta = _TASTE_META.get(t) if isinstance(_TASTE_META, dict) else None
@@ -1208,10 +1218,14 @@ def head_catalog():
     def _aroma(a):
         return {"head": a, "auroc": _AROMA_META.get(a, {}).get("auroc"), "desc": AROMA_DESC.get(a)}
 
+    # mouthfeel = the aroma heads tagged mouthfeel (cooling/pungent) + the dedicated mouthfeel heads
+    mouthfeel = [_aroma(a) for a in aroma_heads if a in _MOUTHFEEL_HEADS]
+    mouthfeel += [{"head": h, "auroc": _MOUTHFEEL_META.get(h, {}).get("auroc"), "desc": AROMA_DESC.get(h)}
+                  for h in mouthfeel_heads]
     return {
         "taste": [{"head": t, "auroc": _taste_auroc(t)} for t in taste_heads],
         "aroma": [_aroma(a) for a in aroma_heads],
-        "mouthfeel": [_aroma(a) for a in aroma_heads if a in _MOUTHFEEL_HEADS],
+        "mouthfeel": mouthfeel,
         "safety": [{"head": t, "auroc": _TOX_META.get(t, {}).get("auroc"),
                     "meaning": _TOX_MEANING.get(t, t)} for t in sorted(_TOX_MODELS)],
     }
@@ -1264,7 +1278,7 @@ def _build_sub_index():
         aromas = [[] for _ in smis]
         if feats:
             X = np.vstack(feats)
-            taste_heads, aroma_heads = _profile_heads()
+            taste_heads, aroma_heads, mouthfeel_heads = _profile_heads()
             cols = [_CLASSIFIERS[t].predict_proba(X)[:, 1] for t in taste_heads]
             for name in aroma_heads:
                 col = _AROMA_MODELS[name].predict_proba(X)[:, 1]
@@ -1272,7 +1286,9 @@ def _build_sub_index():
                 for i in range(len(smis)):
                     if col[i] >= 0.5:
                         aromas[i].append(name)
-            profile_dims = [f"taste:{t}" for t in taste_heads] + [f"aroma:{a}" for a in aroma_heads]
+            cols += [_MOUTHFEEL_MODELS[h].predict_proba(X)[:, 1] for h in mouthfeel_heads]
+            profile_dims = ([f"taste:{t}" for t in taste_heads] + [f"aroma:{a}" for a in aroma_heads]
+                            + [f"mouthfeel:{h}" for h in mouthfeel_heads])
             profiles = np.column_stack(cols).astype("float32") if cols else None
     else:
         aromas = []
@@ -1336,20 +1352,20 @@ def _profiles_unit(profiles):
 
 
 def _query_profile(mol):
-    """The 170-dim taste+aroma profile vector for a query molecule, in the index column order
-    (taste heads then aroma heads). Reuses the memoized predict_aroma so it shares the aroma
-    cache with /api/aroma instead of re-running all 164 forests inline (that made /api/substitutes
-    ~9 s; this drops it to the aroma cost, paid once per molecule)."""
+    """The taste + aroma + mouthfeel profile vector for a query molecule, in the index column order.
+    In-corpus molecules read their precomputed row (instant); novel molecules run the heads (taste +
+    the memoized aroma core shared with /api/aroma + the small mouthfeel set)."""
     import numpy as np
     row = _index_row(mol)
     if row is not None:
-        return np.asarray(_SUB_INDEX[4][row], dtype="float32")  # precomputed 170-head profile
-    taste_heads, aroma_heads = _profile_heads()
+        return np.asarray(_SUB_INDEX[4][row], dtype="float32")  # precomputed profile row
+    taste_heads, aroma_heads, mouthfeel_heads = _profile_heads()
     x = _feat(mol)
     tvals = [float(_CLASSIFIERS[t].predict_proba(x)[0, 1]) for t in taste_heads]  # 6 heads, cheap
-    ascore = _aroma_scores(Chem.MolToSmiles(mol)) or {}  # memoized 164-head core, shared with /api/aroma
+    ascore = _aroma_scores(Chem.MolToSmiles(mol)) or {}  # memoized aroma core, shared with /api/aroma
     avals = [float(ascore.get(a, 0.0)) for a in aroma_heads]
-    return np.array(tvals + avals, dtype="float32")
+    mvals = [float(_MOUTHFEEL_MODELS[h].predict_proba(x)[0, 1]) for h in mouthfeel_heads]  # few heads
+    return np.array(tvals + avals + mvals, dtype="float32")
 
 
 def _predicted_tastes_at(profiles, i):

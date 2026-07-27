@@ -558,11 +558,12 @@
   @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   #results .card{animation:fadeUp .28s ease both}
   /* dashboard modal: read+heads on top (2-col wide), then behavior, then the two swap sections */
-  #results{display:flex;flex-direction:column;gap:16px}
-  /* left column (read + behavior stacked) and the tall Heads card share equal height */
-  .modal-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:stretch}
-  .modal-left{display:flex;flex-direction:column;gap:16px;min-width:0}
-  .heads-card{display:flex;flex-direction:column;gap:13px}
+  #results{display:flex;flex-direction:column;gap:14px}  /* tight, consistent gap between all cards (not 0) */
+  /* left column (read + behavior stacked) and the tall Heads card share equal height; the Heads card
+     scrolls its own overflow so its bottom meets the behavior card's bottom, never overshooting */
+  .modal-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch}
+  .modal-left{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .heads-card{display:flex;flex-direction:column;gap:13px;min-height:0;overflow:hidden}
   /* aroma group grows to fill the Heads card down to the height of the left column, scrolling inside */
   #aromaGroup{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
   .head-group{border-top:1px solid var(--line);padding-top:11px}
@@ -572,7 +573,7 @@
   #aromaPreview{flex:1 1 auto;min-height:150px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px}
   #aromaPreview::-webkit-scrollbar{width:8px}#aromaPreview::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
   /* the two swap lists fill their box (bounded + internal scroll) so no wasted whitespace */
-  .swap-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+  .swap-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
   .swap-grid .card{display:flex;flex-direction:column;min-height:360px;max-height:70vh}
   .swap-grid .card .nb-list{flex:1 1 auto;min-height:0;max-height:none}
   @media(max-width:820px){ .modal-top{grid-template-columns:1fr} .swap-grid{grid-template-columns:1fr} .swap-grid .card{max-height:none} }

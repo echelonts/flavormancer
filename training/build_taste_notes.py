@@ -16,6 +16,7 @@ Usage: python build_taste_notes.py            # -> taste_notes.parquet
 import sys
 
 import pandas as pd
+
 from build_odor_notes import annotation_records, cids_to_structs
 
 COLS = ["inchikey", "smiles", "name", "taste", "taste_source"]
