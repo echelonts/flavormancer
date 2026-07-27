@@ -75,12 +75,17 @@ def cmd_read(a):
         if isinstance(d.get(k), (int, float)):
             taste[lbl] = round(d[k], 3)
     desc = (aroma.get("predicted") or {}).get("descriptors", [])
+    mouth = (d.get("mouthfeel") or {}).get("descriptors", [])
+    tox = ((d.get("safety") or {}).get("tox_screen") or {}).get("assays", [])
     return {"name": names.get("common"), "iupac": names.get("iupac"),
             "formula": names.get("formula"), "smiles": d.get("smiles"),
             "taste_probabilities": taste, "sour_rule": d.get("sour"), "salty_rule": d.get("salty"),
             "confident_aromas": [x["odor"] for x in desc if x.get("confident")],
             "aroma_descriptions": {x["odor"]: x["desc"] for x in desc if x.get("desc")},
+            "mouthfeel": {x["sensation"]: x["score"] for x in mouth},
+            "confident_mouthfeel": [x["sensation"] for x in mouth if x.get("confident")],
             "gras_status": (d.get("safety") or {}).get("gras_status"),
+            "tox_flags": [a["assay"] for a in tox if (a.get("probability") or 0) >= 0.5],
             "in_applicability_domain": (d.get("applicability") or {}).get("in_domain")}
 
 

@@ -1129,6 +1129,37 @@ def predict_aroma(smiles, top_k=8, threshold=0.5):
             "note": "presence/absence model on public-domain HSDB odor text; not intensity"}
 
 
+# Plain-language meaning of each mouthfeel / chemesthesis head (trigeminal sensations).
+_MOUTHFEEL_DESC = {
+    "cooling": "cooling — TRPM8 coolants (menthol, WS-agents); a physiological cool, not just a cool smell",
+    "pungent": "pungent — TRPV1 / mustard-oil heat & bite (capsaicinoids, isothiocyanates, allium sulfur)",
+    "warming": "warming — capsaicinoid & warm-spice heat (chili, pepper, ginger, cinnamon)",
+    "astringent": "astringent — tannins & polyphenols; the puckering, mouth-drying sensation",
+    "tingling": "tingling — paresthesia alkylamides (Sichuan-pepper sanshools, jambu spilanthol)",
+}
+
+
+def predict_mouthfeel(mol):
+    """Predicted MOUTHFEEL / chemesthesis descriptors from the trained mouthfeel heads (trigeminal
+    sensations — cooling, pungent, warming, astringent, tingling). Same presence/absence stack as
+    taste & aroma, on curated public-domain agents; each with its score + CV-AUROC. available:False
+    until trained into mouthfeel_models/ (train_mouthfeel.py)."""
+    if not _MOUTHFEEL_MODELS:
+        return {"available": False, "note": "mouthfeel heads not trained — run train_mouthfeel.py"}
+    x = _feat(mol)
+    preds = []
+    for name, clf in sorted(_MOUTHFEEL_MODELS.items()):
+        p = round(float(clf.predict_proba(x)[0, 1]), 3)
+        preds.append({"sensation": name, "score": p, "confident": p >= 0.5,
+                      "auroc": _MOUTHFEEL_META.get(name, {}).get("auroc"),
+                      "desc": _MOUTHFEEL_DESC.get(name)})
+    preds.sort(key=lambda d: -d["score"])
+    confident = [d for d in preds if d["confident"]]
+    return {"available": True, "descriptors": preds, "top": confident,
+            "any_confident": bool(confident),
+            "note": "trigeminal/chemesthesis heads on curated public-domain agents; presence/absence"}
+
+
 # Plain-language meaning of each Tox21 assay, for caution context.
 _TOX_MEANING = {
     "NR-AhR": "aryl-hydrocarbon receptor (xenobiotic / dioxin-like activity)",
@@ -1647,6 +1678,7 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
     out["physchem"] = physchem(mol)
     out["stability"] = stability(mol)
     out["chemesthesis"] = chemesthesis(mol)
+    out["mouthfeel"] = predict_mouthfeel(mol)  # trained trigeminal heads (cooling/pungent/warming/…)
     out["chirality"] = chirality(mol)
     out["analytical"] = {"retention_index": retention_index(mol)}
     out["labeling"] = labeling(mol)

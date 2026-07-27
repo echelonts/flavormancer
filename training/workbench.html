@@ -575,14 +575,23 @@
      scrolls its own overflow so its bottom meets the behavior card's bottom, never overshooting */
   .modal-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch}
   .modal-left{display:flex;flex-direction:column;gap:14px;min-width:0}
-  .heads-card{display:flex;flex-direction:column;gap:13px;min-height:0;overflow:hidden}
+  .heads-card{display:flex;flex-direction:column;gap:13px;min-height:0;overflow-y:auto}
   /* aroma group grows to fill the Heads card down to the height of the left column, scrolling inside */
-  #aromaGroup{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+  #aromaGroup{display:flex;flex-direction:column;min-height:0}
   .head-group{border-top:1px solid var(--line);padding-top:11px}
   .head-group:first-of-type{border-top:none;padding-top:0}
   .hg-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:baseline;gap:8px}
   .hg-hint{font-size:10px;letter-spacing:.02em;text-transform:none;color:var(--muted);opacity:.7}
-  #aromaPreview{flex:1 1 auto;min-height:150px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px}
+  #aromaPreview{max-height:300px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px}
+  /* compact head bar for the mouthfeel + safety groups (reuses the aroma meter look) */
+  .hbar{display:flex;align-items:center;gap:9px;padding:3px 0;font-size:12.5px}
+  .hbar .hb-name{flex:0 0 118px;color:var(--ink)}
+  .hbar.dim .hb-name{color:var(--muted)}
+  .hbar .hb-track{flex:1;height:7px;border-radius:4px;background:var(--line);overflow:hidden}
+  .hbar .hb-fill{height:100%;border-radius:4px}
+  .hbar .hb-val{flex:0 0 auto;font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+  .hbar .hb-au{color:var(--muted);opacity:.75}
+  .hg-note{font-size:11px;color:var(--muted);margin:6px 0 0;line-height:1.5}
   #aromaPreview::-webkit-scrollbar{width:8px}#aromaPreview::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
   /* the two swap lists fill their box (bounded + internal scroll) so no wasted whitespace */
   .swap-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
@@ -1053,6 +1062,18 @@
         <b>presence/absence</b> (which notes apply), validated per head (CV-AUROC); a scored
         <b>intensity</b> map needs expert panel data, trained on-prem on your data.</p>
       </div>
+      <div class="head-group" id="mouthfeelGroup" style="display:none">
+        <div class="hg-label">Mouthfeel <span class="hg-hint">chemesthesis · trigeminal</span></div>
+        <div id="mouthfeelBars"></div>
+        <p class="hg-note">The oral <b>sensation</b> — cooling, pungent, warming, astringent, tingling —
+        trained on curated public-domain trigeminal agents. Distinct from the same-named aroma notes.</p>
+      </div>
+      <div class="head-group" id="safetyGroup" style="display:none">
+        <div class="hg-label">Safety <span class="hg-hint">Tox21 · caution-only</span></div>
+        <div id="safetyBars"></div>
+        <p class="hg-note"><b>Indicative</b> in-vitro assay activity (Tox21 RandomForest heads) —
+        a review flag, <b>never</b> a toxicity/safety determination. Confirm with a toxicologist.</p>
+      </div>
     </div>
    </div>
 
@@ -1496,6 +1517,8 @@ async function run(){
     // so the spinners never finish before the card is actually ready to reveal
     render(p, n.neighbors||[], (s&&s.svg)||null, nm||{}, (sub&&sub.substitutes)||[]);
     renderAroma(ar||{});
+    renderMouthfeel(p.mouthfeel||{});
+    renderSafety((p.safety&&p.safety.tox_screen)||{});
     setStructure3D((s3&&s3.molblock)||null);
     stepDone('render');
     await new Promise(requestAnimationFrame);  // let the paint flush so the swap is seamless
@@ -1754,6 +1777,36 @@ function renderAroma(ar){
   }
   box.innerHTML=html;
   box.style.display = html ? 'block' : 'none';
+}
+
+// one compact head bar (name · track · value · AUROC) — shared by the mouthfeel + safety groups
+function headBar(name, score, auroc, color, title){
+  const pct=Math.round((score||0)*100), on=score>=0.5;
+  const au = auroc!=null ? ` <span class="hb-au">· AUROC ${auroc}</span>` : '';
+  return `<div class="hbar${on?'':' dim'}"${title?` title="${title.replace(/"/g,'&quot;')}"`:''}>`+
+    `<span class="hb-name">${name}</span>`+
+    `<span class="hb-track"><span class="hb-fill" style="width:${pct}%;background:${color}"></span></span>`+
+    `<span class="hb-val">${pct}%${au}</span></div>`;
+}
+// Mouthfeel (chemesthesis) — the 5 trained trigeminal heads, ranked, each with its CV-AUROC
+function renderMouthfeel(mf){
+  const grp=$('mouthfeelGroup'), box=$('mouthfeelBars');
+  const ds=(mf&&mf.descriptors)||[];
+  if(!ds.length){ if(grp) grp.style.display='none'; return; }
+  box.innerHTML = ds.map(d=> headBar(d.sensation, d.score, d.auroc, aromaColor(d.sensation), d.desc)).join('');
+  grp.style.display='block';
+}
+// Safety — the 12 Tox21 caution-only assay heads, most-active first, each with its CV-AUROC
+function renderSafety(tx){
+  const grp=$('safetyGroup'), box=$('safetyBars');
+  const assays=(tx&&tx.assays)||[];
+  if(!assays.length){ if(grp) grp.style.display='none'; return; }
+  const rows=assays.slice().sort((a,b)=>(b.probability||0)-(a.probability||0));
+  box.innerHTML = rows.map(a=>{
+    const col = a.probability>=0.5 ? '#C0553A' : 'var(--muted)';  // amber-red when the assay fires
+    return headBar(a.assay, a.probability, a.auroc, col, a.meaning);
+  }).join('');
+  grp.style.display='block';
 }
 
 function chip(key, on, color, label){
