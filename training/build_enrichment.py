@@ -138,6 +138,7 @@ def _taste_by_skel():
 
 
 if __name__ == "__main__":
+    P.MODELS_READY.wait()  # predict loads heads on a background thread now — wait before we run inference
     structs = _all_structures()
     # fold in curated supplement molecules (aroma + mouthfeel + flavors) — CSVs the parquet glob
     # misses — so EVERY unique molecule we train on is accounted for in the universe (map/index/pickers)

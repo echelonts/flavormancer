@@ -140,6 +140,7 @@ if __name__ == "__main__":
     # the map still builds without the aroma heads
     with contextlib.suppress(Exception):  # no aroma models; taste-only map
         import predict as P
+        P.MODELS_READY.wait()  # heads load on a background thread now — wait before iterating/inferring
         if P._AROMA_MODELS:
             heads = list(P._AROMA_MODELS.keys())
             # the aroma heads take fingerprint + physicochemical features (chemfeatures), not the
