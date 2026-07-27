@@ -60,9 +60,11 @@ def _heads():
     taste = sorted(p.stem[:-3] for p in TASTE_DIR.glob("*_rf.joblib") if p.stem != "sweet_intensity_rf")
     aroma = sorted(p.stem[:-4] for p in AROMA_DIR.glob("*_clf.joblib"))
     mouth = sorted(p.stem[:-4] for p in MOUTHFEEL_DIR.glob("*_clf.joblib")) if MOUTHFEEL_DIR.exists() else []
-    files = ([(n, str(TASTE_DIR / f"{n}_rf.joblib")) for n in taste]
-             + [(n, str(AROMA_DIR / f"{n}_clf.joblib")) for n in aroma]
-             + [(n, str(MOUTHFEEL_DIR / f"{n}_clf.joblib")) for n in mouth])
+    # keys are DIM-qualified ("mouthfeel:cooling") because cooling/pungent exist as both an aroma
+    # head and a mouthfeel head — a bare-name key would collide and overwrite one with the other.
+    files = ([(f"taste:{n}", str(TASTE_DIR / f"{n}_rf.joblib")) for n in taste]
+             + [(f"aroma:{n}", str(AROMA_DIR / f"{n}_clf.joblib")) for n in aroma]
+             + [(f"mouthfeel:{n}", str(MOUTHFEEL_DIR / f"{n}_clf.joblib")) for n in mouth])
     return taste, aroma, mouth, files
 
 
@@ -101,16 +103,15 @@ def main():
             for part in ex.map(_score_shard, [(x_path, s) for s in shards if s]):
                 scores.update(part)
 
-    order = taste + aroma + mouth
-    profiles = np.column_stack([scores[n] for n in order]).astype("float32")
-    aromas = [[] for _ in smis]
-    for n in aroma:
-        col = scores[n]
-        for i in range(len(smis)):
-            if col[i] >= 0.5:
-                aromas[i].append(n)
     dims = ([f"taste:{t}" for t in taste] + [f"aroma:{a}" for a in aroma]
             + [f"mouthfeel:{h}" for h in mouth])
+    profiles = np.column_stack([scores[k] for k in dims]).astype("float32")  # scores keyed by dim
+    aromas = [[] for _ in smis]
+    for a in aroma:
+        col = scores[f"aroma:{a}"]
+        for i in range(len(smis)):
+            if col[i] >= 0.5:
+                aromas[i].append(a)
     tmp_out = "profile_index.building.npz"  # write then atomically replace so the live index is never half-written
     np.savez_compressed(
         tmp_out,

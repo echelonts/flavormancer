@@ -28,6 +28,17 @@ from build_aroma_supplement import (
 # cooling and pungent already ship as heads (trained from the aroma/odor corpus, tagged mouthfeel);
 # these three add the rest of the trigeminal picture.
 CURATED = {
+    # cooling: TRPM8 physiological coolants — menthol family + food-authorised WS-agents (some, like
+    # WS-23, have essentially NO odour, so this is a genuine SENSATION head, distinct from the aroma
+    # 'cooling' odour descriptor — exactly as taste:sweet differs from aroma:sweet).
+    "cooling":   ["menthol", "menthone", "isomenthone", "neomenthol", "isopulegol", "menthyl lactate",
+                  "menthyl acetate", "WS-3", "WS-23", "WS-5", "WS-12", "cyclohexanecarboxamide, N-ethyl-",
+                  "frescolat MGA", "coolact P", "icilin", "eucalyptol", "camphor", "borneol"],
+    # pungent (sensation): TRPV1 / mustard-oil irritants — capsaicinoids, isothiocyanates, alliaceous
+    # sulfur, peppery amides. Distinct from the aroma 'pungent' odour head (sharp-smelling volatiles).
+    "pungent":   ["capsaicin", "dihydrocapsaicin", "nonivamide", "piperine", "allyl isothiocyanate",
+                  "phenethyl isothiocyanate", "benzyl isothiocyanate", "diallyl disulfide", "allicin",
+                  "6-gingerol", "6-shogaol", "cinnamaldehyde"],
     # warming: capsaicinoid & warm-spice heat agents (chili, black pepper, ginger, cinnamon, clove)
     "warming":   ["capsaicin", "dihydrocapsaicin", "nordihydrocapsaicin", "nonivamide", "piperine",
                   "6-gingerol", "6-shogaol", "zingerone", "cinnamaldehyde", "eugenol",
@@ -48,7 +59,10 @@ CURATED = {
                   "ZP-amide A", "ZP-amide C", "hydroxy-epsilon-sanshool", "sanshoamide",
                   "dihydro-alpha-sanshool"],
 }
-# NOTE: `pungent` and `cooling` are AROMA heads (trained on the odor corpus) that we also TAG
+# NOTE: cooling & pungent ALSO exist as AROMA odour-descriptor heads (menthol smells cool; mustard
+# smells pungent). Those stay — this file trains the SENSATION versions. A molecule can be both.
+# (obsolete note retained below for context)
+# `pungent` and `cooling` are AROMA heads (trained on the odor corpus) that we also TAG
 # mouthfeel — they're genuinely both, like `sweet` is taste + aroma. Their extra positives (e.g. the
 # Piper pungent amides) live in the AROMA supplement, not here. This file holds the mouthfeel-ONLY
 # descriptors (warming / astringent / tingling) that get their own train_mouthfeel.py -> mouthfeel_models/.

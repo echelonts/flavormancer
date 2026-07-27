@@ -1199,10 +1199,10 @@ def _profile_heads():
     return sorted(_CLASSIFIERS), sorted(_AROMA_MODELS), sorted(_MOUTHFEEL_MODELS)
 
 
-# Aroma heads that ALSO belong to mouthfeel — surfaced under BOTH categories (just as 'sweet' is
-# both a taste and an aroma head). cooling & pungent are trained on the odor corpus but are genuine
-# chemesthesis sensations; warming/astringent/tingling are their own mouthfeel_models heads.
-_MOUTHFEEL_HEADS = {"cooling", "pungent"}
+# Aroma heads to ALSO surface under mouthfeel. Now empty: cooling & pungent have their own dedicated
+# mouthfeel_models heads (the SENSATION, trained on TRPM8/TRPV1 agents), separate from the aroma
+# odour-descriptor heads of the same name — exactly as taste:sweet is separate from aroma:sweet.
+_MOUTHFEEL_HEADS = set()
 
 
 def head_catalog():
