@@ -104,6 +104,14 @@ def healthz():
     return {"ok": True, "ready": P.MODELS_READY.is_set()}
 
 
+@app.get("/api/heads")
+@lru_cache(maxsize=1)
+def api_heads():
+    """The full head catalog grouped by category (taste / aroma / mouthfeel / safety) with AUROC —
+    for the modal Heads card and the library category pickers."""
+    return P.head_catalog()
+
+
 @app.middleware("http")
 async def _warming_gate(request: Request, call_next):
     if not P.MODELS_READY.is_set() and request.url.path not in _WARMING_OPEN:

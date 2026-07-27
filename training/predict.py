@@ -208,6 +208,7 @@ _CLASSIFIERS = {}          # sweet/bitter/umami/... taste heads
 _INTENSITY = None          # sweet-intensity regressor
 _TASTE_META = {}           # taste -> {auroc, ...} from taste_models/manifest.json (held-out score)
 _TOX_MODELS = {}           # Tox21 caution-only assay heads (INDICATIVE, never a determination)
+_TOX_META = {}             # assay -> {auroc, n_pos, ...} from tox_models/manifest.json (held-out CV)
 _TOX_DIR = Path("tox_models")
 _AROMA_MODELS = {}         # HSDB odor-descriptor heads (presence/absence; NOT intensity)
 _AROMA_META = {}
@@ -286,6 +287,9 @@ def _load_all_models():
     _mf = _AROMA_DIR / "manifest.json"
     if _mf.exists():
         globals()["_AROMA_META"] = _json.loads(_mf.read_text()).get("descriptors", {})
+    _txf = _TOX_DIR / "manifest.json"
+    if _txf.exists():
+        globals()["_TOX_META"] = _json.loads(_txf.read_text()).get("assays", {})
     with _LOAD_LOCK:
         LOAD_PROGRESS["phase"] = "ready"
         LOAD_PROGRESS["ready"] = True
@@ -1139,7 +1143,8 @@ def predict_tox(mol, threshold=0.5):
     assays = []
     for name, clf in sorted(_TOX_MODELS.items()):
         p = round(float(clf.predict_proba(x)[0, 1]), 3)
-        assays.append({"assay": name, "meaning": _TOX_MEANING.get(name, name), "probability": p})
+        assays.append({"assay": name, "meaning": _TOX_MEANING.get(name, name), "probability": p,
+                       "auroc": _TOX_META.get(name, {}).get("auroc")})
     flags = [a["assay"] for a in assays if a["probability"] >= threshold]
     return {"available": True, "assays": assays, "flags": flags,
             "note": "INDICATIVE in-vitro tox-assay activity (Tox21 RandomForest heads) — "
@@ -1182,6 +1187,34 @@ def _profile_heads():
     Both sorted by name so the order is deterministic — the parallel index builder derives the
     same order straight from the head filenames without loading a single model."""
     return sorted(_CLASSIFIERS), sorted(_AROMA_MODELS)
+
+
+# Chemesthesis (mouthfeel) descriptors that are ALSO trained as aroma heads — surfaced under BOTH
+# categories (just as 'sweet' is both a taste and an aroma head). This set grows as dedicated
+# mouthfeel heads (tingling / astringent / warming / numbing) are trained.
+_MOUTHFEEL_HEADS = {"cooling", "pungent"}
+
+
+def head_catalog():
+    """Every model head grouped by category (taste / aroma / mouthfeel / safety) with its held-out
+    AUROC where known. Categories are TAGS, not buckets — a head can appear in more than one (e.g.
+    cooling is aroma + mouthfeel). Powers the modal Heads card and the library category pickers."""
+    taste_heads, aroma_heads = _profile_heads()
+
+    def _taste_auroc(t):
+        meta = _TASTE_META.get(t) if isinstance(_TASTE_META, dict) else None
+        return meta.get("auroc") if isinstance(meta, dict) else None
+
+    def _aroma(a):
+        return {"head": a, "auroc": _AROMA_META.get(a, {}).get("auroc"), "desc": AROMA_DESC.get(a)}
+
+    return {
+        "taste": [{"head": t, "auroc": _taste_auroc(t)} for t in taste_heads],
+        "aroma": [_aroma(a) for a in aroma_heads],
+        "mouthfeel": [_aroma(a) for a in aroma_heads if a in _MOUTHFEEL_HEADS],
+        "safety": [{"head": t, "auroc": _TOX_META.get(t, {}).get("auroc"),
+                    "meaning": _TOX_MEANING.get(t, t)} for t in sorted(_TOX_MODELS)],
+    }
 
 
 def _build_sub_index():

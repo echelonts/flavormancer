@@ -9,6 +9,7 @@ Reports honest 5-fold CV AUROC; saves to tox_models/.
 
 Data: tox21.csv — the MoleculeNet mirror of the NCATS public-domain Tox21 Challenge set.
 """
+import json
 from pathlib import Path
 
 import joblib
@@ -51,6 +52,7 @@ df = df.iloc[idx].reset_index(drop=True)
 
 print(f"training caution-only tox heads on {len(df)} molecules:")
 kept = 0
+manifest = {}  # assay -> held-out score + support, so the app can show a bar + AUROC like taste/aroma
 for t in TASKS:
     y = df[t].values
     mask = ~np.isnan(y)
@@ -61,6 +63,8 @@ for t in TASKS:
     clf_args = {"n_estimators": 200, "n_jobs": -1, "random_state": 42, "class_weight": "balanced"}
     auc = cross_val_score(RandomForestClassifier(**clf_args), Xd, yd, cv=5, scoring="roc_auc").mean()
     joblib.dump(RandomForestClassifier(**clf_args).fit(Xd, yd), OUT / f"{t}_rf.joblib")
+    manifest[t] = {"auroc": round(float(auc), 3), "n_pos": int(yd.sum()), "n": int(mask.sum())}
     kept += 1
     print(f"  {t:14s} n={int(mask.sum()):5d} pos={int(yd.sum()):4d}  CV-AUROC={auc:.3f}")
+(OUT / "manifest.json").write_text(json.dumps({"assays": manifest}, indent=2))
 print(f"\nkept {kept}/{len(TASKS)} tox heads -> tox_models/  (caution-only, Tox21 public domain)")
