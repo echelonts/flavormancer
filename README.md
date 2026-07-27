@@ -31,7 +31,7 @@ running entirely on hardware you own.
 > supplement **602 associations** (open-gov-sourced). Every one of the 8,847 is enriched with
 > names + measured properties from public-domain PubChem.
 >
-> *How the universe grows:* the flavor-space map and enrichment table show **8,830 unique
+> *How the universe grows:* the flavor-space map and enrichment table show **8,847 unique
 > structures** (deduped by connectivity skeleton), expanded by ingesting the **full EU/GB
 > flavourings Union List (~2,200 authorised, Open Government Licence v3)** so the browse-able
 > universe is food-forward. Meaningfully-distinct stereoisomers (e.g. R- vs S-limonene) that carry
