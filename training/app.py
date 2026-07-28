@@ -25,12 +25,11 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 
+import predict as P  # the unified flavor read + substitution search
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from rdkit import Chem
-
-import predict as P  # the unified flavor read + substitution search
 
 app = FastAPI(title="Flavor Workbench (demo)")
 
@@ -146,7 +145,9 @@ def api_heads():
 
 @app.middleware("http")
 async def _warming_gate(request: Request, call_next):
-    if not P.MODELS_READY.is_set() and request.url.path not in _WARMING_OPEN:
+    _p = request.url.path
+    # /static/* stays open so the warming page's own fonts/logo/favicon load while models warm
+    if not P.MODELS_READY.is_set() and _p not in _WARMING_OPEN and not _p.startswith("/static/"):
         wants_html = request.method == "GET" and (
             request.url.path == "/" or "text/html" in request.headers.get("accept", ""))
         if wants_html:
@@ -1446,7 +1447,6 @@ def _precompute_design():
 
         import numpy as np
         import pandas as pd
-
         from build_aroma_dataset import tag as _odor_tag
         od = pd.read_parquet("odor_notes.parquet")
         rows = []  # (smiles, name, mol_skeleton, {documented tags})
