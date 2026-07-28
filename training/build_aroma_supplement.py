@@ -83,6 +83,10 @@ CURATED = {
     "grassy":   ["cis-3-hexenal", "cis-3-hexen-1-ol", "trans-2-hexenal", "hexanal",
                  "trans-2-hexen-1-ol", "cis-3-hexenyl acetate"],
     "green":    ["cis-3-hexenal", "trans-2-hexenal", "cis-3-hexen-1-ol", "hexanal"],
+    # pungent (an odor/chemesthesis head, also tagged mouthfeel): sharp biting Piper long/black-pepper
+    # amides on top of the corpus's documented pungent molecules (piperine, isothiocyanates, etc.)
+    "pungent":  ["piperlongumine", "piperlonguminine", "pipernonaline", "sarmentine",
+                 "dehydropipernonaline", "guineensine"],
 }
 
 

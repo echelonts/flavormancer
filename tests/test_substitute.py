@@ -49,3 +49,23 @@ def test_mixture_to_molecule_rejects_all_bad(monkeypatch):
     monkeypatch.setattr(predict, "_SUB_INDEX", ([], [], [], [], None, []))
     out = predict.mixture_to_molecule(["nope", "xyz"])
     assert "error" in out
+
+
+def test_substitutes_threshold_and_index_lookup(monkeypatch):
+    """substitutes() returns every match above min_match (self excluded), ranked; and an in-corpus
+    query reads its profile straight off the index row (no forests) via _query_profile/_index_row."""
+    import numpy as np
+    mols = ["CCO", "CCCO", "c1ccccc1"]  # ethanol, propanol, benzene
+    canon = [_canon(s) for s in mols]
+    fps = [predict._MORGAN.GetFingerprint(Chem.MolFromSmiles(s)) for s in mols]
+    profiles = np.array([[1.0, 0.0, 0.0], [0.9, 0.1, 0.0], [0.0, 0.0, 1.0]], dtype="float32")
+    dims = ["taste:sweet", "aroma:x", "aroma:y"]
+    monkeypatch.setattr(predict, "_CLASSIFIERS", {"sweet": None})  # 1 taste col, matches the mock width
+    monkeypatch.setattr(predict, "_SUB_INDEX", (fps, canon, [[], [], []], [[], [], []], profiles, dims))
+    predict._PN_CACHE.clear(); predict._SKEL2ROW.clear()
+    # ethanol is in the index -> query profile is its row (no model inference needed)
+    assert predict._index_row(Chem.MolFromSmiles("CCO")) == 0
+    out = predict.substitutes("CCO", k=10, min_match=0.5)
+    subs = out["substitutes"]
+    assert [n["smiles"] for n in subs] == [_canon("CCCO")]  # propanol passes 0.5; benzene (orthogonal) filtered; self excluded
+    assert subs[0]["profile_match"] >= 0.5

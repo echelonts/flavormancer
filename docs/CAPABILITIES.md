@@ -6,10 +6,11 @@ shape of the tool. The organizing discipline throughout: **every output is tagge
 by how it's derived, and nothing claims more certainty than its source supports.**
 
 > **Edition note.** This catalogues the **commercial** edition (Apache-2.0,
-> commercial-clean data). **Aroma ships here** as 24 presence/absence odor-descriptor
-> heads trained on public-domain HSDB text — what's still gated is scored **intensity**
-> (*how strong* a note is), which needs research/customer panel data and lives in the
-> **academic edition** (or trains on a customer's own data, on-prem).
+> commercial-clean data). **Aroma ships here** as 164 presence/absence odor-descriptor
+> heads trained on public-domain HSDB text (plus 5 mouthfeel/chemesthesis heads and 12
+> Tox21 safety heads) — what's still gated is scored **intensity** (*how strong* a note
+> is), which needs research/customer panel data and lives in the **academic edition**
+> (or trains on a customer's own data, on-prem).
 
 **Confidence tiers used below**
 - **computed** — exact from structure (RDKit). Not a prediction; a calculation.
@@ -52,16 +53,20 @@ by how it's derived, and nothing claims more certainty than its source supports.
 **Stability**
 - Oxidation / hydrolysis / photodegradation watch-flags (**rule/qualitative**).
 
-**Chemesthesis (trigeminal)**
-- Cooling / pungent / astringent class flags (**rule/lookup**, qualitative).
+**Mouthfeel / chemesthesis (trigeminal)** — **five trained sensation heads ship** (**trained**)
+- Cooling / pungent / warming / astringent / tingling — RandomForests on fingerprint +
+  physicochemical features, over curated public-domain trigeminal agents (menthol & WS-coolants,
+  capsaicinoids, tannins/polyphenols, Sichuan-pepper sanshools). CV-AUROC **0.94–1.00** (narrow,
+  structurally-distinct classes). Its own modality (`mouthfeel_models/`), distinct from the
+  same-named *aroma* odour heads — the sensation, not the smell. See [`MOUTHFEEL.md`](MOUTHFEEL.md).
 
 **Safety (all defensive, caution-only — never a clearance)**
 - Disclaimer + scope on every result.
 - Structural tox-alert screen — nitro/N-nitroso/azo/epoxide (**rule**).
 - GRAS / approved-ingredient cross-reference — FDA SAF, public domain, `build_gras_reference.py` (**lookup**).
 - **In-vitro tox-assay flags** — 12 Tox21 assays (genotoxic-stress SR-p53/SR-ATAD5, AhR,
-  mitochondrial, endocrine), `predict_tox()` (**trained**, Tox21 public domain). INDICATIVE
-  activity for review, **never a determination**.
+  mitochondrial, endocrine), `predict_tox()` (**trained**, Tox21 public domain; CV-AUROC
+  **0.72–0.90**, surfaced per assay). INDICATIVE activity for review, **never a determination**.
 - Preliminary TTC concern tier (**qualitative** heuristic; Toxtree for the real call).
 - EU declarable fragrance-allergen labeling flag — `labeling()` (**lookup**, curated subset).
 

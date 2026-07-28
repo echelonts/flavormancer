@@ -137,7 +137,16 @@ def _taste_by_skel():
 
 
 if __name__ == "__main__":
+    P.MODELS_READY.wait()  # predict loads heads on a background thread now — wait before we run inference
     structs = _all_structures()
+    # fold in curated supplement molecules (aroma + mouthfeel + flavors) — CSVs the parquet glob
+    # misses — so EVERY unique molecule we train on is accounted for in the universe (map/index/pickers)
+    for _csv in ("aroma_supplement.csv", "mouthfeel_supplement.csv", "flavors.csv"):
+        with contextlib.suppress(Exception):
+            for _smi in pd.read_csv(_csv)["smiles"].dropna():
+                _m = Chem.MolFromSmiles(str(_smi))
+                if _m is not None:
+                    structs.setdefault(Chem.MolToInchiKey(_m).split("-")[0], Chem.MolToSmiles(_m))
     props = _by_skel("properties.parquet",
                      ["common_name", "iupac_name", "melting_point_c", "boiling_point_c"])
     taste_doc = _taste_by_skel()
@@ -192,6 +201,24 @@ if __name__ == "__main__":
         r["aroma_top"] = best[i]
         r["taste_predicted"] = ",".join(t for t in ("sweet", "bitter", "umami")
                                         if r[f"p_{t}"] >= 0.5)
+
+    # predicted mouthfeel (chemesthesis) + tox — stored per molecule so the browsable universe grid is
+    # complete (taste + aroma + mouthfeel + safety). tox is CAUTION-ONLY (in-vitro assay activity), and
+    # NEITHER mouthfeel here nor tox is part of the substitute-match profile vector — display only.
+    for name, clf in sorted(P._MOUTHFEEL_MODELS.items()):
+        col = clf.predict_proba(X)[:, 1]
+        for i, r in enumerate(rows):
+            r[f"mf_{name}"] = round(float(col[i]), 3)
+    # tox heads were trained on the BARE 2048-bit Morgan fingerprint (_fp), not the _feat block the
+    # taste/aroma/mouthfeel heads use — build a separate matrix so the feature width matches.
+    xtox = np.vstack([P._fp(Chem.MolFromSmiles(s))[0] for s in smis])
+    tox_cols = {}
+    for name, clf in sorted(P._TOX_MODELS.items()):
+        tox_cols[name] = clf.predict_proba(xtox)[:, 1]
+    for i, r in enumerate(rows):
+        for name, col in tox_cols.items():
+            r[f"tox_{name}"] = round(float(col[i]), 3)
+        r["tox_flags"] = ",".join(n for n, col in tox_cols.items() if col[i] >= 0.5)  # assays firing >=0.5
 
     # first-class rows for stereoisomers that differ in documented odor/taste
     name_by_skel = {sk: (props.get(sk, {}).get("common_name") or props.get(sk, {}).get("iupac_name"))

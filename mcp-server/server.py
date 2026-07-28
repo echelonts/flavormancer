@@ -68,6 +68,8 @@ def _read_flavor(molecule: str) -> dict:
     if isinstance(d.get("salty_predicted"), (int, float)):
         taste["salty"] = d["salty_predicted"]
     descriptors = (aroma.get("predicted") or {}).get("descriptors", [])
+    mouth = (d.get("mouthfeel") or {}).get("descriptors", [])  # trained trigeminal heads
+    tox = (safety.get("tox_screen") or {}).get("assays", [])   # Tox21 caution-only assay heads
     return {
         "name": names.get("common"), "iupac": names.get("iupac"),
         "formula": names.get("formula"), "smiles": d.get("smiles"),
@@ -76,10 +78,14 @@ def _read_flavor(molecule: str) -> dict:
         "confident_aromas": [x["odor"] for x in descriptors if x.get("confident")],
         "all_aroma_scores": {x["odor"]: round(x["score"], 3) for x in descriptors},
         "aroma_descriptions": {x["odor"]: x["desc"] for x in descriptors if x.get("desc")},
+        "mouthfeel_scores": {x["sensation"]: x["score"] for x in mouth},
+        "confident_mouthfeel": [x["sensation"] for x in mouth if x.get("confident")],
         "gras_status": safety.get("gras_status"),
         "structural_alerts": safety.get("structural_alerts"),
+        "tox_flags": [a["assay"] for a in tox if (a.get("probability") or 0) >= 0.5],
         "in_applicability_domain": (d.get("applicability") or {}).get("in_domain"),
-        "disclaimer": "Flavor prediction only — NOT a safety, GRAS, or regulatory determination.",
+        "disclaimer": "Flavor prediction only — NOT a safety, GRAS, or regulatory determination. "
+                      "Tox flags are indicative in-vitro assay activity, never a toxicity determination.",
     }
 
 
@@ -248,12 +254,23 @@ def _flavor_map(label: str, limit: int, full: bool) -> dict:
 # ── MCP tool surface ─────────────────────────────────────────────────────────
 @mcp.tool()
 def read_flavor(molecule: str) -> dict:
-    """Predict the taste + aroma of a single molecule (name or SMILES).
+    """Predict the flavor of a single molecule (name or SMILES).
 
-    Returns the six taste-head probabilities, confident aromas plus all 24 aroma scores,
-    GRAS status, structural alerts, and applicability-domain flag. Prediction only.
+    Returns the six taste-head probabilities, confident aromas plus all 164 aroma scores, the
+    trained mouthfeel/chemesthesis scores (cooling/pungent/warming/astringent/tingling), GRAS
+    status, structural alerts, caution-only Tox21 flags, and the applicability-domain flag.
+    Prediction only — tox flags are indicative in-vitro activity, never a determination.
     """
     return _read_flavor(molecule)
+
+
+@mcp.tool()
+def list_heads() -> dict:
+    """The full model-head catalog grouped by category — taste / aroma / mouthfeel / safety —
+    each head with its held-out CV-AUROC. Categories are tags, not buckets (a head can appear in
+    more than one). Useful to see the complete predictable dimension set."""
+    with _client() as c:
+        return c.get("/api/heads").json()
 
 
 @mcp.tool()
@@ -267,20 +284,22 @@ def read_full(molecule: str) -> dict:
 
 
 @mcp.tool()
-def find_substitutes(molecule: str, k: int = 8) -> dict:
-    """Find the k best SUBSTITUTES — molecules whose predicted taste+aroma PROFILE is closest to
-    the given molecule (cosine over the head scores). These are the drop-in swaps: a molecule that
-    tastes and smells like the target, regardless of structure (e.g. ethyl vanillin for vanillin).
-    Each with its profile_match, known tastes, and aromas.
+def find_substitutes(molecule: str, k: int = 25) -> dict:
+    """Find SUBSTITUTES — molecules whose predicted taste+aroma PROFILE is closest to the given
+    molecule (cosine over the head scores). These are the drop-in swaps: a molecule that tastes
+    and smells like the target, regardless of structure (e.g. ethyl vanillin for vanillin). Returns
+    every match above a profile-similarity floor, ranked, up to k. Each with its profile_match,
+    known tastes, and aromas.
     """
     return _find_substitutes(molecule, k)
 
 
 @mcp.tool()
-def find_structural_neighbors(molecule: str, k: int = 8) -> dict:
-    """Find the k STRUCTURAL neighbors — molecules most similar in structure (Tanimoto / Morgan
+def find_structural_neighbors(molecule: str, k: int = 25) -> dict:
+    """Find STRUCTURAL neighbors — molecules most similar in structure (Tanimoto / Morgan
     fingerprint) to the given molecule. Structural look-alikes (contrast find_substitutes, which
-    matches by taste+aroma profile). Each with its similarity and known tastes.
+    matches by taste+aroma profile). Returns every match above a similarity floor, ranked, up to k.
+    Each with its similarity and known tastes.
     """
     return _find_structural_neighbors(molecule, k)
 

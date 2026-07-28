@@ -17,20 +17,21 @@ running entirely on hardware you own.
 <p align="center">
   <img src="docs/assets/flavor-map.png" alt="Flavor-space map in 3D on MW × logP × TPSA axes, colored by taste and aroma" width="900">
 </p>
-<p align="center"><sub>The interactive flavor-space map in 3D on real <b>MW × logP × TPSA</b> axes, colored by <b>taste &amp; aroma</b> — every one of the 164 aroma + 6 taste classes labelled.</sub></p>
+<p align="center"><sub>The interactive flavor-space map in 3D on real <b>MW × logP × TPSA</b> axes, colored by <b>taste &amp; aroma</b> — every one of the 164 aroma + 6 taste classes labelled. <b>187 trained heads</b> in all: 6 taste + 164 aroma + 5 mouthfeel + 12 safety.</sub></p>
 
-> **8,830 unique molecules** across the open datasets · **taste + aroma** prediction from
+> **8,847 unique molecules** across the open datasets · **taste + aroma + mouthfeel** prediction from
 > structure · a **flavor library** (start from a flavor → its character-impact molecule) and
 > **flavor designer** (pick your notes → best food-safe molecules + drop-in swaps) · an
 > interactive 2D/3D **flavor-space map** · **2D & 3D** structure views. All on
 > commercial-clean public data.
 >
 > Per set (unique molecules): taste training **3,845** · aroma training **2,394** · odor
-> corpus **2,255** · documented taste **676** · GRAS reference **2,781** · sweetness
-> intensity **316** · character-impact aroma supplement **602 associations** (open-gov-sourced).
-> Every one of the 8,830 is enriched with names + measured properties from public-domain PubChem.
+> corpus **2,255** · documented taste **676** · mouthfeel training **2,534** · Tox21 (safety)
+> **7,823** · GRAS reference **2,781** · sweetness intensity **316** · character-impact aroma
+> supplement **602 associations** (open-gov-sourced). Every one of the 8,847 is enriched with
+> names + measured properties from public-domain PubChem.
 >
-> *How the universe grows:* the flavor-space map and enrichment table show **8,830 unique
+> *How the universe grows:* the flavor-space map and enrichment table show **8,847 unique
 > structures** (deduped by connectivity skeleton), expanded by ingesting the **full EU/GB
 > flavourings Union List (~2,200 authorised, Open Government Licence v3)** so the browse-able
 > universe is food-forward. Meaningfully-distinct stereoisomers (e.g. R- vs S-limonene) that carry
@@ -70,12 +71,17 @@ is tagged by how it was derived**, so nothing reads as more certain than its sou
   (computed); water solubility (ESOL estimate); volatility tier and pKa ranges
   (qualitative); measured boiling point / vapor pressure when a property table is
   loaded (lookup — structure-based BP was evaluated and declined as too inaccurate).
-- **Stability & chemesthesis** — oxidation / hydrolysis / photo watch-flags;
-  cooling / pungent / astringent class flags.
+- **Mouthfeel** — **five trained chemesthesis heads** (cooling / pungent / warming /
+  astringent / tingling): the *trigeminal* sensation, trained on curated public-domain
+  agents (menthol & WS-coolants, capsaicinoids, tannins, Sichuan-pepper sanshools), each
+  with its held-out CV-AUROC. Distinct from the same-named aroma notes — the sensation, not
+  the smell (menthol *feels* cool; WS-23 cools with almost no odour).
+- **Stability** — oxidation / hydrolysis / photo watch-flags.
 - **Safety (defensive, caution-only)** — a disclaimer + scope on every result,
-  structural tox-alert screening, a preliminary TTC/Cramer concern tier, an optional
-  GRAS cross-reference, and EU declarable-allergen labeling. It **flags for review;
-  it never clears a compound for use.**
+  **twelve Tox21 in-vitro assay heads** (nuclear-receptor + stress-response, each with its
+  CV-AUROC) surfaced as *indicative* review flags, structural tox-alert screening, a
+  preliminary TTC/Cramer concern tier, an optional GRAS cross-reference, and EU
+  declarable-allergen labeling. It **flags for review; it never clears a compound for use.**
 - **Formulation** — a documented dangerous-mixture screen (benzene, nitrosamine,
   acrylamide, ethyl carbamate, furan, and more) and an OAV dosing-balance analysis
   that flags the component about to overpower a blend (quantitative when threshold

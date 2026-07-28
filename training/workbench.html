@@ -162,6 +162,12 @@
   .tox-code{font-size:9.5px;opacity:.62;letter-spacing:.02em}
   .chip[title]{cursor:help}
   .chip.on{color:#fff;border-color:transparent}
+  /* scroll the qualifying set (every match above the similarity floor) instead of a fixed few;
+     ~5 rows tall, then scroll. A subtle fade at the bottom hints there's more below. */
+  .nb-list{max-height:430px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px}
+  .nb-list::-webkit-scrollbar{width:8px}
+  .nb-list::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  .nb-count{font-family:var(--mono);font-size:12px;font-weight:400;color:var(--muted);margin-left:6px}
   .neighbor{display:flex;align-items:center;gap:12px;
     padding:11px 0;border-bottom:1px solid var(--line)}
   .neighbor:last-child{border-bottom:none}
@@ -232,6 +238,18 @@
   .map-key b{color:var(--ink)}
   .map-canvas-wrap{position:relative;width:100%;overflow-x:auto}
   #flavorMap{max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:crosshair}
+  /* reusable branded loading overlay for the flavor map + enrichment grid (first-open feedback) */
+  .load-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;background:var(--surface);border-radius:8px;z-index:5;text-align:center;padding:20px}
+  .load-overlay.done{opacity:0;pointer-events:none;transition:opacity .35s ease}
+  .load-ring{width:38px;height:38px;border-radius:50%;border:3px solid var(--line);
+    border-top-color:var(--brand-2);border-right-color:var(--brand-1);animation:loadspin .8s linear infinite}
+  @keyframes loadspin{to{transform:rotate(360deg)}}
+  .load-lbl{font-family:'Cinzel Decorative',Georgia,serif;font-size:13.5px;letter-spacing:.04em;color:var(--cream)}
+  .load-sub{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:-4px}
+  .et-loading{display:flex;align-items:center;justify-content:center;gap:12px}
+  .et-loading .load-ring{width:22px;height:22px;border-width:2.5px}
+  @media(prefers-reduced-motion:reduce){.load-ring{animation:none}}
   .map-tip{position:absolute;pointer-events:none;background:#1c2620;color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-150%);box-shadow:0 4px 14px rgba(0,0,0,.4)}
   .map-tip .tip-coord{font-family:var(--mono);font-size:10px;color:#9FE8D8}
   .neighbor .s{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all}
@@ -550,8 +568,36 @@
   #flavorMap{width:100%;height:auto;display:block}  /* fill the content width like the rest of the page */
   /* smooth reveal for result cards */
   @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  #results .card,#behaviorCard,#aromaCard{animation:fadeUp .28s ease both}
-  #behaviorCard{animation-delay:.04s;margin-top:18px}#aromaCard{animation-delay:.08s}
+  #results .card{animation:fadeUp .28s ease both}
+  /* dashboard modal: read+heads on top (2-col wide), then behavior, then the two swap sections */
+  #results{display:flex;flex-direction:column;gap:14px}  /* tight, consistent gap between all cards (not 0) */
+  /* left column (read + behavior stacked) and the tall Heads card share equal height; the Heads card
+     scrolls its own overflow so its bottom meets the behavior card's bottom, never overshooting */
+  .modal-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch}
+  .modal-left{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .heads-card{display:flex;flex-direction:column;gap:13px;min-height:0;overflow-y:auto}
+  /* aroma group grows to fill the Heads card down to the height of the left column, scrolling inside */
+  #aromaGroup{display:flex;flex-direction:column;min-height:0}
+  .head-group{border-top:1px solid var(--line);padding-top:11px}
+  .head-group:first-of-type{border-top:none;padding-top:0}
+  .hg-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:baseline;gap:8px}
+  .hg-hint{font-size:10px;letter-spacing:.02em;text-transform:none;color:var(--muted);opacity:.7}
+  #aromaPreview{max-height:300px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px}
+  /* compact head bar for the mouthfeel + safety groups (reuses the aroma meter look) */
+  .hbar{display:flex;align-items:center;gap:9px;padding:3px 0;font-size:12.5px}
+  .hbar .hb-name{flex:0 0 118px;color:var(--ink)}
+  .hbar.dim .hb-name{color:var(--muted)}
+  .hbar .hb-track{flex:1;height:7px;border-radius:4px;background:var(--line);overflow:hidden}
+  .hbar .hb-fill{height:100%;border-radius:4px}
+  .hbar .hb-val{flex:0 0 auto;font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+  .hbar .hb-au{color:var(--muted);opacity:.75}
+  .hg-note{font-size:11px;color:var(--muted);margin:6px 0 0;line-height:1.5}
+  #aromaPreview::-webkit-scrollbar{width:8px}#aromaPreview::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  /* the two swap lists fill their box (bounded + internal scroll) so no wasted whitespace */
+  .swap-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+  .swap-grid .card{display:flex;flex-direction:column;min-height:360px;max-height:70vh}
+  .swap-grid .card .nb-list{flex:1 1 auto;min-height:0;max-height:none}
+  @media(max-width:820px){ .modal-top{grid-template-columns:1fr} .swap-grid{grid-template-columns:1fr} .swap-grid .card{max-height:none} }
   /* mobile */
   @media(max-width:640px){
     header{padding:22px 14px 18px}
@@ -571,14 +617,14 @@
     .studio-chips{max-height:220px}
     h1,h2,.design-head,.map-head{overflow-wrap:anywhere}
     .mol-modal{padding:16px 8px}
-    .mol-modal-inner{padding:16px 13px 20px}
+    .mol-modal-inner{padding:54px 13px 20px}
   }
   /* --- molecule modal + logo-matched loader --- */
   .mol-modal{position:fixed;inset:0;z-index:200;background:rgba(6,10,14,.72);backdrop-filter:blur(4px);
     display:flex;align-items:center;justify-content:center;overflow:hidden auto;padding:34px 16px}  /* clip x so the scroll rods never overflow the viewport (was zooming mobile out) */
   .mol-modal-inner{position:relative;width:100%;max-width:1000px;margin:auto;background:var(--surface);
-    border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.55);padding:20px 22px 26px;
-    animation:modalIn .22s cubic-bezier(.2,.9,.3,1)}
+    border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.55);padding:60px 22px 26px;
+    animation:modalIn .22s cubic-bezier(.2,.9,.3,1)}  /* generous top pad clears the centered action row + buffer */
   .mol-modal-inner::before{content:'';position:absolute;inset:0;border-radius:16px;padding:1px;pointer-events:none;
     background:linear-gradient(135deg,rgba(124,92,191,.5),rgba(43,196,196,.5));
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.6}
@@ -600,11 +646,13 @@
     color:#F0D9A8;font-size:15px;cursor:pointer;line-height:1;
     box-shadow:0 3px 9px rgba(0,0,0,.5),inset 0 1px 2px rgba(255,255,255,.18),inset 0 -2px 5px rgba(0,0,0,.45)}
   .mol-close:hover{filter:brightness(1.12);color:#FBEFCF}
-  .mol-share{position:absolute;top:19px;right:64px;z-index:4;font:inherit;font-size:11px;font-weight:600;
+  /* function buttons: centered as a group at the top; the close X stays top-right */
+  .mol-actions{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:4;display:flex;gap:8px}
+  .mol-share{font:inherit;font-size:11px;font-weight:600;
     padding:5px 11px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer}
   .mol-share:hover{border-color:var(--brand-2);color:var(--ink)}
-  .mol-export{right:150px}
-  @media(max-width:640px){.mol-share{right:56px;top:20px;padding:4px 9px;font-size:10px}.mol-export{right:132px}}
+  .mol-modal.loading .mol-actions{display:none}  /* reveal only once the read has finished rendering */
+  @media(max-width:640px){.mol-share{padding:4px 9px;font-size:10px}}
   .mol-loader{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 16px 40px}
   .loader-flask{width:150px;height:150px}
   .loader-ring{transform-origin:70px 70px;animation:ringspin 1.15s linear infinite}
@@ -621,6 +669,15 @@
   @keyframes wisp{to{stroke-dashoffset:-28}}
   @keyframes wispRise{0%,100%{transform:translateY(2px) scaleY(.96)}50%{transform:translateY(-2px) scaleY(1.02)}}
   .loader-title{font-family:'Cinzel Decorative',Georgia,serif;font-size:15px;letter-spacing:.06em;color:var(--cream);margin-top:6px}
+  /* rotating flavor-wizardry cantrip between the title and the step list */
+  .loader-cantrip{font-family:'Cinzel Decorative',Georgia,serif;font-size:12.5px;letter-spacing:.04em;
+    color:var(--brand-2);min-height:1.2em;margin-top:2px;opacity:0;transition:opacity .32s ease}
+  .loader-cantrip.show{opacity:.92}
+  /* out-of-corpus banner: fades in above the flask when the molecule isn't precomputed */
+  .loader-corpus-note{max-width:420px;margin:0 auto 4px;padding:8px 13px;border-radius:11px;font-size:12px;line-height:1.5;
+    color:var(--cream);background:rgba(217,171,116,.10);border:1px solid rgba(217,171,116,.35);
+    opacity:0;transform:translateY(-4px);transition:opacity .4s ease,transform .4s ease;display:none}
+  .loader-corpus-note.show{display:block;opacity:1;transform:none}
   .loader-steps{list-style:none;margin:14px auto 0;padding:0;display:flex;flex-direction:column;gap:7px;min-width:250px}
   .loader-steps li{display:flex;align-items:center;justify-content:center;gap:9px;font-size:12.5px;color:var(--muted);transition:color .2s}
   .loader-steps li.done{color:var(--ink)}
@@ -848,6 +905,9 @@
         <button type="button" id="mapReset" class="map-reset">Reset view</button>
       </div>
       <div class="map-canvas-wrap"><canvas id="flavorMap" width="1440" height="760"></canvas>
+        <div id="mapLoad" class="load-overlay"><div class="load-ring"></div>
+          <div class="load-lbl">Charting the flavor map…</div>
+          <div class="load-sub">placing every molecule in flavor space</div></div>
         <div id="mapTip" class="map-tip" style="display:none"></div></div>
       <div id="mapAxisKey" class="map-axis-key"></div>
       <div class="map-key">Each dot is a molecule; <b>nearby dots are structurally similar</b>.
@@ -910,8 +970,10 @@
    <div class="mol-modal-inner">
     <div class="scroll-rod scroll-rod-top" aria-hidden="true"></div>
     <div class="scroll-rod scroll-rod-bottom" aria-hidden="true"></div>
-    <button type="button" id="molExport" class="mol-share mol-export" title="Download a shareable flavor card (PNG)">Export</button>
-    <button type="button" id="molShare" class="mol-share" title="Copy a shareable link to this read">Copy link</button>
+    <div class="mol-actions" id="molActions">
+      <button type="button" id="molExport" class="mol-share" title="Download a shareable flavor card (PNG)">Export</button>
+      <button type="button" id="molShare" class="mol-share" title="Copy a shareable link to this read">Copy link</button>
+    </div>
     <button type="button" id="molClose" class="mol-close" aria-label="Close">✕</button>
     <div id="molLoader" class="mol-loader">
       <svg class="loader-flask" viewBox="0 0 140 140" aria-hidden="true">
@@ -943,20 +1005,28 @@
         </g>
       </svg>
       <div class="loader-title" id="loaderTitle">Brewing the flavor read…</div>
+      <div id="loaderCorpusNote" class="loader-corpus-note">Uncharted molecule — <b>conjuring a fresh reading</b> from the raw structure. This one isn't in the grimoire yet, so it takes a breath longer…</div>
+      <div class="loader-cantrip" id="loaderCantrip" aria-hidden="true"></div>
       <ul class="loader-steps" id="loaderSteps">
-        <li data-step="predict"><span class="ls-dot"></span> Taste models + chemistry</li>
-        <li data-step="aroma"><span class="ls-dot"></span> Aroma descriptors</li>
+        <li data-step="predict"><span class="ls-dot"></span> Taste heads + chemistry + safety</li>
+        <li data-step="aroma"><span class="ls-dot"></span> Aroma — 164 odor heads</li>
         <li data-step="names"><span class="ls-dot"></span> Names (common / IUPAC)</li>
         <li data-step="structure"><span class="ls-dot"></span> 2D structure</li>
         <li data-step="structure3d"><span class="ls-dot"></span> 3D conformer</li>
-        <li data-step="neighbors"><span class="ls-dot"></span> Neighbors &amp; substitutes</li>
+        <li data-step="substitutes"><span class="ls-dot"></span> Substitutes — taste + aroma match</li>
+        <li data-step="neighbors"><span class="ls-dot"></span> Structural neighbors — Tanimoto</li>
+        <li data-step="render"><span class="ls-dot"></span> Rendering the flavor card</li>
       </ul>
     </div>
     <div id="molBody">
   <div id="err" class="err" style="display:none"></div>
 
-  <div class="grid" id="results" style="display:none">
-    <div class="card">
+  <div id="results" style="display:none">
+   <!-- top row: the molecule's own read — structure/identity on the left, all its head bars on the right -->
+   <div class="modal-top">
+    <!-- left column: the molecule read, with Behavior & safety stacked beneath it -->
+    <div class="modal-left">
+     <div class="card">
       <h2>Flavor read</h2>
       <div class="struct-toggle" id="structToggle" style="display:none">
         <button type="button" id="btn2d" class="st-tab on">2D</button>
@@ -971,38 +1041,55 @@
       <div id="domainBanner" class="domain-banner" style="display:none"></div>
       <div id="flavorTags" class="flavor-tags"></div>
       <div id="references" class="references"></div>
-      <div id="meters"></div>
-      <div class="chips" id="chips"></div>
+     </div>
+     <div class="card" id="behaviorCard">
+      <h2>Behavior &amp; safety</h2>
+      <div id="behavior"></div>
+     </div>
     </div>
+    <div class="card heads-card">
+      <h2>Heads</h2>
+      <div class="head-group">
+        <div class="hg-label">Taste <span class="hg-hint">6 trained heads</span></div>
+        <div id="meters"></div>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="head-group" id="aromaGroup">
+        <div class="hg-label">Aroma <span class="hg-hint">164 trained heads</span></div>
+        <div id="aromaPreview" style="display:none"></div>
+        <p class="aroma-note">Predicted from structure by RandomForest heads on <b>public-domain</b> HSDB
+        odor data — the same stack as taste, so aroma is predicted for <b>any</b> molecule. This is
+        <b>presence/absence</b> (which notes apply), validated per head (CV-AUROC); a scored
+        <b>intensity</b> map needs expert panel data, trained on-prem on your data.</p>
+      </div>
+      <div class="head-group" id="mouthfeelGroup" style="display:none">
+        <div class="hg-label">Mouthfeel <span class="hg-hint">chemesthesis · trigeminal</span></div>
+        <div id="mouthfeelBars"></div>
+        <p class="hg-note">The oral <b>sensation</b> — cooling, pungent, warming, astringent, tingling —
+        trained on curated public-domain trigeminal agents. Distinct from the same-named aroma notes.</p>
+      </div>
+      <div class="head-group" id="safetyGroup" style="display:none">
+        <div class="hg-label">Safety <span class="hg-hint">Tox21 · caution-only</span></div>
+        <div id="safetyBars"></div>
+        <p class="hg-note"><b>Indicative</b> in-vitro assay activity (Tox21 RandomForest heads) —
+        a review flag, <b>never</b> a toxicity/safety determination. Confirm with a toxicologist.</p>
+      </div>
+    </div>
+   </div>
+
+   <!-- two DISTINCT swap sections so the difference is obvious; each fills its box and scrolls -->
+   <div class="swap-grid">
     <div class="card">
-      <h2>Substitutes</h2>
+      <h2>Substitutes <span id="subCount" class="nb-count"></span></h2>
       <p class="card-sub">Closest <b>taste + aroma profile</b> — the drop-in swaps (a match by how it tastes &amp; smells, not by structure).</p>
-      <div id="substitutes"></div>
+      <div id="substitutes" class="nb-list"></div>
     </div>
     <div class="card">
-      <h2>Structural neighbors</h2>
-      <p class="card-sub">Similar <b>structure</b> (Tanimoto / Morgan) — look-alikes, each with its known tastes.</p>
-      <div id="neighbors"></div>
+      <h2>Structural neighbors <span id="nbCount" class="nb-count"></span></h2>
+      <p class="card-sub">Similar <b>structure</b> (Tanimoto / Morgan) — look-alikes, each with its known tastes <b>and smells</b>.</p>
+      <div id="neighbors" class="nb-list"></div>
     </div>
-  </div>
-
-  <div class="card" id="behaviorCard" style="display:none">
-    <h2>Behavior &amp; safety</h2>
-    <div id="behavior"></div>
-  </div>
-
-  <div class="card aroma-card" id="aromaCard" style="display:none">
-    <h2>Aroma</h2>
-    <div id="aromaPreview" style="display:none;margin-bottom:14px"></div>
-    <div class="aroma-lead">Odor descriptors are <b>predicted</b> from structure; <b>intensity</b> comes with <b>your</b> data.</div>
-    <p class="aroma-note">The predicted descriptors above come from RandomForest heads trained
-    on <b>public-domain</b> odor data (HSDB), the same stack as the taste engine — so aroma is
-    predicted for <b>any</b> molecule, not just ones with a documented entry. This is
-    <b>presence/absence</b> (which notes apply), validated per descriptor (CV-AUROC). A
-    <b>scored intensity</b> map — how strong each note is — needs expert-labeled panel data,
-    trained <b>on-premise, on your licensed or in-house data</b>, never leaving your firewall.</p>
-    <p class="aroma-note" style="margin-top:8px">A more robust <b>open-source academic
-    edition</b> — trained on richer research odor data (the GS-LF set) — is coming soon.</p>
+   </div>
   </div>
 
   <p class="note" id="footnote" style="display:none">
@@ -1351,6 +1438,40 @@ function meter(name, value, measured, auroc, note){
 }
 
 function stepDone(name){ const li=document.querySelector('#loaderSteps li[data-step="'+name+'"]'); if(li){ li.classList.remove('active'); li.classList.add('done'); } }
+
+// Flavor-wizardry cantrips: sciencey/alchemical one-liners that rotate under the title while a read
+// brews (always, whether it's an instant cache hit or a fresh compute) — pure flavor, no signal.
+const CANTRIPS = ['Distilling essences…','Consulting the aroma grimoire…','Tuning the odor lattice…',
+  'Titrating the tastebuds…','Folding fragrant proteins…','Aligning the flavor spins…',
+  'Coaxing the volatiles…','Charging the olfactory runes…','Recombobulating esters…',
+  'Steeping the terpene tea…','Divining the descriptor heads…','Balancing sweet and bitter humours…',
+  'Whispering to the vanillin…','Unfurling the scent scroll…','Percolating the palate…',
+  'Transmuting structure into taste…','Summoning the substitute spirits…','Calibrating the nose…'];
+let _cantripTimer=null;
+function _cantripTick(){
+  const el=$('loaderCantrip'); if(!el) return;
+  el.classList.remove('show');
+  setTimeout(()=>{ el.textContent = CANTRIPS[Math.floor(Math.random()*CANTRIPS.length)]; el.classList.add('show'); }, 320);
+}
+function startLoaderCantrips(text){
+  // 1) the rotating cantrips — always on
+  const note=$('loaderCorpusNote'); if(note) note.classList.remove('show');
+  clearInterval(_cantripTimer);
+  _cantripTick();
+  _cantripTimer = setInterval(_cantripTick, 5000);
+  // 2) the out-of-corpus "computing fresh" note — only when the heads must actually run
+  if(note){
+    post('/api/precomputed',{smiles:text}).then(r=>{
+      // still on the same read? (loader visible) and this molecule isn't precomputed -> reveal
+      if(r && r.precomputed===false && $('molModal').classList.contains('loading')) note.classList.add('show');
+    }).catch(()=>{});
+  }
+}
+function stopLoaderCantrips(){
+  clearInterval(_cantripTimer); _cantripTimer=null;
+  const el=$('loaderCantrip'); if(el) el.classList.remove('show');
+  const note=$('loaderCorpusNote'); if(note) note.classList.remove('show');
+}
 function openModal(){ $('molModal').style.display='flex'; $('molModal').scrollTop=0; document.body.style.overflow='hidden'; }
 function closeModal(){ $('molModal').style.display='none'; document.body.style.overflow=''; history.replaceState(null,'',location.pathname); }
 $('molClose').addEventListener('click', closeModal);
@@ -1376,28 +1497,39 @@ async function run(){
   go.disabled = true; go.textContent = 'Reading…';
   $('err').style.display='none';
   openModal();
+  $('molModal').classList.add('loading');  // hide the Export/Copy actions until the read is ready
   $('molLoader').style.display='flex'; $('molBody').style.display='none';
   document.querySelectorAll('#loaderSteps li').forEach(li=>{ li.classList.remove('done'); li.classList.add('active'); });
   $('loaderTitle').textContent='Brewing the flavor read…';
+  startLoaderCantrips(text);  // rotating wizardry phrases + out-of-corpus "computing fresh" note
   try{
     const [p, n, sub, s, nm, ar, s3] = await Promise.all([
       post('/api/predict',{smiles:text}).then(r=>{stepDone('predict');return r;}),
-      post('/api/neighbors',{smiles:text, k:8}).then(r=>{stepDone('neighbors');return r;}),
-      post('/api/substitutes',{smiles:text, k:8}),
+      post('/api/neighbors',{smiles:text}).then(r=>{stepDone('neighbors');return r;}),
+      post('/api/substitutes',{smiles:text}).then(r=>{stepDone('substitutes');return r;}),
       post('/api/structure',{smiles:text}).then(r=>{stepDone('structure');return r;}),
       post('/api/names',{smiles:text}).then(r=>{stepDone('names');return r;}),
       post('/api/aroma',{smiles:text}).then(r=>{stepDone('aroma');return r;}),
       post('/api/structure3d',{smiles:text}).then(r=>{stepDone('structure3d');return r;})
     ]);
     if(p.error){ throw new Error(p.error); }
-    $('molLoader').style.display='none'; $('molBody').style.display='block';
+    // build the (heavy) DOM into the still-hidden body while the loader shows a 'Rendering' step,
+    // so the spinners never finish before the card is actually ready to reveal
     render(p, n.neighbors||[], (s&&s.svg)||null, nm||{}, (sub&&sub.substitutes)||[]);
     renderAroma(ar||{});
+    renderMouthfeel(p.mouthfeel||{});
+    renderSafety((p.safety&&p.safety.tox_screen)||{});
     setStructure3D((s3&&s3.molblock)||null);
+    stepDone('render');
+    await new Promise(requestAnimationFrame);  // let the paint flush so the swap is seamless
+    stopLoaderCantrips();
+    $('molModal').classList.remove('loading');  // read is rendered — reveal Export/Copy
+    $('molLoader').style.display='none'; $('molBody').style.display='block';
     $('molModal').scrollTop=0;
   }catch(e){
+    stopLoaderCantrips();
     $('molLoader').style.display='none'; $('molBody').style.display='block';
-    $('results').style.display='none'; $('behaviorCard').style.display='none'; $('aromaCard').style.display='none'; $('footnote').style.display='none';
+    $('results').style.display='none'; $('footnote').style.display='none';
     $('err').textContent = e.message; $('err').style.display='block';
   }finally{
     go.disabled=false; go.textContent='Read flavor';
@@ -1406,7 +1538,8 @@ async function run(){
 
 // render one neighbor/substitute list into `el`; scoreKey is 'similarity' (structural) or
 // 'profile_match' (substitutes), both 0-1 shown as a % match.
-function renderNeighborList(el, list, scoreKey, emptyMsg){
+function renderNeighborList(el, list, scoreKey, emptyMsg, countEl){
+  if(countEl) countEl.textContent = list.length ? `${list.length} match${list.length===1?'':'es'}` : '';
   if(!list.length){ el.innerHTML = `<div class="empty">${emptyMsg}</div>`; return; }
   el.innerHTML = list.map((x,i)=>`
       <div class="neighbor" data-smi="${x.smiles}" title="Click to analyze this molecule">
@@ -1422,6 +1555,7 @@ function renderNeighborList(el, list, scoreKey, emptyMsg){
         </div>
         <div class="sim">${Math.round((x[scoreKey]||0)*100)}% match</div>
       </div>`).join('');
+  el.scrollTop = 0;  // always show the top (best) matches first, not mid-list
 }
 
 function render(p, neighbors, svg, names, substitutes){
@@ -1502,12 +1636,12 @@ function render(p, neighbors, svg, names, substitutes){
   // substitutes (taste+aroma profile match) and structural neighbors (Tanimoto)
   window._nbrs = neighbors;  // for the per-card 3D toggle handler
   renderNeighborList($('substitutes'), substitutes, 'profile_match',
-    'No profile match available (build the profile index).');
+    'No profile match available (build the profile index).', $('subCount'));
   renderNeighborList($('neighbors'), neighbors, 'similarity',
-    'Build the reference set to enable structural neighbors.');
+    'Build the reference set to enable structural neighbors.', $('nbCount'));
 
   renderBehavior(p);
-  $('results').style.display='grid'; $('behaviorCard').style.display='block'; $('aromaCard').style.display='block'; $('footnote').style.display='block';
+  $('results').style.display='block'; $('footnote').style.display='block';
   // animate bar fills
   requestAnimationFrame(()=>document.querySelectorAll('.fill')
     .forEach(f=>f.style.width=f.dataset.w+'%'));
@@ -1606,6 +1740,7 @@ async function exploreStereo(smiles){
 
 function renderAroma(ar){
   const box=$('aromaPreview');
+  const grp=$('aromaGroup'); if(grp) grp.style.display = (!ar || !ar.available) ? 'none' : 'block';
   if(!ar || !ar.available){ box.style.display='none'; return; }
   let html='';
   const pred = ar.predicted;
@@ -1642,6 +1777,36 @@ function renderAroma(ar){
   }
   box.innerHTML=html;
   box.style.display = html ? 'block' : 'none';
+}
+
+// one compact head bar (name · track · value · AUROC) — shared by the mouthfeel + safety groups
+function headBar(name, score, auroc, color, title){
+  const pct=Math.round((score||0)*100), on=score>=0.5;
+  const au = auroc!=null ? ` <span class="hb-au">· AUROC ${auroc}</span>` : '';
+  return `<div class="hbar${on?'':' dim'}"${title?` title="${title.replace(/"/g,'&quot;')}"`:''}>`+
+    `<span class="hb-name">${name}</span>`+
+    `<span class="hb-track"><span class="hb-fill" style="width:${pct}%;background:${color}"></span></span>`+
+    `<span class="hb-val">${pct}%${au}</span></div>`;
+}
+// Mouthfeel (chemesthesis) — the 5 trained trigeminal heads, ranked, each with its CV-AUROC
+function renderMouthfeel(mf){
+  const grp=$('mouthfeelGroup'), box=$('mouthfeelBars');
+  const ds=(mf&&mf.descriptors)||[];
+  if(!ds.length){ if(grp) grp.style.display='none'; return; }
+  box.innerHTML = ds.map(d=> headBar(d.sensation, d.score, d.auroc, aromaColor(d.sensation), d.desc)).join('');
+  grp.style.display='block';
+}
+// Safety — the 12 Tox21 caution-only assay heads, most-active first, each with its CV-AUROC
+function renderSafety(tx){
+  const grp=$('safetyGroup'), box=$('safetyBars');
+  const assays=(tx&&tx.assays)||[];
+  if(!assays.length){ if(grp) grp.style.display='none'; return; }
+  const rows=assays.slice().sort((a,b)=>(b.probability||0)-(a.probability||0));
+  box.innerHTML = rows.map(a=>{
+    const col = a.probability>=0.5 ? '#C0553A' : 'var(--muted)';  // amber-red when the assay fires
+    return headBar(a.assay, a.probability, a.auroc, col, a.meaning);
+  }).join('');
+  grp.style.display='block';
 }
 
 function chip(key, on, color, label){
@@ -1864,12 +2029,21 @@ function mapLegendRender(){
 }
 
 async function loadMap(){
-  const cv=$('flavorMap'), ctx=cv.getContext('2d');
-  ctx.fillStyle='#8a938c'; ctx.font='13px sans-serif'; ctx.fillText('Loading…',12,22);
-  const d=await getJSON('/api/map'); _mapPts=d.points||[];
-  if(!_mapPts.length){ ctx.clearRect(0,0,cv.width,cv.height); ctx.fillText('Map not built yet (build_flavor_map.py).',12,22); return; }
-  mapLegendRender();
-  _mapReady=true; attachMapEvents(cv); drawMap();
+  const cv=$('flavorMap'), ctx=cv.getContext('2d'), ov=$('mapLoad');
+  if(ov){ ov.classList.remove('done'); }  // show the branded overlay while the (~2 MB) map loads
+  try{
+    const d=await getJSON('/api/map'); _mapPts=d.points||[];
+    if(!_mapPts.length){
+      if(ov){ ov.querySelector('.load-ring').style.display='none';
+              ov.querySelector('.load-lbl').textContent='Map not built yet';
+              ov.querySelector('.load-sub').textContent='run build_flavor_map.py'; }
+      return;
+    }
+    mapLegendRender();
+    _mapReady=true; attachMapEvents(cv); drawMap();
+  } finally {
+    if(ov && _mapReady) ov.classList.add('done');  // fade the overlay out once the map is drawn
+  }
 }
 function drawMap(){ _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D()); if(_showLabels) drawClusterLabels(); updateAxisKey(); }
 let _showLabels=true, _showClusters=true;
@@ -1916,7 +2090,7 @@ function updateAxisKey(){
 }
 
 function draw2D(){
-  const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=18;
+  const cv=$('flavorMap'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pad=40;  // roomier margin so the UMAP cloud never jams the frame
   ctx.clearRect(0,0,W,H);
   const px=p=>(pad+p.x*(W-2*pad))*_v2.s+_v2.ox, py=p=>(H-pad-p.y*(H-2*pad))*_v2.s+_v2.oy;
   drawDensity(ctx, p=>({x:px(p),y:py(p)}));
@@ -1942,7 +2116,10 @@ function drawProps(){
     // out-of-range points are clamped to the edge (a handful of polymers/lipids).
     const pct=(arr,q)=>{ const a=arr.filter(v=>v!=null).sort((x,y)=>x-y); return a[Math.floor(q*(a.length-1))]; };
     const mws=_mapPts.map(p=>p.mw), lps=_mapPts.map(p=>p.logp);
-    _propDom={mwMax:Math.ceil(pct(mws,0.98)/50)*50, lpMin:Math.floor(pct(lps,0.01)), lpMax:Math.ceil(pct(lps,0.99))};
+    // Extend each axis ~8% past the (near-full) data range so points sit at their TRUE position with
+    // headroom instead of piling up clamped on the frame edge — "give the axes more length".
+    const mwHi=pct(mws,0.995), lpLo=pct(lps,0.005), lpHi=pct(lps,0.995), lpPad=Math.max(0.5,(lpHi-lpLo)*0.08);
+    _propDom={mwMax:Math.ceil((mwHi*1.08)/50)*50, lpMin:Math.floor(lpLo-lpPad), lpMax:Math.ceil(lpHi+lpPad)};
   }
   const {mwMax,lpMin,lpMax}=_propDom;
   const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1986,9 +2163,11 @@ function draw3D(){
   if(props && !_prop3){  // real-axis 3D: MW × logP × TPSA, normalized to the unit cube
     const pc=(a,q)=>{ const s=a.filter(v=>v!=null).sort((x,y)=>x-y); return s[Math.floor(q*(s.length-1))]; };
     const mw=_mapPts.map(p=>p.mw), lp=_mapPts.map(p=>p.logp), tp=_mapPts.map(p=>p.tpsa);
-    // domain to the 96th percentile so the bulk of molecules fills the cube (the handful of
-    // heavy/greasy outliers clamp to the far faces rather than stretching the whole scale).
-    _prop3={mwMax:pc(mw,.96)||1, lpMin:pc(lp,.03), lpMax:pc(lp,.96), tpMax:pc(tp,.96)||1};
+    // domain out to ~99.5th percentile + ~8% headroom so points sit at their true cube position with
+    // room, instead of a wall of outliers clamped flat on the far faces ("more length on the axes").
+    const lpLo=pc(lp,.005), lpHi=pc(lp,.995), lpPad=Math.max(0.5,(lpHi-lpLo)*0.08);
+    _prop3={mwMax:(pc(mw,.995)||1)*1.08, lpMin:Math.floor(lpLo-lpPad), lpMax:Math.ceil(lpHi+lpPad),
+            tpMax:(pc(tp,.995)||1)*1.08};
   }
   const cl=(v)=>Math.max(0,Math.min(1,v));
   const coord=p=>{
@@ -2208,6 +2387,9 @@ function etCell(c, r){
 }
 async function loadEnrich(){
   $('enrichHead').querySelectorAll('.th-ar').forEach(s=> s.textContent = s.dataset.k===_enSort ? (_enDesc?'▼':'▲') : '');
+  const cols = _enCols.length || 1;
+  $('enrichBody').innerHTML = `<tr><td colspan="${cols}" style="padding:26px"><div class="et-loading"><span class="load-ring"></span>`
+    + `<span class="load-lbl">Loading the molecule universe…</span></div></td></tr>`;  // feedback while fetching
   const d = await getJSON(`/api/enrichment?q=${encodeURIComponent(_enQ)}&sort=${_enSort}&desc=${_enDesc?1:0}&offset=${_enOffset}&limit=${EN_PAGE}`);
   const tot=d.total||0;
   $('enrichBody').innerHTML = (d.rows||[]).map(r=>`<tr data-smi="${r.smiles.replace(/"/g,'&quot;')}">`+_enCols.map(c=>etCell(c,r)).join('')+'</tr>').join('') || `<tr><td colspan="${_enCols.length}" class="et-mut" style="padding:16px">No molecules match.</td></tr>`;
