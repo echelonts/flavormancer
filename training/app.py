@@ -1101,11 +1101,14 @@ _VOL_PPM = {"high": 33.0, "moderate": 50.0, "low": 100.0}  # inverse-volatility:
 
 def _load_note_carriers():
     """descriptor/note -> [(smiles, name)] of KNOWN character-impact molecules, from the curated
-    flavors.csv + aroma_supplement.csv. The recipe designer prefers these (e.g. gamma-nonalactone
-    for coconut, maltol for caramel) over a generic palette match, which can surface poor carriers."""
+    flavors.csv + aroma_supplement.csv + mouthfeel_supplement.csv (same schema). The recipe designer
+    prefers these (e.g. gamma-nonalactone for coconut, maltol for caramel) over a generic palette
+    match, which can surface poor carriers. The mouthfeel agents matter especially here: the design
+    pool is built from the HSDB *odor* corpus, which barely contains them (0 of 11 tingling agents,
+    1 of 11 astringent), so without folding them in those chips would match nothing."""
     import csv
     m = {}
-    for path in ("flavors.csv", "aroma_supplement.csv"):
+    for path in ("flavors.csv", "aroma_supplement.csv", "mouthfeel_supplement.csv"):
         with contextlib.suppress(Exception), open(path, encoding="utf-8") as fh:  # missing file / bad rows; just skip
             for r in csv.DictReader(fh):
                 note = (r.get("flavor") or "").strip().lower()
@@ -1492,8 +1495,12 @@ def _precompute_design():
                 cnt.update([note])
         _DESIGN[:] = pool
         # Offer EVERY trained aroma head as a selectable note (even aroma-only ones with few
-        # food-safe carriers), plus any design note that has >=5 carriers.
-        _DESIGN_DESCS[:] = sorted({d for d, n in cnt.items() if n >= 5} | set(P._AROMA_MODELS))
+        # food-safe carriers), plus any design note that has >=5 carriers — but keep the
+        # mouthfeel-ONLY sensations out of the notes list (they get their own group below).
+        # cooling/pungent are exempt from that subtraction: they're genuine aroma heads too.
+        mouth_only = set(P._MOUTHFEEL_MODELS) - set(P._AROMA_MODELS)
+        _DESIGN_DESCS[:] = sorted(
+            ({d for d, n in cnt.items() if n >= 5} | set(P._AROMA_MODELS)) - mouth_only)
         # Mouthfeel is offered as its own pick-list — a different modality, not an odour note.
         # cooling/pungent intentionally appear in BOTH lists (they're a trained aroma head *and* a
         # trained sensation head), so a molecule that smells cool and one that feels cool both match.
