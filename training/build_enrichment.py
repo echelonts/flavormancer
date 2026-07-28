@@ -18,10 +18,9 @@ import glob
 
 import numpy as np
 import pandas as pd
+import predict as P
 from rdkit import Chem, RDLogger
 from rdkit.Chem import Crippen, Descriptors, rdMolDescriptors
-
-import predict as P
 
 RDLogger.DisableLog("rdApp.*")
 _BASIC = ["sweet", "bitter", "umami", "sour", "salty"]

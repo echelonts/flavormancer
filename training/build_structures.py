@@ -18,9 +18,8 @@ import glob
 from pathlib import Path
 
 import pandas as pd
-from rdkit import Chem, RDLogger
-
 from build_properties import _BASE, _cid, _get
+from rdkit import Chem, RDLogger
 
 RDLogger.DisableLog("rdApp.*")
 OUT = "structures.parquet"

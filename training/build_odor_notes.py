@@ -29,10 +29,10 @@ import urllib.parse
 from pathlib import Path
 
 import pandas as pd
-from rdkit import Chem
 
 # reuse the rate-limited fetcher + InChIKey->CID + molecule-set loader
 from build_properties import _BASE, _cid, _get, load_keys
+from rdkit import Chem
 
 # keep only public-domain sources; drop proprietary flavor databases outright
 PUBLIC_DOMAIN = ("hazardous substances data bank", "hsdb", "haz-map", "cameo chemicals")
