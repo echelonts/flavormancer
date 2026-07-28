@@ -161,6 +161,9 @@
     border:1px solid var(--line);background:var(--surface)}
   .tox-code{font-size:9.5px;opacity:.62;letter-spacing:.02em}
   .chip[title]{cursor:help}
+  /* mouthfeel target chips: dotted amber edge, so the sensation modality reads apart from the
+     aroma-note chips beside it (cooling/pungent legitimately appear in both groups) */
+  .chip-mouth{border-style:dotted;border-color:var(--accent);color:var(--accent)}
   .chip.on{color:#fff;border-color:transparent}
   /* scroll the qualifying set (every match above the similarity floor) instead of a fixed few;
      ~5 rows tall, then scroll. A subtle fade at the bottom hints there's more below. */
@@ -501,6 +504,10 @@
   .schip{font:inherit;font-size:12px;padding:3px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);cursor:pointer;text-transform:capitalize}
   .schip:hover{border-color:var(--brand-2)}
   .schip-note{border-style:dashed}
+  /* mouthfeel chips: a distinct dotted edge + amber cast so the sensation modality reads apart
+     from odour notes at a glance (cooling/pungent legitimately appear in both rows) */
+  .schip-mouth{border-style:dotted;border-color:var(--accent);color:var(--accent)}
+  .schip-mouth:hover{border-color:var(--brand-2)}
   .schip.on{background:var(--brand-grad);color:#08121A;border-color:transparent;font-weight:650;box-shadow:0 2px 12px rgba(43,196,196,.32);transform:translateY(-1px)}
   .schip{transition:all .13s ease}
   .design-grid .dcell{animation:fadeUp .3s ease both}
@@ -829,6 +836,7 @@
         <div class="form-target-head">Target profile <span class="mapsub" style="text-transform:none;font-weight:600">— optional; pick the <b>flavors</b> and <b>notes</b> you're aiming for. <b>Analyze</b> (above) scores your rows against it; <b>Design</b> (below) proposes a recipe for it.</span></div>
         <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors</span><div id="formTargetFlavors" class="form-chips"></div></div>
         <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-notes"/></svg> Notes</span><div id="formTargetChips" class="form-chips"></div></div>
+        <div class="form-tgt-group"><span class="form-tgt-label" title="Chemesthesis — how it feels in the mouth, not how it smells"><svg class="ic"><use href="#ic-notes"/></svg> Mouthfeel</span><div id="formTargetMouth" class="form-chips"></div></div>
         <button class="mix-btn" id="formDesign" title="Propose a starting recipe for your target flavors + notes" style="margin-top:4px">✨ Design a recipe for this target</button>
       </div>
       <div id="formResults"></div>
@@ -1235,6 +1243,16 @@ const TASTE_HELP = {
   sour:'free acids / low pH — a solution property, so paired with an acid-group rule',
   salty:'small mineral (alkali) salts — paired with a cation rule',
   tasteless:'little or no basic taste expected from structure'
+};
+// per-sensation "what this feels like" — the mouthfeel parallel to AROMA_HELP/TASTE_HELP.
+// Mouthfeel is trigeminal (chemesthesis), a different modality from smell — cooling and pungent
+// exist as BOTH an aroma head and a mouthfeel head, so these blurbs stress the *sensation*.
+const MOUTHFEEL_HELP = {
+  cooling:'cooling — TRPM8 coolants (menthol, WS-agents); a physiological cool, not just a cool smell',
+  pungent:'pungent — TRPV1 / mustard-oil heat &amp; bite (capsaicinoids, isothiocyanates, allium sulfur)',
+  warming:'warming — capsaicinoid &amp; warm-spice heat (chili, pepper, ginger, cinnamon)',
+  astringent:'astringent — tannins &amp; polyphenols; the puckering, mouth-drying sensation',
+  tingling:'tingling — paresthesia alkylamides (Sichuan-pepper sanshools, jambu spilanthol)',
 };
 // per-descriptor "what this note smells like" — the aroma parallel to TASTE_HELP
 const AROMA_HELP = {
@@ -2270,7 +2288,7 @@ const _studioSel = new Set(); const STUDIO_PAGE = 20;
 const STUDIO_EMPTY='<div class="empty">Pick one or more flavors or notes above, then “Find molecules”.</div>';
 async function initStudio(){
   try{
-    const d = await getJSON('/api/studio_terms'); const cats=d.flavors||[], notes=d.notes||[];
+    const d = await getJSON('/api/studio_terms'); const cats=d.flavors||[], notes=d.notes||[], mouth=d.mouthfeel||[];
     if(!cats.length && !notes.length){ setTimeout(initStudio, 4000); return; }
     const esc = s => s.replace(/"/g,'&quot;');
     // category -> icon-sprite id (custom SVG glyphs, no emoji). Extra synonyms map to the
@@ -2293,6 +2311,14 @@ async function initStudio(){
       html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Notes <span class="ss-sub">an aroma/taste quality → molecules that carry it</span></div><div class="ss-body">`+
         `<div class="studio-group studio-group-notes">`+
         notes.map(n=>`<button type="button" class="schip schip-note" data-term="${esc(n)}">${n}</button>`).join('')+
+        `</div></div></div>`;
+    }
+    // Mouthfeel — trained trigeminal sensations (a different modality from taste and aroma)
+    if(mouth.length){
+      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Mouthfeel <span class="ss-sub">how it <b>feels</b> in the mouth — chemesthesis, not smell</span></div><div class="ss-body">`+
+        `<div class="studio-group studio-group-notes">`+
+        mouth.map(m=>{const lbl=m.replace(/^mouthfeel:/,'');  // term stays namespaced, label reads plain
+          return `<button type="button" class="schip schip-mouth" data-term="${esc(m)}" title="${esc(MOUTHFEEL_HELP[lbl]||lbl)}">${lbl}</button>`;}).join('')+
         `</div></div></div>`;
     }
     $('studioChips').innerHTML = html;
@@ -2561,6 +2587,15 @@ fetch('/api/studio_terms').then(r=>r.json()).then(d=>{
     b.onclick=()=>{ if(_formFlavors.has(fl)){ _formFlavors.delete(fl); b.classList.remove('on'); } else { _formFlavors.add(fl); b.classList.add('on'); } };
     box.appendChild(b);
   }));
+  // mouthfeel targets — the trigeminal sensations, aimed at like notes but a distinct modality
+  const mbox=$('formTargetMouth');
+  (d.mouthfeel||[]).forEach(m=>{
+    const lbl=m.replace(/^mouthfeel:/,'');   // term stays namespaced so it matches the sensation tag
+    const b=document.createElement('span'); b.className='chip chip-mouth'; b.textContent=lbl; b.dataset.term=m;
+    b.title=MOUTHFEEL_HELP[lbl]||lbl;
+    b.onclick=()=>{ if(_formTarget.has(m)){ _formTarget.delete(m); b.classList.remove('on'); } else { _formTarget.add(m); b.classList.add('on'); } };
+    mbox.appendChild(b);
+  });
 }).catch(()=>{});
 let _lastRecipe=[]; let _lastRecipeMeta={flavors:[],notes:[]};
 $('formDesign').addEventListener('click', async ()=>{
@@ -2732,8 +2767,10 @@ document.querySelectorAll('.form-ex').forEach(b=> b.addEventListener('click', ()
   $('formRows').innerHTML='';
   b.dataset.ings.split('|').forEach(s=>{ const i=s.indexOf(':'); formAddRow(i<0?s:s.slice(0,i), i<0?'':s.slice(i+1)); });
   _formTarget.clear(); $('formTargetChips').querySelectorAll('.chip.on').forEach(x=>x.classList.remove('on'));
+  $('formTargetMouth').querySelectorAll('.chip.on').forEach(x=>x.classList.remove('on'));  // mouthfeel shares _formTarget
   _formFlavors.clear(); $('formTargetFlavors').querySelectorAll('.chip.on').forEach(x=>x.classList.remove('on'));
-  (b.dataset.tgt||'').split(',').filter(Boolean).forEach(t=>{ _formTarget.add(t); const c=$('formTargetChips').querySelector(`.chip[data-term="${t}"]`); if(c) c.classList.add('on'); });
+  // a preset term may be an aroma note or a mouthfeel sensation — light whichever chip carries it
+  (b.dataset.tgt||'').split(',').filter(Boolean).forEach(t=>{ _formTarget.add(t); const c=$('formTargetChips').querySelector(`.chip[data-term="${t}"]`) || $('formTargetMouth').querySelector(`.chip[data-term="${t}"]`); if(c) c.classList.add('on'); });
   $('formGo').click();
 }));
 </script>
