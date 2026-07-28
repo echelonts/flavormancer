@@ -41,7 +41,12 @@ docs(data): document ChemTastesDB column names
 - **Small** — one logical change, readable as a sequence of decisions.
 - **Link the issue:** `Closes #42`.
 - **CI green** before merge.
-- **One approval required**, routed by [`CODEOWNERS`](CODEOWNERS).
+- **Review:** while the project has a single active contributor, the lead **self-merges** once CI
+  is green (GitHub does not allow approving your own PR, and branch protection currently requires
+  0 approvals). As soon as a second contributor is active, this reverts to **one required
+  approval**, routed by [`CODEOWNERS`](CODEOWNERS) — flip
+  `required_approving_review_count` to 1 on `main` at the same time so the rule is enforced, not
+  just documented.
 - **Squash-merge**; the branch is deleted on merge. Full commit-by-commit detail
   and the review thread stay preserved in the PR.
 - For genuine pair work, add `Co-authored-by:` trailers so everyone gets credit.

@@ -67,6 +67,8 @@ by how it's derived, and nothing claims more certainty than its source supports.
 - **In-vitro tox-assay flags** — 12 Tox21 assays (genotoxic-stress SR-p53/SR-ATAD5, AhR,
   mitochondrial, endocrine), `predict_tox()` (**trained**, Tox21 public domain; CV-AUROC
   **0.72–0.90**, surfaced per assay). INDICATIVE activity for review, **never a determination**.
+  Assay activity is not toxicity, and these heads are deliberately kept OUT of the flavor-match
+  vector. See [`TOX.md`](TOX.md).
 - Preliminary TTC concern tier (**qualitative** heuristic; Toxtree for the real call).
 - EU declarable fragrance-allergen labeling flag — `labeling()` (**lookup**, curated subset).
 
