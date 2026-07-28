@@ -1435,6 +1435,7 @@ def api_map():
 # --- Flavor designer: reverse search (desired descriptors -> best food-safe molecules) ---
 _DESIGN = []          # [{smiles, name, tags:set, gras:bool}]
 _DESIGN_DESCS = []    # descriptors with enough molecules to offer as options
+_DESIGN_MOUTHFEEL = []  # trained mouthfeel/chemesthesis sensations, offered as their own pick-list
 
 
 def _precompute_design():
@@ -1469,6 +1470,9 @@ def _precompute_design():
             if clf is not None:
                 for i in np.where(clf.predict_proba(X)[:, 1] >= 0.5)[0]:
                     tagsets[i].add(t)
+        for name, clf in P._MOUTHFEEL_MODELS.items():             # mouthfeel / chemesthesis
+            for i in np.where(clf.predict_proba(X)[:, 1] >= 0.5)[0]:
+                tagsets[i].add(name)
         cnt, pool = Counter(), []
         for (smi, nm, skel, _, _), tags in zip(rows, tagsets):
             if not tags:
@@ -1490,6 +1494,10 @@ def _precompute_design():
         # Offer EVERY trained aroma head as a selectable note (even aroma-only ones with few
         # food-safe carriers), plus any design note that has >=5 carriers.
         _DESIGN_DESCS[:] = sorted({d for d, n in cnt.items() if n >= 5} | set(P._AROMA_MODELS))
+        # Mouthfeel is offered as its own pick-list — a different modality, not an odour note.
+        # cooling/pungent intentionally appear in BOTH lists (they're a trained aroma head *and* a
+        # trained sensation head), so a molecule that smells cool and one that feels cool both match.
+        _DESIGN_MOUTHFEEL[:] = sorted(P._MOUTHFEEL_MODELS)
 
 
 def _fpvec(mol):
@@ -1666,8 +1674,9 @@ def _gras_subs(smi, k=3):
 
 @app.get("/api/studio_terms")
 def api_studio_terms():
-    """The unified pick-list: curated flavors (grouped by category) + matchable note descriptors."""
-    return {"flavors": _FLAVOR_CATS, "notes": _DESIGN_DESCS}
+    """The unified pick-list: curated flavors (grouped by category), matchable aroma-note
+    descriptors, and mouthfeel sensations — three modalities the studios can target."""
+    return {"flavors": _FLAVOR_CATS, "notes": _DESIGN_DESCS, "mouthfeel": _DESIGN_MOUTHFEEL}
 
 
 @app.get("/api/nl")
