@@ -2317,7 +2317,8 @@ async function initStudio(){
     if(mouth.length){
       html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Mouthfeel <span class="ss-sub">how it <b>feels</b> in the mouth — chemesthesis, not smell</span></div><div class="ss-body">`+
         `<div class="studio-group studio-group-notes">`+
-        mouth.map(m=>`<button type="button" class="schip schip-mouth" data-term="${esc(m)}" title="${esc(MOUTHFEEL_HELP[m]||m)}">${m}</button>`).join('')+
+        mouth.map(m=>{const lbl=m.replace(/^mouthfeel:/,'');  // term stays namespaced, label reads plain
+          return `<button type="button" class="schip schip-mouth" data-term="${esc(m)}" title="${esc(MOUTHFEEL_HELP[lbl]||lbl)}">${lbl}</button>`;}).join('')+
         `</div></div></div>`;
     }
     $('studioChips').innerHTML = html;
@@ -2589,8 +2590,9 @@ fetch('/api/studio_terms').then(r=>r.json()).then(d=>{
   // mouthfeel targets — the trigeminal sensations, aimed at like notes but a distinct modality
   const mbox=$('formTargetMouth');
   (d.mouthfeel||[]).forEach(m=>{
-    const b=document.createElement('span'); b.className='chip chip-mouth'; b.textContent=m; b.dataset.term=m;
-    b.title=MOUTHFEEL_HELP[m]||m;
+    const lbl=m.replace(/^mouthfeel:/,'');   // term stays namespaced so it matches the sensation tag
+    const b=document.createElement('span'); b.className='chip chip-mouth'; b.textContent=lbl; b.dataset.term=m;
+    b.title=MOUTHFEEL_HELP[lbl]||lbl;
     b.onclick=()=>{ if(_formTarget.has(m)){ _formTarget.delete(m); b.classList.remove('on'); } else { _formTarget.add(m); b.classList.add('on'); } };
     mbox.appendChild(b);
   });

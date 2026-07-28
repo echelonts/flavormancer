@@ -1101,14 +1101,15 @@ _VOL_PPM = {"high": 33.0, "moderate": 50.0, "low": 100.0}  # inverse-volatility:
 
 def _load_note_carriers():
     """descriptor/note -> [(smiles, name)] of KNOWN character-impact molecules, from the curated
-    flavors.csv + aroma_supplement.csv + mouthfeel_supplement.csv (same schema). The recipe designer
-    prefers these (e.g. gamma-nonalactone for coconut, maltol for caramel) over a generic palette
-    match, which can surface poor carriers. The mouthfeel agents matter especially here: the design
-    pool is built from the HSDB *odor* corpus, which barely contains them (0 of 11 tingling agents,
-    1 of 11 astringent), so without folding them in those chips would match nothing."""
+    flavors.csv + aroma_supplement.csv. The recipe designer prefers these (e.g. gamma-nonalactone
+    for coconut, maltol for caramel) over a generic palette match, which can surface poor carriers.
+
+    Mouthfeel agents load separately (_load_mouthfeel_carriers) and are NOT merged here: both files
+    key on bare names, so aroma_supplement's `pungent` Piper amides and mouthfeel_supplement's
+    TRPV1 agents would collide under one key and lose their modality."""
     import csv
     m = {}
-    for path in ("flavors.csv", "aroma_supplement.csv", "mouthfeel_supplement.csv"):
+    for path in ("flavors.csv", "aroma_supplement.csv"):
         with contextlib.suppress(Exception), open(path, encoding="utf-8") as fh:  # missing file / bad rows; just skip
             for r in csv.DictReader(fh):
                 note = (r.get("flavor") or "").strip().lower()
@@ -1119,7 +1120,25 @@ def _load_note_carriers():
     return m
 
 
+def _load_mouthfeel_carriers():
+    """sensation -> [(smiles, name)] of curated trigeminal agents (mouthfeel_supplement.csv, same
+    schema as flavors.csv). Kept separate from _NOTE_CARRIERS so the modality survives: the design
+    pool is built from the HSDB *odor* corpus, which barely contains these (0 of 11 tingling agents,
+    1 of 11 astringent), so without folding them in those chips match nothing."""
+    import csv
+    m = {}
+    with contextlib.suppress(Exception), open("mouthfeel_supplement.csv", encoding="utf-8") as fh:
+        for r in csv.DictReader(fh):
+            note = (r.get("flavor") or "").strip().lower()
+            smi = (r.get("smiles") or "").strip()
+            nm = (r.get("molecule") or "").strip()
+            if note and smi:
+                m.setdefault(note, []).append((smi, nm or note))
+    return m
+
+
 _NOTE_CARRIERS = _load_note_carriers()
+_MOUTHFEEL_CARRIERS = _load_mouthfeel_carriers()
 
 
 class DesignRecipeQuery(BaseModel):
@@ -1473,9 +1492,13 @@ def _precompute_design():
             if clf is not None:
                 for i in np.where(clf.predict_proba(X)[:, 1] >= 0.5)[0]:
                     tagsets[i].add(t)
+        # Mouthfeel tags are NAMESPACED ("mouthfeel:pungent"), matching how the profile index keys
+        # its dims. Without this, picking `pungent` under Mouthfeel returned sharp-SMELLING
+        # molecules (acetic acid, ammonia, CO2) from the far larger aroma:pungent set instead of
+        # the TRPV1 burn agents — the two modalities share a name but not a meaning.
         for name, clf in P._MOUTHFEEL_MODELS.items():             # mouthfeel / chemesthesis
             for i in np.where(clf.predict_proba(X)[:, 1] >= 0.5)[0]:
-                tagsets[i].add(name)
+                tagsets[i].add(f"mouthfeel:{name}")
         cnt, pool = Counter(), []
         for (smi, nm, skel, _, _), tags in zip(rows, tagsets):
             if not tags:
@@ -1485,26 +1508,27 @@ def _precompute_design():
         # fold the curated character-impact molecules (supplement + flavors) into the index so
         # their descriptors (coconut, nutty, vanilla, cinnamon...) are searchable + offerable even
         # where the industrial-skewed odor corpus is thin on them
-        for note, carriers in _NOTE_CARRIERS.items():
+        # aroma/flavor carriers keep their bare note; mouthfeel carriers carry the namespaced tag
+        folds = [(n, c, n) for n, c in _NOTE_CARRIERS.items()]
+        folds += [(n, c, f"mouthfeel:{n}") for n, c in _MOUTHFEEL_CARRIERS.items()]
+        for _note, carriers, tag in folds:
             for csmi, cnm in carriers:
                 cm = Chem.MolFromSmiles(csmi)
                 if cm is None:
                     continue
-                pool.append({"smiles": csmi, "name": cnm or "", "tags": {note},
+                pool.append({"smiles": csmi, "name": cnm or "", "tags": {tag},
                              "gras": Chem.MolToInchiKey(cm).split("-")[0] in P._GRAS})
-                cnt.update([note])
+                cnt.update([tag])
         _DESIGN[:] = pool
         # Offer EVERY trained aroma head as a selectable note (even aroma-only ones with few
-        # food-safe carriers), plus any design note that has >=5 carriers — but keep the
-        # mouthfeel-ONLY sensations out of the notes list (they get their own group below).
-        # cooling/pungent are exempt from that subtraction: they're genuine aroma heads too.
-        mouth_only = set(P._MOUTHFEEL_MODELS) - set(P._AROMA_MODELS)
+        # food-safe carriers), plus any design note with >=5 carriers. Namespaced mouthfeel tags
+        # are excluded — they're a separate modality with their own pick-list below.
         _DESIGN_DESCS[:] = sorted(
-            ({d for d, n in cnt.items() if n >= 5} | set(P._AROMA_MODELS)) - mouth_only)
-        # Mouthfeel is offered as its own pick-list — a different modality, not an odour note.
-        # cooling/pungent intentionally appear in BOTH lists (they're a trained aroma head *and* a
-        # trained sensation head), so a molecule that smells cool and one that feels cool both match.
-        _DESIGN_MOUTHFEEL[:] = sorted(P._MOUTHFEEL_MODELS)
+            {d for d, n in cnt.items() if n >= 5 and not d.startswith("mouthfeel:")}
+            | set(P._AROMA_MODELS))
+        # Mouthfeel terms stay namespaced ("mouthfeel:cooling") so picking `cooling` here matches
+        # the SENSATION, not the like-named odour note. The UI shows the bare label.
+        _DESIGN_MOUTHFEEL[:] = [f"mouthfeel:{m}" for m in sorted(P._MOUTHFEEL_MODELS)]
 
 
 def _fpvec(mol):
