@@ -86,9 +86,47 @@ and a rule is used only where it's *more honest* than a model. Companion to
 
 ---
 
+## Does a head LEARN, or just MEMORIZE?
+A high cross-validated AUROC is necessary but **not sufficient**, and this is the single easiest
+place to fool yourself. A head trained on twelve molecules that all share one scaffold can score
+0.99 by recognizing that scaffold and nothing else — it fires on exactly its own training
+molecules and stays silent on every other molecule in the corpus. Cross-validation cannot see
+this, because it only ever asks about molecules *inside* the labelled set.
+
+- **Generalization test** — `computed`. Fire the head over the **whole corpus**, then count the
+  hits that are **not** in its training positives. That count is the head's discovery power.
+  Run it with [`training/audit_generalization.py`](../training/audit_generalization.py).
+- **Two thresholds, because zero is ambiguous.** A head with 13 positives against 2400 negatives
+  is calibrated conservatively even with balanced class weights — it can have learned its class
+  and still rarely clear 0.5 outside the molecules it was fit on. So the audit also scores at
+  **0.35**, which splits one number into two very different diagnoses:
+  - `novel@0.5 > 0` → **generalizes**.
+  - `novel@0.5 = 0 < novel@0.35` → **under-confident**. It found real unlabelled molecules just
+    below the bar. The class is learnable and the head isn't broken; more positives sharpen it.
+  - `novel@0.35 = 0` → **memorizing**. Fires on its training set and nothing else, at any
+    threshold. This is the real failure.
+- Worth stating plainly because it bit us: `pine` and `rosemary` read as memorizing at 0.5 and
+  turned out to be under-confident (8 and 9 novel hits at 0.35). `celery` and `turmeric` were
+  memorizing at both. Same table, opposite verdicts, opposite fixes.
+- **Reading the result.** A memorizing head is not worthless — it still labels its own positives
+  correctly — but it must not be presented as if it can *discover*, and it is not evidence the
+  model learned the class.
+- **The fix is diversity, not volume.** `tingling` trained on nine *Zanthoxylum* sanshools learns
+  "sanshool"; the same head trained on sanshools **plus** *Echinacea*, *Anacyclus* and *Heliopsis*
+  amides learns "long-chain unsaturated N-alkylamide" and starts finding molecules nobody
+  labelled. More of the same scaffold never moves the count off zero.
+- **Some heads can't be fixed with molecules.** A broad, fuzzy, multi-scaffold class like `sweet`
+  **odour** (AUROC 0.724 over 208 positives) isn't thin — it's genuinely hard. The honest answer
+  there is a better model (a GNN), not a longer list.
+
 ## The honest ceiling on "deeper flavor description"
-Taste tops out at the **5 basics + intensity + chemesthesis** on public data. The rich
-descriptors people mean by "flavor" — *vanilla, fruity, green, woody, minty, caramel…* — are
-**aroma**, not taste: a separate odor model that needs expert-labeled odor data (licensed or
-customer; deferred — see [`AROMA.md`](AROMA.md)). That model is the real route to deeper flavor
-language, and it's exactly the "comes with your data" piece.
+Taste tops out at the **5 basics + intensity + chemesthesis** on public data — that ceiling is
+real and hasn't moved. The rich descriptors people mean by "flavor" — *vanilla, fruity, green,
+woody, minty, caramel…* — are **aroma**, a separate modality with its own heads (see
+[`AROMA.md`](AROMA.md)), now trained from open sources rather than deferred to licensed data.
+
+What remains gated is **depth**, not vocabulary: the aroma heads are weakly labelled from public
+odor text plus a hand-curated character-impact supplement, so they are strongest on the classic,
+widely-documented associations and thinnest on the rare naturals — which is precisely what the
+generalization test above measures and reports honestly. Expert-labelled odor panel data (licensed
+or customer-supplied) is still the route to depth, and it remains the "comes with your data" piece.
