@@ -57,7 +57,20 @@ CURATED = {
                   # more genuine tingle amides — tested against PubChem for an authoritative structure
                   "bungeanool", "isobungeanool", "tetrahydrobungeanool", "neoherculin",
                   "ZP-amide A", "ZP-amide C", "hydroxy-epsilon-sanshool", "sanshoamide",
-                  "dihydro-alpha-sanshool"],
+                  "dihydro-alpha-sanshool",
+                  # STRUCTURAL DIVERSITY, deliberately beyond Zanthoxylum: a head trained only on
+                  # sanshools memorizes that one scaffold instead of learning "long-chain unsaturated
+                  # N-alkylamide". These are paresthesia amides from other genera — Echinacea,
+                  # Anacyclus (pellitory), Heliopsis, Piper — with different chain lengths and
+                  # unsaturation patterns, so the class itself becomes learnable.
+                  "dodeca-2E,4E,8Z,10E-tetraenoic acid isobutylamide",
+                  "dodeca-2E,4E,8Z,10Z-tetraenoic acid isobutylamide",
+                  "undeca-2E,4Z-diene-8,10-diynoic acid isobutylamide",
+                  "dodeca-2E,4E-dienoic acid isobutylamide",
+                  "deca-2E,4E-dienoic acid isobutylamide",
+                  "anacyclin", "scabrin", "achilleamide", "retrofractamide A",
+                  "guineensine", "piperlonguminine", "trichostachine",
+                  "N-isobutyl-2E,4E-decadienamide", "echinacein", "affinin"],
 }
 # NOTE: cooling & pungent ALSO exist as AROMA odour-descriptor heads (menthol smells cool; mustard
 # smells pungent). Those stay — this file trains the SENSATION versions. A molecule can be both.

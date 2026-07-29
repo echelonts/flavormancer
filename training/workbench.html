@@ -164,6 +164,7 @@
   /* mouthfeel target chips: dotted amber edge, so the sensation modality reads apart from the
      aroma-note chips beside it (cooling/pungent legitimately appear in both groups) */
   .chip-mouth{border-style:dotted;border-color:var(--accent);color:var(--accent)}
+  .chip-taste{border-width:1.5px}
   .chip.on{color:#fff;border-color:transparent}
   /* scroll the qualifying set (every match above the similarity floor) instead of a fixed few;
      ~5 rows tall, then scroll. A subtle fade at the bottom hints there's more below. */
@@ -515,6 +516,8 @@
     color:var(--muted);margin:0 0 5px;display:flex;align-items:baseline;gap:7px}
   .fam-n{font-size:10px;opacity:.6}
   .schip-note{border-style:dashed}
+  .schip-taste{border-style:solid;border-width:1.5px}
+  .dtox{margin-top:4px;font-family:var(--mono);font-size:10.5px;color:#C0553A;cursor:help}
   /* mouthfeel chips: a distinct dotted edge + amber cast so the sensation modality reads apart
      from odour notes at a glance (cooling/pungent legitimately appear in both rows) */
   .schip-mouth{border-style:dotted;border-color:var(--accent);color:var(--accent)}
@@ -817,6 +820,7 @@
       <div id="studioChips" class="studio-chips"></div>
       <div class="design-controls">
         <label class="design-gras"><input type="checkbox" id="designGras" checked> food-listed only</label>
+        <label class="design-gras" title="Hide molecules predicted active in any Tox21 in-vitro assay. Caution-only — assay activity is a review flag, never a toxicity finding."><input type="checkbox" id="designNoTox"> hide tox-flagged</label>
         <button class="mix-btn" id="studioGo">Find molecules<span id="studioGoCount" class="studio-count"></span></button>
         <button type="button" id="studioClear" class="studio-clear">clear</button>
       </div>
@@ -847,6 +851,7 @@
         <div class="form-target-head">Target profile <span class="mapsub" style="text-transform:none;font-weight:600">— optional; pick the <b>flavors</b> and <b>notes</b> you're aiming for. <b>Analyze</b> (above) scores your rows against it; <b>Design</b> (below) proposes a recipe for it.</span></div>
         <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors</span><div id="formTargetFlavors" class="form-chips"></div></div>
         <div class="form-tgt-group"><span class="form-tgt-label"><svg class="ic"><use href="#ic-notes"/></svg> Notes</span><div id="formTargetChips" class="form-chips"></div></div>
+        <div class="form-tgt-group"><span class="form-tgt-label" title="What the tongue reads — distinct from a sweet smell"><svg class="ic"><use href="#ic-flavors"/></svg> Taste</span><div id="formTargetTaste" class="form-chips"></div></div>
         <div class="form-tgt-group"><span class="form-tgt-label" title="Chemesthesis — how it feels in the mouth, not how it smells"><svg class="ic"><use href="#ic-notes"/></svg> Mouthfeel</span><div id="formTargetMouth" class="form-chips"></div></div>
         <button class="mix-btn" id="formDesign" title="Propose a starting recipe for your target flavors + notes" style="margin-top:4px">✨ Design a recipe for this target</button>
       </div>
@@ -916,7 +921,7 @@
       <div class="map-controls">
         <span class="map-toggle3d"><button type="button" id="mapLsim" class="st-tab on">similarity</button><button type="button" id="mapLprop" class="st-tab">property axes</button></span>
         <span class="map-toggle3d"><button type="button" id="map2d" class="st-tab on">2D</button><button type="button" id="map3d" class="st-tab">3D</button></span>
-        <span class="map-toggle3d"><button type="button" id="mapCT" class="st-tab on">taste</button><button type="button" id="mapCA" class="st-tab">aroma</button><button type="button" id="mapCB" class="st-tab">both</button></span>
+        <span class="map-toggle3d"><button type="button" id="mapCT" class="st-tab on">taste</button><button type="button" id="mapCA" class="st-tab">aroma</button><button type="button" id="mapCB" class="st-tab">both</button><button type="button" id="mapCM" class="st-tab" title="Colour by the dominant trigeminal sensation">mouthfeel</button></span>
         <span id="mapLegend" class="map-legend"></span>
         <button type="button" id="mapLabels" class="st-tab on">labels</button>
         <button type="button" id="mapClusters" class="st-tab on" title="Soft density shading under each class — spotlight a class in the legend to see where it concentrates">clusters</button>
@@ -1250,7 +1255,6 @@ const AROMA_FAMILIES = [
   ['Animalic &amp; musk', ['animalic','musky','powdery']],
   ['Sharp &amp; chemical', ['acidic','alcoholic','ammoniacal','ethereal','petroleum','phenolic','medicinal',
     'smoky','tarry','burnt','putrid','metallic','soapy','pungent','winey','cognac']],
-  ['Base taste', ['sweet','bitter']],
 ];
 
 const $ = id => document.getElementById(id);
@@ -1289,6 +1293,12 @@ const TASTE_HELP = {
 // per-sensation "what this feels like" — the mouthfeel parallel to AROMA_HELP/TASTE_HELP.
 // Mouthfeel is trigeminal (chemesthesis), a different modality from smell — cooling and pungent
 // exist as BOTH an aroma head and a mouthfeel head, so these blurbs stress the *sensation*.
+// map "colour by mouthfeel": the five sensations + their swatches. Cool hues for the cooling end,
+// warm for the burn, so the map reads as a temperature gradient at a glance.
+const MOUTHFEEL_CLASSES = ['cooling','tingling','astringent','pungent','warming'];
+const MOUTHFEEL_COLORS = {cooling:'#6FD0C0', tingling:'#8FA9E8', astringent:'#B08FD0',
+                          pungent:'#E8873A', warming:'#D9503A'};
+const _mouthC = m => (!m || m==='other') ? '#39424C' : (MOUTHFEEL_COLORS[m]||'var(--accent)');
 const MOUTHFEEL_HELP = {
   cooling:'cooling — TRPM8 coolants (menthol, WS-agents); a physiological cool, not just a cool smell',
   pungent:'pungent — TRPV1 / mustard-oil heat &amp; bite (capsaicinoids, isothiocyanates, allium sulfur)',
@@ -2012,6 +2022,7 @@ const AROMA_HEADS = ['odorless','pungent','sweet','ammoniacal','fruity','etherea
 function legendClasses(){
   if(_mapColorBy==='aroma') return AROMA_HEADS;
   if(_mapColorBy==='both')  return TASTE_CLASSES.concat(AROMA_HEADS);
+  if(_mapColorBy==='mouthfeel') return MOUTHFEEL_CLASSES;
   return TASTE_CLASSES;
 }
 let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste', _mapLayout='similarity';
@@ -2024,17 +2035,20 @@ function _tasteC(l){ return MAP_COLORS[l]||MAP_COLORS.other; }
 function _aromaC(a){ return a && a!=='other' ? aromaColor(a) : GREY; }
 function mapLabel(p){
   if(_mapColorBy==='aroma') return p.aroma||'other';
+  if(_mapColorBy==='mouthfeel') return p.mouth||'other';
   if(_mapColorBy==='both')  return (p.label && p.label!=='other') ? p.label : (p.aroma||'other');
   return p.label;
 }
 function mapColor(p){
   if(_mapColorBy==='aroma') return _aromaC(p.aroma);
+  if(_mapColorBy==='mouthfeel') return _mouthC(p.mouth);
   if(_mapColorBy==='both'){ return (p.label && p.label!=='other') ? _tasteC(p.label) : _aromaC(p.aroma); }
   return _tasteC(p.label);
 }
 function legendColor(l){  // color a legend label given the current mode
   if(_mapColorBy==='taste') return _tasteC(l);
   if(_mapColorBy==='aroma') return l==='other'?GREY:aromaColor(l);
+  if(_mapColorBy==='mouthfeel') return l==='other'?GREY:MOUTHFEEL_COLORS[l]||'var(--accent)';
   return MAP_COLORS[l] ? _tasteC(l) : (l==='other'?GREY:aromaColor(l));  // both: taste palette if it's a taste
 }
 
@@ -2050,6 +2064,7 @@ $('mapLprop').addEventListener('click', ()=>setMapLayout('properties'));
 $('mapCT').addEventListener('click', ()=>setMapColor('taste'));
 $('mapCA').addEventListener('click', ()=>setMapColor('aroma'));
 $('mapCB').addEventListener('click', ()=>setMapColor('both'));
+$('mapCM').addEventListener('click', ()=>setMapColor('mouthfeel'));
 $('mapReset').addEventListener('click', ()=>{ cancelAnimationFrame(_inertia); _v2={s:1,ox:0,oy:0}; _v3={rx:-0.45,ry:0.6,z:1,ox:0,oy:0}; drawMap(); });
 $('mapLabels').addEventListener('click', ()=>{ _showLabels=!_showLabels; $('mapLabels').classList.toggle('on',_showLabels); drawMap(); });
 $('mapClusters').addEventListener('click', ()=>{ _showClusters=!_showClusters; $('mapClusters').classList.toggle('on',_showClusters); drawMap(); });
@@ -2066,7 +2081,8 @@ function setMapLayout(l){
   drawMap();
 }
 function setMapColor(c){ _mapColorBy=c;
-  $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma'); $('mapCB').classList.toggle('on',c==='both');
+  $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma');
+  $('mapCB').classList.toggle('on',c==='both'); $('mapCM').classList.toggle('on',c==='mouthfeel');
   mapLegendRender(); drawMap();
 }
 let _mapHi = new Set();  // classes highlighted from the legend (empty = show all evenly)
@@ -2330,7 +2346,7 @@ const _studioSel = new Set(); const STUDIO_PAGE = 20;
 const STUDIO_EMPTY='<div class="empty">Pick one or more flavors or notes above, then “Find molecules”.</div>';
 async function initStudio(){
   try{
-    const d = await getJSON('/api/studio_terms'); const cats=d.flavors||[], notes=d.notes||[], mouth=d.mouthfeel||[];
+    const d = await getJSON('/api/studio_terms'); const cats=d.flavors||[], notes=d.notes||[], mouth=d.mouthfeel||[], tastes=d.taste||[];
     if(!cats.length && !notes.length){ setTimeout(initStudio, 4000); return; }
     const esc = s => s.replace(/"/g,'&quot;');
     // category -> icon-sprite id (custom SVG glyphs, no emoji). Extra synonyms map to the
@@ -2346,7 +2362,7 @@ async function initStudio(){
     // Flavors — named flavors grouped by category, each with its glyph
     // one filter across every chip — with 300+ of them, scanning is not a search strategy
     let html = `<div class="chip-filter"><input id="studioFilter" type="search" autocomplete="off"
-      placeholder="Filter ${cats.reduce((a,c)=>a+(c.flavors||[]).length,0)+notes.length+mouth.length} flavors, notes &amp; sensations — e.g. citrus, vanilla, cool">
+      placeholder="Filter ${cats.reduce((a,c)=>a+(c.flavors||[]).length,0)+notes.length+mouth.length+tastes.length} flavors, tastes, notes &amp; sensations — e.g. citrus, vanilla, cool">
       <span id="studioFilterNone" class="cf-none" hidden>no match</span></div>`;
     html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors <span class="ss-sub">a flavor you know → the molecule that makes it</span></div><div class="ss-body">`;
     html += cats.map(c=>`<div class="studio-group"><span class="sg-label" title="${esc(c.category)}"><span class="sg-ico">${svgIcon(c.category)}</span>${c.category}</span>`+
@@ -2369,6 +2385,14 @@ async function initStudio(){
           ms.map(n=>`<button type="button" class="schip schip-note" data-term="${esc(n)}" title="${esc(AROMA_HELP[n]||n)}">${n}</button>`).join('')+
           `</div></div>`).join('')+
         `</div></div>`;
+    }
+    // Taste — the basic tastes, namespaced so they don't collide with the like-named aroma notes
+    if(tastes.length){
+      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Taste <span class="ss-sub">what the tongue reads — distinct from a sweet <i>smell</i></span></div><div class="ss-body">`+
+        `<div class="studio-group studio-group-notes">`+
+        tastes.map(t=>{const lbl=t.replace(/^taste:/,'');
+          return `<button type="button" class="schip schip-taste" data-term="${esc(t)}" title="${esc(TASTE_HELP[lbl]||lbl)}" style="border-color:${TASTE_COLORS[lbl]||'var(--line)'};color:${TASTE_COLORS[lbl]||'var(--ink)'}">${lbl}</button>`;}).join('')+
+        `</div></div></div>`;
     }
     // Mouthfeel — trained trigeminal sensations (a different modality from taste and aroma)
     if(mouth.length){
@@ -2440,9 +2464,9 @@ $('studioNl').addEventListener('keydown', e=>{ if(e.key==='Enter') studioNL(); }
 async function runStudio(offset){
   const res=$('studioResults');
   if(!_studioSel.size){ res.innerHTML=STUDIO_EMPTY; return; }
-  const gras=$('designGras').checked?1:0;
+  const gras=$('designGras').checked?1:0, noTox=$('designNoTox').checked?1:0;
   res.innerHTML='<div class="empty">Searching…</div>';
-  const d=await getJSON('/api/studio?terms='+encodeURIComponent([..._studioSel].join(','))+'&gras='+gras+'&offset='+offset+'&limit='+STUDIO_PAGE);
+  const d=await getJSON('/api/studio?terms='+encodeURIComponent([..._studioSel].join(','))+'&gras='+gras+'&no_tox='+noTox+'&offset='+offset+'&limit='+STUDIO_PAGE);
   const items=d.items||[], tot=d.total_matches||0;
   if(!items.length){ res.innerHTML='<div class="empty">No molecule carries those'+(gras?' and is food-safe':'')+'. Try fewer, or turn off food-safe.</div>'; return; }
   const from=offset+1, to=offset+items.length;
@@ -2454,10 +2478,12 @@ async function runStudio(offset){
     const match=(it.matched||[]).map(t=>`<span class="mt" style="background:${aromaColor(t)};color:#08121A">${t}</span>`).join('');
     const other=(it.other&&it.other.length)?`<div class="dmatch">${it.other.map(t=>`<span class="mt" style="background:#2A323C;color:var(--muted)">${t}</span>`).join('')}</div>`:'';
     const subs=(it.subs&&it.subs.length)?`<div class="dsubs">food-safe drop-ins: ${it.subs.map(s=>`<a data-smi="${s.smiles.replace(/"/g,'&quot;')}">${s.name||s.smiles.slice(0,14)}</a>`).join(', ')}</div>`:'';
+    // Tox21 assay flags — caution-only, so they read as a muted review marker, not a hazard label
+    const tox=(it.tox_flags&&it.tox_flags.length)?`<div class="dtox" title="Predicted active in ${it.tox_flags.length} Tox21 in-vitro assay(s): ${it.tox_flags.join(', ')}. INDICATIVE — a review flag, never a toxicity determination.">⚠ ${it.tox_flags.length} tox flag${it.tox_flags.length>1?'s':''}</div>`:'';
     return `<div class="dcell"><div class="dstruct" id="sts${i}">${it.svg||''}</div>
       ${_has3D?`<button type="button" class="mini-3d" data-i="${i}" data-m="2d">3D</button>`:''}
       <div class="dname" data-smi="${it.smiles.replace(/"/g,'&quot;')}">${it.name||it.smiles}${badge}</div>
-      <div class="dmatch">${match}</div>${other}${subs}</div>`;
+      <div class="dmatch">${match}</div>${other}${subs}${tox}</div>`;
   }).join('')+`<div style="grid-column:1/-1">${pager}</div>`;
   res.querySelectorAll('.mini-3d').forEach(b=>{ const i=+b.dataset.i;
     b.addEventListener('click', ()=> cardToggle3D(b, $('sts'+i), items[i].smiles, items[i].svg||'')); });
@@ -2672,6 +2698,15 @@ fetch('/api/studio_terms').then(r=>r.json()).then(d=>{
     b.onclick=()=>{ if(_formFlavors.has(fl)){ _formFlavors.delete(fl); b.classList.remove('on'); } else { _formFlavors.add(fl); b.classList.add('on'); } };
     box.appendChild(b);
   }));
+  // taste targets — namespaced so `sweet` here means the TASTE, not a sweet-smelling note
+  const tbox=$('formTargetTaste');
+  (d.taste||[]).forEach(t=>{
+    const lbl=t.replace(/^taste:/,'');
+    const b=document.createElement('span'); b.className='chip chip-taste'; b.textContent=lbl; b.dataset.term=t;
+    b.title=TASTE_HELP[lbl]||lbl;
+    b.onclick=()=>{ if(_formTarget.has(t)){ _formTarget.delete(t); b.classList.remove('on'); } else { _formTarget.add(t); b.classList.add('on'); } };
+    tbox.appendChild(b);
+  });
   // mouthfeel targets — the trigeminal sensations, aimed at like notes but a distinct modality
   const mbox=$('formTargetMouth');
   (d.mouthfeel||[]).forEach(m=>{
@@ -2853,9 +2888,10 @@ document.querySelectorAll('.form-ex').forEach(b=> b.addEventListener('click', ()
   b.dataset.ings.split('|').forEach(s=>{ const i=s.indexOf(':'); formAddRow(i<0?s:s.slice(0,i), i<0?'':s.slice(i+1)); });
   _formTarget.clear(); $('formTargetChips').querySelectorAll('.chip.on').forEach(x=>x.classList.remove('on'));
   $('formTargetMouth').querySelectorAll('.chip.on').forEach(x=>x.classList.remove('on'));  // mouthfeel shares _formTarget
+  $('formTargetTaste').querySelectorAll('.chip.on').forEach(x=>x.classList.remove('on'));  // taste shares _formTarget too
   _formFlavors.clear(); $('formTargetFlavors').querySelectorAll('.chip.on').forEach(x=>x.classList.remove('on'));
   // a preset term may be an aroma note or a mouthfeel sensation — light whichever chip carries it
-  (b.dataset.tgt||'').split(',').filter(Boolean).forEach(t=>{ _formTarget.add(t); const c=$('formTargetChips').querySelector(`.chip[data-term="${t}"]`) || $('formTargetMouth').querySelector(`.chip[data-term="${t}"]`); if(c) c.classList.add('on'); });
+  (b.dataset.tgt||'').split(',').filter(Boolean).forEach(t=>{ _formTarget.add(t); const c=$('formTargetChips').querySelector(`.chip[data-term="${t}"]`) || $('formTargetMouth').querySelector(`.chip[data-term="${t}"]`) || $('formTargetTaste').querySelector(`.chip[data-term="${t}"]`); if(c) c.classList.add('on'); });
   $('formGo').click();
 }));
 </script>

@@ -1423,13 +1423,15 @@ def _load_flavor_map():
         cols = {c: norm(c).tolist() for c in ("x", "y", "x3", "y3", "z3") if c in df.columns}
         smis, labs = df["smiles"].tolist(), df["label"].tolist()
         aromas = df["aroma_label"].tolist() if "aroma_label" in df.columns else [None] * len(smis)
+        mouth = (df["mouthfeel_label"].tolist() if "mouthfeel_label" in df.columns
+                 else [None] * len(smis))   # dominant trigeminal sensation, for color-by-mouthfeel
         # raw physicochemical values (for the interpretable MW×logP×TPSA axes view — real units)
         mw = df["mw"].tolist() if "mw" in df.columns else [None] * len(smis)
         logp = df["logp"].tolist() if "logp" in df.columns else [None] * len(smis)
         tpsa = df["tpsa"].tolist() if "tpsa" in df.columns else [None] * len(smis)
         pts = []
         for i in range(len(smis)):
-            p = {"label": labs[i], "aroma": aromas[i], "smiles": smis[i],
+            p = {"label": labs[i], "aroma": aromas[i], "mouth": mouth[i], "smiles": smis[i],
                  "name": _table_name(smis[i]) or "",
                  "mw": None if mw[i] != mw[i] else mw[i],      # NaN -> None
                  "logp": None if logp[i] != logp[i] else logp[i],
@@ -1458,6 +1460,57 @@ def api_map():
 _DESIGN = []          # [{smiles, name, tags:set, gras:bool}]
 _DESIGN_DESCS = []    # descriptors with enough molecules to offer as options
 _DESIGN_MOUTHFEEL = []  # trained mouthfeel/chemesthesis sensations, offered as their own pick-list
+_DESIGN_TASTE = []      # trained taste heads, offered as their own pick-list (namespaced taste:*)
+_TERM_ALIASES = {}      # term -> (equivalent terms in the other modality), both directions
+
+# Curated flavor<->note synonyms the string normalizer can't reach: genuinely the same material
+# under two names, not a loose association. Deliberately conservative — "lemon"/"citrus" is NOT
+# here, because citrus is broader than lemon and equating them would silently widen a search.
+_TERM_SYNONYMS = {
+    "blackcurrant": "cassis",       # cassis IS blackcurrant
+    "tangerine": "mandarin",        # tangerine IS a mandarin
+    "orange blossom": "neroli",     # neroli IS orange-blossom
+    "cilantro": "coriander",        # cilantro IS coriander leaf
+    "chocolate": "cocoa",
+    "licorice": "anise",
+    "cheese": "cheesy",
+    "smoke": "smoky",
+    "peppermint": "minty",
+    "spearmint": "minty",
+}
+
+
+def _build_term_aliases():
+    """flavor <-> note aliases, both directions. Auto-derives spelling/adjective pairs (bread ->
+    bready, black pepper -> blackpepper) by normalizing away spacing and common suffixes, then
+    folds in the curated synonym table. Auto-derivation means new vocabulary keeps linking up
+    without anyone maintaining a list."""
+    import re
+
+    def norm(t):
+        t = re.sub(r"[^a-z]", "", t.lower())
+        for suf in ("y", "ic", "ish"):
+            if t.endswith(suf) and len(t) > len(suf) + 3:
+                t = t[: -len(suf)]
+        return t
+
+    by_norm = {}
+    for n in _DESIGN_DESCS:
+        by_norm.setdefault(norm(n), set()).add(n)
+    pairs = set()
+    for f in _FLAVORS:
+        for n in by_norm.get(norm(f), ()):
+            if n != f:
+                pairs.add((f, n))
+    for f, n in _TERM_SYNONYMS.items():
+        if f in _FLAVORS and n in _DESIGN_DESCS:
+            pairs.add((f, n))
+    out = {}
+    for f, n in pairs:                       # link both ways
+        out.setdefault(f, set()).add(n)
+        out.setdefault(n, set()).add(f)
+    _TERM_ALIASES.clear()
+    _TERM_ALIASES.update({k: tuple(sorted(v)) for k, v in out.items()})
 
 
 def _precompute_design():
@@ -1487,11 +1540,16 @@ def _precompute_design():
         for name, clf in P._AROMA_MODELS.items():                 # model-confident aroma
             for i in np.where(clf.predict_proba(X)[:, 1] >= 0.5)[0]:
                 tagsets[i].add(name)
-        for t in ("sweet", "bitter", "umami"):                    # taste
+        # Taste tags are NAMESPACED ("taste:sweet") for the same reason mouthfeel is: `sweet` is
+        # both a taste head and an aroma head, and a bare tag conflated "tastes sweet" with
+        # "smells sweet". `bitter` had additionally leaked into the aroma-notes picker.
+        # EVERY trained taste head, not just sweet/bitter/umami — sour, salty and tasteless are
+        # equally real targets (a neutral, tasteless carrier is a genuine formulation ask).
+        for t in sorted(P._CLASSIFIERS):                          # taste
             clf = P._CLASSIFIERS.get(t)
             if clf is not None:
                 for i in np.where(clf.predict_proba(X)[:, 1] >= 0.5)[0]:
-                    tagsets[i].add(t)
+                    tagsets[i].add(f"taste:{t}")
         # Mouthfeel tags are NAMESPACED ("mouthfeel:pungent"), matching how the profile index keys
         # its dims. Without this, picking `pungent` under Mouthfeel returned sharp-SMELLING
         # molecules (acetic acid, ammonia, CO2) from the far larger aroma:pungent set instead of
@@ -1524,11 +1582,16 @@ def _precompute_design():
         # food-safe carriers), plus any design note with >=5 carriers. Namespaced mouthfeel tags
         # are excluded — they're a separate modality with their own pick-list below.
         _DESIGN_DESCS[:] = sorted(
-            {d for d, n in cnt.items() if n >= 5 and not d.startswith("mouthfeel:")}
-            | set(P._AROMA_MODELS))
-        # Mouthfeel terms stay namespaced ("mouthfeel:cooling") so picking `cooling` here matches
-        # the SENSATION, not the like-named odour note. The UI shows the bare label.
+            {d for d, n in cnt.items() if n >= 5 and ":" not in d} | set(P._AROMA_MODELS))
+        # Mouthfeel and taste terms stay namespaced ("mouthfeel:cooling", "taste:sweet") so picking
+        # `cooling`/`sweet` there matches the SENSATION / the TASTE, not the like-named odour note.
+        # The UI shows the bare label. Only tastes with carriers in the pool are offered.
         _DESIGN_MOUTHFEEL[:] = [f"mouthfeel:{m}" for m in sorted(P._MOUTHFEEL_MODELS)]
+        # EVERY trained taste head is offered, exactly like the aroma heads above — a head with few
+        # confident carriers in this pool (sour, salty) must still be selectable, or the picker
+        # silently hides a dimension the model can actually read.
+        _DESIGN_TASTE[:] = [f"taste:{t}" for t in sorted(P._CLASSIFIERS)]
+        _build_term_aliases()   # needs _FLAVORS + the finished _DESIGN_DESCS
 
 
 def _fpvec(mol):
@@ -1705,9 +1768,10 @@ def _gras_subs(smi, k=3):
 
 @app.get("/api/studio_terms")
 def api_studio_terms():
-    """The unified pick-list: curated flavors (grouped by category), matchable aroma-note
-    descriptors, and mouthfeel sensations — three modalities the studios can target."""
-    return {"flavors": _FLAVOR_CATS, "notes": _DESIGN_DESCS, "mouthfeel": _DESIGN_MOUTHFEEL}
+    """The unified pick-list, one entry per modality the studios can target: curated flavors
+    (grouped by category), aroma-note descriptors, mouthfeel sensations, and basic tastes."""
+    return {"flavors": _FLAVOR_CATS, "notes": _DESIGN_DESCS,
+            "mouthfeel": _DESIGN_MOUTHFEEL, "taste": _DESIGN_TASTE}
 
 
 @app.get("/api/nl")
@@ -1843,8 +1907,20 @@ def _svg_cell(smi):
     return _svg(smi, 104, 62)
 
 
+@lru_cache(maxsize=8192)
+def _tox_flags(smiles):
+    """Tox21 assays this molecule is predicted active in (>=0.5), as a tuple. Caution-only: assay
+    activity is INDICATIVE and warrants review, it is never a toxicity determination (see TOX.md).
+    Cached because the studio calls it once per result row."""
+    mol = Chem.MolFromSmiles(smiles or "")
+    if mol is None:
+        return ()
+    scr = P.predict_tox(mol)
+    return tuple(a["assay"] for a in scr.get("assays", []) if (a.get("probability") or 0) >= 0.5)
+
+
 @app.get("/api/studio")
-def api_studio(terms: str = "", gras: int = 0, offset: int = 0, limit: int = 20):
+def api_studio(terms: str = "", gras: int = 0, no_tox: int = 0, offset: int = 0, limit: int = 20):
     """Unified search: given any mix of flavors and notes, rank the molecules that carry them.
     Each molecule scores by how many distinct picked terms it matches (a flavor's character
     molecule matches that flavor; a molecule with a note matches that note)."""
@@ -1853,6 +1929,10 @@ def api_studio(terms: str = "", gras: int = 0, offset: int = 0, limit: int = 20)
         return {"items": [], "requested": want, "total_matches": 0, "offset": offset, "limit": limit}
     flavor_terms = [t for t in want if t in _FLAVORS]
     note_terms = [t for t in want if t not in _FLAVORS]
+    # cross-list dual-purpose terms: a flavor and its like-named note are the same concept spelled
+    # differently ("black pepper"/"blackpepper", "butter"/"buttery", "cilantro"/"coriander"), so
+    # picking either should surface the other's molecules too.
+    note_terms += [a for t in want for a in _TERM_ALIASES.get(t, ()) if a not in note_terms]
     cand = {}  # skeleton -> {smiles, name, gras, matched:set}
 
     def add(smi, name, is_gras, term):
@@ -1878,6 +1958,11 @@ def api_studio(terms: str = "", gras: int = 0, offset: int = 0, limit: int = 20)
                 add(m["smiles"], m["name"], m["gras"], nt)
                 cand[Chem.MolToInchiKey(Chem.MolFromSmiles(m["smiles"])).split("-")[0]]["tags"] = m["tags"]
     scored = [r for r in cand.values() if not (gras and not r["gras"])]
+    # The 12 Tox21 heads aren't design TARGETS — nobody formulates *for* assay activity — but they
+    # shouldn't be invisible either, so they surface per result and can filter the list. Still
+    # caution-only: an assay flag means "review this", never "this is toxic".
+    if no_tox:
+        scored = [r for r in scored if not _tox_flags(r["smiles"])]
     scored.sort(key=lambda r: (-len(r["matched"]), not r["gras"], r["name"] == ""))
     items = []
     for r in scored[offset:offset + limit]:
@@ -1886,6 +1971,7 @@ def api_studio(terms: str = "", gras: int = 0, offset: int = 0, limit: int = 20)
                       "matched": matched, "n_matched": len(matched),
                       "svg": _svg(r["smiles"], 108, 78),
                       "other": sorted(t for t in r["tags"] if t not in r["matched"])[:5],
+                      "tox_flags": _tox_flags(r["smiles"]),
                       "subs": _gras_subs(r["smiles"])})
     return {"items": items, "requested": want, "flavor_terms": flavor_terms, "note_terms": note_terms,
             "total_matches": len(scored), "offset": offset, "limit": limit}
