@@ -1290,15 +1290,29 @@ def head_catalog():
         meta = _TASTE_META.get(t) if isinstance(_TASTE_META, dict) else None
         return meta.get("auroc") if isinstance(meta, dict) else None
 
+    def _cal(meta, h):
+        """The head's published calibration: where its bar sits, how precise it is there, and
+        whether it may be shown as confident. Surfaced so the catalog is auditable — a head that
+        fires at 0.16 and is right 6% of the time should say so on its own row, not only inside a
+        molecule read."""
+        m = meta.get(h, {})
+        return {"threshold": m.get("threshold"), "precision": m.get("cv_precision"),
+                "recall": m.get("cv_recall"), "n_pos": m.get("n_pos"),
+                "confident_capable": m.get("confident_capable", True)}
+
     def _aroma(a):
-        return {"head": a, "auroc": _AROMA_META.get(a, {}).get("auroc"), "desc": AROMA_DESC.get(a)}
+        return {"head": a, "auroc": _AROMA_META.get(a, {}).get("auroc"),
+                "desc": AROMA_DESC.get(a), **_cal(_AROMA_META, a)}
 
     # mouthfeel = the aroma heads tagged mouthfeel (cooling/pungent) + the dedicated mouthfeel heads
     mouthfeel = [_aroma(a) for a in aroma_heads if a in _MOUTHFEEL_HEADS]
-    mouthfeel += [{"head": h, "auroc": _MOUTHFEEL_META.get(h, {}).get("auroc"), "desc": AROMA_DESC.get(h)}
+    mouthfeel += [{"head": h, "auroc": _MOUTHFEEL_META.get(h, {}).get("auroc"),
+                   "desc": AROMA_DESC.get(h), **_cal(_MOUTHFEEL_META, h)}
                   for h in mouthfeel_heads]
     return {
-        "taste": [{"head": t, "auroc": _taste_auroc(t)} for t in taste_heads],
+        # taste heads keep a flat 0.5: hundreds of positives each, so they were never shy
+        "taste": [{"head": t, "auroc": _taste_auroc(t), "threshold": 0.5,
+                   "confident_capable": True} for t in taste_heads],
         "aroma": [_aroma(a) for a in aroma_heads],
         "mouthfeel": mouthfeel,
         "safety": [{"head": t, "auroc": _TOX_META.get(t, {}).get("auroc"),

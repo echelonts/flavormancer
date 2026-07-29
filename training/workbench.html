@@ -284,6 +284,8 @@
   /* a head that fires but is right <50% of the time out-of-fold: shown, never sold as confident */
   .ameter.indicative .afill{background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(0,0,0,.28) 3px,rgba(0,0,0,.28) 6px)}
   .ameter.indicative .aval b{font-weight:600;opacity:.75;font-style:italic}
+  .hbar.indicative .hb-fill{background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(0,0,0,.28) 3px,rgba(0,0,0,.28) 6px)}
+  .hb-ind{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-left:6px;border:1px solid currentColor;border-radius:3px;padding:0 3px}
   .arow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
   .aname{font-weight:600;font-size:13px;text-transform:capitalize}
   .aval{font-family:var(--mono);font-size:12px;color:var(--muted)}
@@ -1867,20 +1869,29 @@ function renderAroma(ar){
 }
 
 // one compact head bar (name · track · value · AUROC) — shared by the mouthfeel + safety groups
-function headBar(name, score, auroc, color, title){
-  const pct=Math.round((score||0)*100), on=score>=0.5;
+// `cal` carries the head's published calibration when it has one: {threshold, precision,
+// indicative}. Tox heads aren't calibrated and fall back to a flat 0.5, which is correct for them —
+// they have hundreds of positives each and were never shy.
+function headBar(name, score, auroc, color, title, cal){
+  const thr = (cal && cal.threshold!=null) ? cal.threshold : 0.5;
+  const pct=Math.round((score||0)*100), on=(score||0)>=thr;
+  const ind = !!(cal && cal.indicative);
   const au = auroc!=null ? ` <span class="hb-au">· AUROC ${auroc}</span>` : '';
-  return `<div class="hbar${on?'':' dim'}"${title?` title="${title.replace(/"/g,'&quot;')}"`:''}>`+
-    `<span class="hb-name">${name}</span>`+
+  // show WHERE the bar sits and how precise the head is there — a head firing at 16% should say so
+  const cl = (cal && cal.threshold!=null)
+    ? ` <span class="hb-au">· fires ≥${Math.round(thr*100)}%${cal.precision!=null?` · ${Math.round(cal.precision*100)}% precise`:''}</span>` : '';
+  return `<div class="hbar${on?'':' dim'}${ind?' indicative':''}"${title?` title="${title.replace(/"/g,'&quot;')}"`:''}>`+
+    `<span class="hb-name">${name}${ind?'<span class="hb-ind">indicative</span>':''}</span>`+
     `<span class="hb-track"><span class="hb-fill" style="width:${pct}%;background:${color}"></span></span>`+
-    `<span class="hb-val">${pct}%${au}</span></div>`;
+    `<span class="hb-val">${pct}%${au}${cl}</span></div>`;
 }
 // Mouthfeel (chemesthesis) — the 5 trained trigeminal heads, ranked, each with its CV-AUROC
 function renderMouthfeel(mf){
   const grp=$('mouthfeelGroup'), box=$('mouthfeelBars');
   const ds=(mf&&mf.descriptors)||[];
   if(!ds.length){ if(grp) grp.style.display='none'; return; }
-  box.innerHTML = ds.map(d=> headBar(d.sensation, d.score, d.auroc, aromaColor(d.sensation), d.desc)).join('');
+  box.innerHTML = ds.map(d=> headBar(d.sensation, d.score, d.auroc, aromaColor(d.sensation), d.desc,
+                                     {threshold:d.threshold, precision:d.precision, indicative:d.indicative})).join('');
   grp.style.display='block';
 }
 // Safety — the 12 Tox21 caution-only assay heads, most-active first, each with its CV-AUROC
