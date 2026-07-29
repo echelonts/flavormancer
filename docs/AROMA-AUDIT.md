@@ -2,7 +2,7 @@
 
 > **Update — supplement applied, then made food-only.** `build_aroma_supplement.py` adds a curated
 > **public-domain** character-impact set (`aroma_supplement.csv`, resolved via PubChem) for the sparse
-> descriptors below. Result: **42 → 164 heads** (food-safe core + non-food aroma-only tier; see the
+> descriptors below. Result: **42 → 167 heads** (food-safe core + non-food aroma-only tier; see the
 > multi-industry note below), after open-government sourcing (see below) took the
 > curated supplement to **~1,994 labelled molecules**. New heads include `coconut`, `nutty`, `caramel`,
 > `winey`, `onion`, `honey`, `herbal`, `vanilla`, `buttery`, `balsamic`, `smoky`, `cinnamon`, `spicy`,
@@ -28,10 +28,10 @@
 > 2-phenylethanol) instead of the E/Z terpene twins (nerol/geraniol) that dedupe to one row under the
 > connectivity-skeleton key. That was the **food-safe** ceiling at ~86.
 >
-> **Then we walked the road past it — the non-food aroma-only descriptor space — to 164 heads.** The
+> **Then we walked the road past it — the non-food aroma-only descriptor space — to 167 heads.** The
 > corpus is now deliberately **multi-industry**, not food-only: odor is physical, so to read
 > structure→smell well the corpus should include the fragrance space, and a per-molecule **safety flag**
-> (open-gov food registers) — not corpus membership — gates edibility per mode. The same 164 heads serve
+> (open-gov food registers) — not corpus membership — gates edibility per mode. The same 167 heads serve
 > every "Mancer" mode: **Flavormancer** (food chemistry), **Beveragemancer** (beverage), **Aromamancer**
 > (fragrance), **Vapemancer** (inhalation), **Oilmancer** (essential oils). Molecule names are resolved
 > to structures through PubChem and folded in flagged non-food. New heads cleared across several
@@ -60,7 +60,7 @@
 >    its white-floral neighbours (`jasmine`/`gardenia`/`ylang`/`champaca`), nearly doubling their example
 >    counts and de-inflating their small-n scores.
 >
-> `sweet`-odor rides the bar (0.72, documented-only until a GNN). Net: **164 aroma heads / 170 total
+> `sweet`-odor rides the bar (0.72, documented-only until a GNN). Net: **167 aroma heads / 190 total
 > (with the 6 taste heads).** The count is inherently ±2–3 at the margin — ~15 heads sit right at the
 > 10-positive / 0.70-AUROC boundary, so any data change reshuffles which marginal heads ship.
 >

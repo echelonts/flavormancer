@@ -256,7 +256,7 @@ def _flavor_map(label: str, limit: int, full: bool) -> dict:
 def read_flavor(molecule: str) -> dict:
     """Predict the flavor of a single molecule (name or SMILES).
 
-    Returns the six taste-head probabilities, confident aromas plus all 164 aroma scores, the
+    Returns the six taste-head probabilities, confident aromas plus all 167 aroma scores, the
     trained mouthfeel/chemesthesis scores (cooling/pungent/warming/astringent/tingling), GRAS
     status, structural alerts, caution-only Tox21 flags, and the applicability-domain flag.
     Prediction only — tox flags are indicative in-vitro activity, never a determination.
