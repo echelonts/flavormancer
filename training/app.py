@@ -583,9 +583,25 @@ def api_card(q: str = "", dl: int = 0):
                  "tasteless": out.get("tasteless")}
     taste_cells = sorted(((t, float(v) if isinstance(v, (int, float)) else 0.0)
                           for t, v in taste_src.items()), key=lambda kv: -kv[1])
+    # The card is a shareable SNAPSHOT — a PNG can't scroll, and there are 187 heads. So: the 6
+    # tastes ALWAYS render (a complete, fixed row you can compare across cards), while aroma,
+    # mouthfeel and safety show only what actually FIRES, capped. The labels say "N of M" so a
+    # reader knows they're seeing the firing subset, not the whole model.
+    AROMA_CAP = 18                                   # 3 rows of 6 — keeps the card readable
     pa = P.predict_aroma(smi)
-    aroma_cells = sorted(((d["odor"], d["score"]) for d in pa.get("descriptors", [])),
-                         key=lambda kv: -kv[1])
+    _all_aroma = sorted(((d["odor"], d["score"]) for d in pa.get("descriptors", [])),
+                        key=lambda kv: -kv[1])
+    _fired = [c for c in _all_aroma if c[1] >= 0.5]
+    aroma_cells = (_fired or _all_aroma[:3])[:AROMA_CAP]   # nothing firing -> top 3, never a blank card
+    aroma_total, aroma_fired = len(_all_aroma), len(_fired)
+
+    _mol = Chem.MolFromSmiles(smi)
+    mouth_cells = [(d["sensation"], d["score"])
+                   for d in (P.predict_mouthfeel(_mol).get("descriptors", []) if _mol else [])
+                   if d["score"] >= 0.5]
+    tox_cells = [(a["assay"], a["probability"])
+                 for a in ((out.get("safety") or {}).get("tox_screen") or {}).get("assays", [])
+                 if (a.get("probability") or 0) >= 0.5]
 
     pill_items = ([(fl, cream) for fl in tags.get("flavors", [])[:3]]
                   + [(t, _TASTE_RGB.get(t, teal)) for t in tags.get("tastes", [])]
@@ -611,6 +627,15 @@ def api_card(q: str = "", dl: int = 0):
     aroma_grid_y = aroma_label_y + 22
     aroma_rows = (len(aroma_cells) + COLS - 1) // COLS
     content_bottom = aroma_grid_y + aroma_rows * ROW_H
+    # mouthfeel + safety only take space when something actually fires
+    mouth_label_y = content_bottom + 12 if mouth_cells else None
+    mouth_row_y = (mouth_label_y + 22) if mouth_cells else None
+    if mouth_cells:
+        content_bottom = mouth_row_y + ((len(mouth_cells) + COLS - 1) // COLS) * ROW_H
+    tox_label_y = content_bottom + 12 if tox_cells else None
+    tox_row_y = (tox_label_y + 22) if tox_cells else None
+    if tox_cells:
+        content_bottom = tox_row_y + ((len(tox_cells) + COLS - 1) // COLS) * ROW_H
     H = max(560, content_bottom + 56)
 
     img = Image.new("RGB", (W, H), (15, 19, 25))
@@ -678,10 +703,28 @@ def api_card(q: str = "", dl: int = 0):
     for i, (t, v) in enumerate(taste_cells):
         cell(i, taste_row_y, t, v, _TASTE_RGB.get(t, teal))
 
-    # AROMA MODEL — all 24 heads in a 6-wide grid
-    dr.text((GX0, aroma_label_y), f"AROMA MODEL · all {len(aroma_cells)} heads", font=f_lab, fill=muted)
+    # AROMA MODEL — only the heads that fire, capped; label states the subset honestly
+    _shown = len(aroma_cells)
+    _alab = (f"AROMA MODEL · {_shown} of {aroma_total} heads firing"
+             + (f" (top {_shown} shown)" if aroma_fired > _shown else "")
+             if aroma_fired else f"AROMA MODEL · none of {aroma_total} heads firing · strongest {_shown}")
+    dr.text((GX0, aroma_label_y), _alab, font=f_lab, fill=muted)
     for i, (a, v) in enumerate(aroma_cells):
         cell(i % COLS, aroma_grid_y + (i // COLS) * ROW_H, a, v, teal)
+
+    # MOUTHFEEL — trigeminal sensations, only what fires
+    if mouth_cells:
+        dr.text((GX0, mouth_label_y), f"MOUTHFEEL · {len(mouth_cells)} of 5 sensations firing",
+                font=f_lab, fill=muted)
+        for i, (m, v) in enumerate(mouth_cells):
+            cell(i % COLS, mouth_row_y + (i // COLS) * ROW_H, m, v, cream)
+
+    # SAFETY — Tox21 assays, only when flagged; caution-only, never a determination
+    if tox_cells:
+        dr.text((GX0, tox_label_y), f"SAFETY · {len(tox_cells)} Tox21 assay(s) flagged — caution-only, "
+                "indicative in-vitro activity, NOT a toxicity determination", font=f_lab, fill=muted)
+        for i, (a, v) in enumerate(tox_cells):
+            cell(i % COLS, tox_row_y + (i // COLS) * ROW_H, a, v, (192, 85, 58))
 
     # footer
     fy = H - 54
@@ -1905,6 +1948,40 @@ def api_enrichment(q: str = "", sort: str = "name", desc: int = 0, offset: int =
 def _svg_cell(smi):
     """A compact 2D depiction for one enrichment-table row (cached; rendered per visible page)."""
     return _svg(smi, 104, 62)
+
+
+@app.get("/api/map_members")
+@lru_cache(maxsize=512)
+def api_map_members(term: str = "", threshold: float = 0.5):
+    """Every molecule whose head `term` fires >= threshold — not just the ones where it happens to
+    be the DOMINANT label.
+
+    The map colours each molecule by a single winning label, so a head can read "0" in the legend
+    while still being trained on plenty of molecules — they're simply displayed under a rarer
+    co-occurring label. Highlighting from the legend used to match that winner-take-all label, so
+    those heads lit up nothing and looked broken. This returns true membership from the profile
+    index (which carries every head score for every molecule), so no head can ever look empty.
+
+    `term` may be bare ("clarysage") or dimension-qualified ("aroma:clarysage", "mouthfeel:cooling")
+    — bare names resolve to aroma first, matching how the map legend labels them.
+    """
+    t = (term or "").strip().lower()
+    if not t:
+        return {"term": term, "smiles": [], "n": 0}
+    P._ensure_sub_index()
+    smis, profiles, dims = P._SUB_INDEX[1], P._SUB_INDEX[4], P._SUB_INDEX[5]
+    if profiles is None or not smis:
+        return {"term": term, "smiles": [], "n": 0, "note": "profile index not built"}
+    dims = [str(d) for d in dims]
+    col = None
+    for cand in ([t] if ":" in t else [f"aroma:{t}", f"taste:{t}", f"mouthfeel:{t}"]):
+        if cand in dims:
+            col = dims.index(cand)
+            break
+    if col is None:
+        return {"term": term, "smiles": [], "n": 0, "note": "no such head"}
+    hits = [smis[i] for i in range(len(smis)) if float(profiles[i][col]) >= threshold]
+    return {"term": term, "dim": dims[col], "threshold": threshold, "n": len(hits), "smiles": hits}
 
 
 @lru_cache(maxsize=8192)
