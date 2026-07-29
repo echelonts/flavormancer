@@ -219,7 +219,9 @@
   .map-legend span{display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:2px 8px;border-radius:20px;border:1px solid transparent;transition:all .12s}
   .map-legend span:hover{border-color:var(--line)}
   .map-legend span.on{border-color:var(--brand-2);background:rgba(43,196,196,.10);color:var(--ink)}
-  .map-legend span.leg-zero{opacity:.42;cursor:default}
+  /* a (0) head is dimmed but still CLICKABLE — it has molecules, it just never wins the colour */
+  .map-legend span.leg-zero{opacity:.55;cursor:pointer}
+  .map-legend span.leg-zero:hover{opacity:.9}
   .map-legend span.leg-zero:hover{border-color:transparent}
   .map-legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
   .map-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:10px 0 8px}
@@ -2086,6 +2088,15 @@ function setMapColor(c){ _mapColorBy=c;
   mapLegendRender(); drawMap();
 }
 let _mapHi = new Set();  // classes highlighted from the legend (empty = show all evenly)
+const _mapMembers = new Map();  // class -> Set(smiles) of TRUE members (head >= 0.5), from /api/map_members
+// A point is spotlit if its dominant label is picked OR the head actually fires on it. Without the
+// second test, heads that never win the winner-take-all colour highlight nothing and look broken.
+function mapHit(p){
+  if(!_mapHi.size) return true;
+  if(_mapHi.has(mapLabel(p))) return true;
+  for(const l of _mapHi){ const m=_mapMembers.get(l); if(m && m.has(p.smiles)) return true; }
+  return false;
+}
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
   // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 164 aroma heads /
@@ -2097,10 +2108,24 @@ function mapLegendRender(){
   const labs=present.concat(empty); if(counts.other) labs.push('other');
   $('mapLegend').innerHTML=labs.map(l=>{
     const n=counts[l]||0, zero=n===0;
-    return `<span class="leg${_mapHi.has(l)?' on':''}${zero?' leg-zero':''}" data-l="${l.replace(/"/g,'&quot;')}"><i style="background:${legendColor(l)}"></i>${l} (${n})</span>`;
+    // A "(0)" head isn't empty — it just never WINS the winner-take-all colour. Clicking it
+    // fetches true membership (every molecule the head predicts >=0.5), so no head looks broken.
+    const t = zero ? `${l}: no molecule shows this as its dominant note — click to highlight every molecule the head predicts`
+                   : `${n} molecule${n===1?'':'s'} show ${l} as their dominant note — click to spotlight`;
+    return `<span class="leg${_mapHi.has(l)?' on':''}${zero?' leg-zero':''}" data-l="${l.replace(/"/g,'&quot;')}" title="${t.replace(/"/g,'&quot;')}"><i style="background:${legendColor(l)}"></i>${l} (${n})</span>`;
   }).join('');
-  $('mapLegend').querySelectorAll('.leg:not(.leg-zero)').forEach(s=> s.addEventListener('click', ()=>{
-    const l=s.dataset.l; if(_mapHi.has(l)) _mapHi.delete(l); else _mapHi.add(l); mapLegendRender(); drawMap();
+  $('mapLegend').querySelectorAll('.leg').forEach(s=> s.addEventListener('click', async ()=>{
+    const l=s.dataset.l;
+    if(_mapHi.has(l)){ _mapHi.delete(l); _mapMembers.delete(l); }
+    else {
+      _mapHi.add(l);
+      // pull true membership so a zero-count (or merely under-represented) head still lights up
+      if(l!=='other' && !_mapMembers.has(l)){
+        try{ const d=await getJSON('/api/map_members?term='+encodeURIComponent(l));
+             _mapMembers.set(l, new Set(d.smiles||[])); }catch(_){ _mapMembers.set(l, new Set()); }
+      }
+    }
+    mapLegendRender(); drawMap();
   }));
 }
 
@@ -2132,7 +2157,7 @@ function drawDensity(ctx, screenOf){
   ctx.save(); ctx.globalCompositeOperation='lighter';
   for(const p of _mapPts){
     const l=mapLabel(p); if(!l||l==='other') continue;
-    if(hl && !_mapHi.has(l)) continue;
+    if(hl && !mapHit(p)) continue;
     const s=screenOf(p); if(!s||s.x<-9000||!isFinite(s.x)||!isFinite(s.y)) continue;
     ctx.fillStyle=mapColor(p); ctx.globalAlpha=A;
     ctx.beginPath(); ctx.arc(s.x,s.y,R,0,7); ctx.fill();
@@ -2172,10 +2197,10 @@ function draw2D(){
   drawDensity(ctx, p=>({x:px(p),y:py(p)}));
   const hl=_mapHi.size;
   ctx.globalCompositeOperation='lighter';  // glow only on shown/highlighted points (subtle by default)
-  for(const p of _mapPts){ if(hl && !_mapHi.has(mapLabel(p))) continue; const x=px(p),y=py(p); ctx.fillStyle=mapColor(p);
+  for(const p of _mapPts){ if(hl && !mapHit(p)) continue; const x=px(p),y=py(p); ctx.fillStyle=mapColor(p);
     ctx.beginPath(); ctx.arc(x,y,hl?5.2:3.2,0,7); ctx.globalAlpha=hl?.16:.045; ctx.fill(); }
   ctx.globalCompositeOperation='source-over';
-  for(const p of _mapPts){ const on=!hl||_mapHi.has(mapLabel(p)),x=px(p),y=py(p);
+  for(const p of _mapPts){ const on=!hl||mapHit(p),x=px(p),y=py(p);
     ctx.fillStyle=on?mapColor(p):'#39424C'; ctx.beginPath(); ctx.arc(x,y,on?2.4:1.4,0,7); ctx.globalAlpha=on?(hl?.96:.82):.16; ctx.fill(); }
   ctx.globalAlpha=1;
   ctx.globalAlpha=1; _mapProj={px,py};
@@ -2221,10 +2246,10 @@ function drawProps(){
   // points
   const hl=_mapHi.size;
   ctx.globalCompositeOperation='lighter';
-  for(const p of _mapPts){ if(p.mw==null||p.logp==null||(hl&&!_mapHi.has(mapLabel(p)))) continue; const x=bx(p.mw),y=by(p.logp); ctx.fillStyle=mapColor(p);
+  for(const p of _mapPts){ if(p.mw==null||p.logp==null||(hl&&!mapHit(p))) continue; const x=bx(p.mw),y=by(p.logp); ctx.fillStyle=mapColor(p);
     ctx.beginPath(); ctx.arc(x,y,hl?5:3,0,7); ctx.globalAlpha=hl?.15:.04; ctx.fill(); }
   ctx.globalCompositeOperation='source-over';
-  for(const p of _mapPts){ if(p.mw==null||p.logp==null) continue; const on=!hl||_mapHi.has(mapLabel(p)),x=bx(p.mw),y=by(p.logp);
+  for(const p of _mapPts){ if(p.mw==null||p.logp==null) continue; const on=!hl||mapHit(p),x=bx(p.mw),y=by(p.logp);
     ctx.fillStyle=on?mapColor(p):'#39424C'; ctx.beginPath(); ctx.arc(x,y,on?2.4:1.4,0,7); ctx.globalAlpha=on?(hl?.95:.8):.15; ctx.fill(); }
   ctx.globalAlpha=1;
   ctx.globalAlpha=1;
@@ -2283,10 +2308,10 @@ function draw3D(){
   drawDensity(ctx, p=>{ const s=proj(p); return {x:s.sx,y:s.sy}; });
   const hl=_mapHi.size;
   ctx.globalCompositeOperation='lighter';  // glow with depth; subtle by default, strong when highlighting
-  for(const {p,pr} of all){ if(hl && !_mapHi.has(mapLabel(p))) continue; const t=pr.d+0.5, rr=1.7+2.1*t, a=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fillStyle=mapColor(p);
+  for(const {p,pr} of all){ if(hl && !mapHit(p)) continue; const t=pr.d+0.5, rr=1.7+2.1*t, a=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fillStyle=mapColor(p);
     ctx.beginPath(); ctx.arc(pr.sx,pr.sy,rr*(hl?2.1:1.5),0,7); ctx.globalAlpha=a*(hl?.2:.07); ctx.fill(); }
   ctx.globalCompositeOperation='source-over';
-  for(const {p,pr} of all){ const on=!hl||_mapHi.has(mapLabel(p)); const t=pr.d+0.5, rr=1.7+2.1*t, a=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fillStyle=on?mapColor(p):'#39424C';
+  for(const {p,pr} of all){ const on=!hl||mapHit(p); const t=pr.d+0.5, rr=1.7+2.1*t, a=Math.max(.22,Math.min(1,.35+.6*t)); ctx.fillStyle=on?mapColor(p):'#39424C';
     ctx.beginPath(); ctx.arc(pr.sx,pr.sy,on?rr:rr*.7,0,7); ctx.globalAlpha=on?a:a*.28; ctx.fill(); }
   ctx.globalAlpha=1; _mapProj={px:p=>proj(p).sx, py:p=>proj(p).sy};
 }
