@@ -82,6 +82,35 @@ CURATED = {
     "vegetable":["2-isobutyl-3-methoxypyrazine", "2-isopropyl-3-methoxypyrazine", "dimethyl sulfide", "2-acetylpyrrole"],
     "grassy":   ["cis-3-hexenal", "cis-3-hexen-1-ol", "trans-2-hexenal", "hexanal",
                  "trans-2-hexen-1-ol", "cis-3-hexenyl acetate"],
+    # --- Heads that were MEMORIZING (#256): each fired on exactly its own training molecules and
+    # nothing else. The fix is structural DIVERSITY within the class, not more of one scaffold —
+    # the same approach that moved `tingling` off zero in #247. All well-established
+    # character-impact chemistry for these materials, public-domain flavour/essential-oil facts.
+    "pine":     ["alpha-pinene", "beta-pinene", "camphene", "delta-3-carene", "terpinolene",
+                 "myrcene", "bornyl acetate", "isobornyl acetate", "longifolene", "borneol",
+                 "verbenone", "alpha-terpineol"],
+    "eucalyptus": ["1,8-cineole", "alpha-terpineol", "terpinen-4-ol", "p-cymene", "aromadendrene",
+                 "globulol", "alpha-phellandrene", "gamma-terpinene", "trans-pinocarveol"],
+    "fennel":   ["anethole", "fenchone", "estragole", "alpha-phellandrene", "anisaldehyde",
+                 "fenchyl alcohol", "limonene", "beta-phellandrene", "camphene"],
+    "celery":   ["3-n-butylphthalide", "sedanolide", "sedanenolide", "neocnidilide",
+                 "beta-selinene", "3-n-butyl-4,5-dihydrophthalide", "senkyunolide A", "ligustilide"],
+    "rosemary": ["1,8-cineole", "camphor", "borneol", "verbenone", "alpha-pinene", "bornyl acetate",
+                 "camphene", "isoborneol", "rosmarinic acid"],
+    "turmeric": ["ar-turmerone", "alpha-turmerone", "beta-turmerone", "ar-curcumene", "zingiberene",
+                 "beta-sesquiphellandrene", "curlone", "curcumene"],
+    "allspice": ["eugenol", "methyl eugenol", "beta-caryophyllene", "1,8-cineole", "chavicol",
+                 "eugenyl acetate", "alpha-phellandrene", "terpinen-4-ol"],
+    "frankincense": ["incensole", "incensole acetate", "alpha-pinene", "octyl acetate", "verbenone",
+                 "serratol", "cembrene", "alpha-thujene", "octanol"],
+    "narcissus": ["indole", "p-cresol", "benzyl acetate", "cinnamyl alcohol", "benzyl benzoate",
+                 "methyl benzoate", "alpha-terpineol", "eugenol", "benzyl alcohol"],
+    "freesia":  ["linalool", "alpha-ionone", "beta-ionone", "geraniol", "nerol", "benzaldehyde",
+                 "dihydro-beta-ionone", "linalyl acetate", "citronellol"],
+    "elemi":    ["elemol", "elemicin", "limonene", "alpha-phellandrene", "beta-elemene",
+                 "dill apiole", "elemene", "sabinene"],
+    "costus":   ["costunolide", "dehydrocostus lactone", "costol", "costic acid",
+                 "dihydrocostunolide", "alpha-costene", "aplotaxene"],
     "green":    ["cis-3-hexenal", "trans-2-hexenal", "cis-3-hexen-1-ol", "hexanal"],
     # pungent (an odor/chemesthesis head, also tagged mouthfeel): sharp biting Piper long/black-pepper
     # amides on top of the corpus's documented pungent molecules (piperine, isothiocyanates, etc.)
