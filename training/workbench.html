@@ -281,6 +281,9 @@
   .odor-thr span{color:var(--muted);font-size:12px}
   .ameter{margin:8px 0}
   .ameter.dim{opacity:.4}.ameter.dim:hover{opacity:.75}
+  /* a head that fires but is right <50% of the time out-of-fold: shown, never sold as confident */
+  .ameter.indicative .afill{background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(0,0,0,.28) 3px,rgba(0,0,0,.28) 6px)}
+  .ameter.indicative .aval b{font-weight:600;opacity:.75;font-style:italic}
   .arow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
   .aname{font-weight:600;font-size:13px;text-transform:capitalize}
   .aval{font-family:var(--mono);font-size:12px;color:var(--muted)}
@@ -1828,11 +1831,20 @@ function renderAroma(ar){
       const pct=Math.round(d.score*100); const col=aromaColor(d.odor);
       const isDoc = docSet.has(String(d.odor).toLowerCase());
       const tag = isDoc ? '<span class="tag measured">documented</span>' : '<span class="tag predicted">predicted</span>';
-      const lvl = pct>=65?'likely':pct>=40?'possible':pct>=15?'weak':'unlikely';
-      const au = (d.auroc && !isDoc) ? ` <span class="au">· AUROC ${d.auroc}</span>` : '';
+      // Level is read against the head's OWN calibrated threshold, not a flat percentage — a head
+      // whose bar sits at 0.16 is genuinely firing at 20%, and calling that "weak" would repeat
+      // the mistake the calibration fixed. Heads that never reach 50% out-of-fold precision are
+      // labelled `indicative`: real evidence, never dressed up as a confident call.
+      const thrH = (d.threshold!=null) ? d.threshold : 0.5;
+      const fires = d.score >= thrH;
+      const lvl = d.indicative ? 'indicative'
+                : d.confident  ? (d.score >= thrH + (1-thrH)*0.5 ? 'likely' : 'possible')
+                : (d.score >= thrH*0.6 ? 'weak' : 'unlikely');
+      const prec = (d.precision!=null) ? ` · ${Math.round(d.precision*100)}% precise` : '';
+      const au = (d.auroc && !isDoc) ? ` <span class="au">· AUROC ${d.auroc}${prec}</span>` : '';
       const blurb = d.desc || AROMA_HELP[d.odor];  // API is canonical; local map is the fallback
       const help = blurb ? `<div class="meter-help">${blurb}</div>` : '';
-      return `<div class="ameter${d.confident?'':' dim'}">`+
+      return `<div class="ameter${fires?'':' dim'}${d.indicative?' indicative':''}">`+
         `<div class="arow"><span class="aname" style="color:${col}">${d.odor}${tag}</span>`+
         `<span class="aval"><b>${lvl}</b> · ${pct}%${au}</span></div>`+
         `<div class="atrack"><div class="afill" style="width:${pct}%;background:${col}"></div></div>${help}</div>`;

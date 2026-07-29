@@ -589,16 +589,19 @@ def api_card(q: str = "", dl: int = 0):
     # reader knows they're seeing the firing subset, not the whole model.
     AROMA_CAP = 18                                   # 3 rows of 6 — keeps the card readable
     pa = P.predict_aroma(smi)
-    _all_aroma = sorted(((d["odor"], d["score"]) for d in pa.get("descriptors", [])),
-                        key=lambda kv: -kv[1])
-    _fired = [c for c in _all_aroma if c[1] >= 0.5]
+    # rank by score but decide "fired" from the head's OWN calibrated threshold, which
+    # predict_aroma already applied — re-thresholding at a flat 0.5 here would disagree with the
+    # modal for exactly the thin heads that needed calibrating
+    _descs = sorted(pa.get("descriptors", []), key=lambda d: -d["score"])
+    _all_aroma = [(d["odor"], d["score"]) for d in _descs]
+    _fired = [(d["odor"], d["score"]) for d in _descs if d.get("confident")]
     aroma_cells = (_fired or _all_aroma[:3])[:AROMA_CAP]   # nothing firing -> top 3, never a blank card
     aroma_total, aroma_fired = len(_all_aroma), len(_fired)
 
     _mol = Chem.MolFromSmiles(smi)
     mouth_cells = [(d["sensation"], d["score"])
                    for d in (P.predict_mouthfeel(_mol).get("descriptors", []) if _mol else [])
-                   if d["score"] >= 0.5]
+                   if d.get("confident")]
     tox_cells = [(a["assay"], a["probability"])
                  for a in ((out.get("safety") or {}).get("tox_screen") or {}).get("assays", [])
                  if (a.get("probability") or 0) >= 0.5]

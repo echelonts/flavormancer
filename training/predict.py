@@ -1101,8 +1101,38 @@ def _aroma_scores(smiles):
     return _aroma_scores_canon(Chem.MolToSmiles(m))
 
 
+def _head_threshold(meta, name, override=None):
+    """The probability at or above which a head counts as FIRING.
+
+    Not a flat 0.5. Each head carries its own threshold, fitted on out-of-fold predictions at
+    training time (train_aroma._calibrate) and stored in its manifest. The thin heads need this:
+    with 13 positives against 2400 negatives a forest hedges, so a genuine pine match can land at
+    0.42 and a flat cut-off would silently withhold it — while a head with 800 positives has no
+    such problem and keeps a threshold near 0.5.
+
+    This decides only whether a descriptor is marked *confident*. The raw probability is returned
+    and displayed either way, so nothing is hidden and nothing is inflated.
+    """
+    if override is not None:
+        return override
+    t = meta.get(name, {}).get("threshold")
+    return float(t) if isinstance(t, (int, float)) else 0.5
+
+
+def _head_capable(meta, name):
+    """Whether this head may be presented as making a CONFIDENT call.
+
+    False for heads that never reach 50% out-of-fold precision at any threshold — they are right
+    less than half the time when they fire, so calling them confident would be a lie no matter
+    where the cut-off sits. Such a head keeps its score and its place in the profile (it is still
+    real evidence, and often far better than the base rate); it is reported as INDICATIVE instead.
+    Heads trained before calibration shipped have no flag, and are trusted as before.
+    """
+    return meta.get(name, {}).get("confident_capable", True)
+
+
 @lru_cache(maxsize=8192)
-def predict_aroma(smiles, top_k=8, threshold=0.5):
+def predict_aroma(smiles, top_k=8, threshold=None):
     """Predicted odor descriptors from RandomForest heads trained on the PUBLIC-DOMAIN HSDB
     odor corpus (see docs/AROMA.md). Returns the descriptors the model scores above threshold,
     each with its probability and the head's CV-AUROC. This is PRESENCE/ABSENCE (the free-text
@@ -1115,17 +1145,27 @@ def predict_aroma(smiles, top_k=8, threshold=0.5):
     if scores is None:
         return {"available": False,
                 "note": "aroma model not trained here — build with train_aroma.py"}
-    preds = [{"odor": name, "score": p, "confident": p >= threshold,
-              "auroc": _AROMA_META.get(name, {}).get("auroc"),
-              "desc": AROMA_DESC.get(name)}
-             for name, p in scores.items()]
+    preds = []
+    for name, p in scores.items():
+        thr = _head_threshold(_AROMA_META, name, threshold)
+        fires, capable = p >= thr, _head_capable(_AROMA_META, name)
+        preds.append({"odor": name, "score": p, "threshold": thr,
+                      # a head that never reaches 50% out-of-fold precision fires as INDICATIVE,
+                      # never as confident — see _head_capable
+                      "confident": fires and capable,
+                      "indicative": fires and not capable,
+                      "precision": _AROMA_META.get(name, {}).get("cv_precision"),
+                      "auroc": _AROMA_META.get(name, {}).get("auroc"),
+                      "desc": AROMA_DESC.get(name)})
     preds.sort(key=lambda d: -d["score"])
     # Return EVERY head (like the taste meters list every taste), ranked, each flagged confident
     # or not — so the read shows the full aroma profile across all trained descriptor models, not
     # just the ones that fired. `top` is the confident shortlist for compact tag uses elsewhere.
     confident = [d for d in preds if d["confident"]]
+    indicative = [d for d in preds if d["indicative"]]
     return {"available": True, "predicted": True, "descriptors": preds,
             "top": (confident or preds[:3]), "any_confident": bool(confident),
+            "indicative": indicative,
             "note": "presence/absence model on public-domain HSDB odor text; not intensity"}
 
 
@@ -1150,7 +1190,11 @@ def predict_mouthfeel(mol):
     preds = []
     for name, clf in sorted(_MOUTHFEEL_MODELS.items()):
         p = round(float(clf.predict_proba(x)[0, 1]), 3)
-        preds.append({"sensation": name, "score": p, "confident": p >= 0.5,
+        thr = _head_threshold(_MOUTHFEEL_META, name)
+        fires, capable = p >= thr, _head_capable(_MOUTHFEEL_META, name)
+        preds.append({"sensation": name, "score": p, "threshold": thr,
+                      "confident": fires and capable, "indicative": fires and not capable,
+                      "precision": _MOUTHFEEL_META.get(name, {}).get("cv_precision"),
                       "auroc": _MOUTHFEEL_META.get(name, {}).get("auroc"),
                       "desc": _MOUTHFEEL_DESC.get(name)})
     preds.sort(key=lambda d: -d["score"])
@@ -1314,8 +1358,11 @@ def _build_sub_index():
             for name in aroma_heads:
                 col = _AROMA_MODELS[name].predict_proba(X)[:, 1]
                 cols.append(col)
+                # per-head threshold, same as a live read — otherwise the precomputed chip list
+                # and the on-the-fly one disagree for exactly the thin heads this fixes
+                thr = _head_threshold(_AROMA_META, name)
                 for i in range(len(smis)):
-                    if col[i] >= 0.5:
+                    if col[i] >= thr:
                         aromas[i].append(name)
             cols += [_MOUTHFEEL_MODELS[h].predict_proba(X)[:, 1] for h in mouthfeel_heads]
             profile_dims = ([f"taste:{t}" for t in taste_heads] + [f"aroma:{a}" for a in aroma_heads]
