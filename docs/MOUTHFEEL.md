@@ -15,14 +15,16 @@ block (the same stack as taste/aroma), in their own `mouthfeel_models/` director
 | head | what it is | held-out CV-AUROC |
 |---|---|---|
 | **cooling** | TRPM8 coolants — menthol family + food-authorised WS-agents | 0.94 |
-| **pungent** | TRPV1 / mustard-oil heat & bite — capsaicinoids, isothiocyanates, allium sulfur | 0.98 |
-| **warming** | capsaicinoid & warm-spice heat — chili, pepper, ginger, cinnamon | 0.99 |
-| **astringent** | tannins & polyphenols — the puckering, mouth-drying sensation | 1.00 |
-| **tingling** | paresthesia alkylamides — Sichuan-pepper sanshools, jambu spilanthol, ZP-amides | 1.00 |
+| **pungent** | TRPV1 / mustard-oil heat & bite — capsaicinoids, isothiocyanates, allium sulfur | 0.97 |
+| **warming** | capsaicinoid & warm-spice heat — chili, pepper, ginger, cinnamon | 0.98 |
+| **astringent** | tannins & polyphenols — the puckering, mouth-drying sensation | 0.95 |
+| **tingling** | paresthesia alkylamides — sanshools, spilanthol, ZP-amides, Echinacea/Anacyclus amides | 1.00 |
 
 The high AUROCs reflect **narrow, structurally-distinct classes** (a capsaicinoid does not look like
 a tannin) trained against a broad random background — honest for what they are, but not a claim of
 fine-grained intensity resolution. Like aroma, this is **presence/absence**, not scored intensity.
+A high AUROC alone does not prove a head is useful; see *Does a head generalize, or is it
+memorizing?* below for the test that does.
 
 ## `cooling` / `pungent` exist in **both** aroma and mouthfeel
 
@@ -53,8 +55,31 @@ tannic acid 21 CFR) — but that a molecule is a good *warming* example does not
 flavouring. The per-molecule food-safe flag and the standing IP/food review gate still govern any
 commercial use, exactly as for the aroma corpus.
 
-## Near-misses (documented, not shipped)
+## Does a head generalize, or is it memorizing?
 
-`tingling` sits right at the bar — the pure sanshool/spilanthol/ZP-amide class is genuinely small
-(~11 public structures). It ships, but strictly on real paresthesia agents; the Piper long-pepper
-amides that *read pungent* were routed to the aroma `pungent` head instead, not used to pad tingling.
+A high CV-AUROC on a narrow, structurally distinctive class can mean "this head learned the class"
+or "this head memorized its training molecules" — and the two look identical in the AUROC column.
+The honest test is different: run the head over the whole universe and count how many molecules it
+fires on that were **not** in its training set.
+
+Measured over 8.8k molecules:
+
+| head | fires | trained on | **novel** |
+|---|---|---|---|
+| cooling | 32 | 14 | **16** |
+| pungent | 24 | 12 | **12** |
+| warming | 21 | 12 | **9** |
+| astringent | 19 | 11 | **8** |
+| tingling | 16 | 18 | **2** |
+
+`cooling` is the clearest case of the model actually working: it independently surfaced **AR-15512**,
+**menthyl lactate** and **menthone glycerol ketal** — real commercial coolants it was never shown.
+
+**`tingling` remains the weak one, and this is a known limitation.** Trained only on Zanthoxylum
+sanshools it generalized to *nothing* — it fired on exactly its own training molecules, i.e. it was
+a lookup table wearing a 1.00 AUROC. Broadening the positives with paresthesia amides from other
+genera (Echinacea tetraenoic isobutylamides, Anacyclus, Heliopsis, Piper — deliberately different
+chain lengths and unsaturation patterns) moved it to **2 novel hits**, one of which is piperine.
+That is real generalization but a thin margin: the class of public tingle structures is genuinely
+small, and the head still leans on the scaffold it was taught. Treat a tingling prediction on an
+unfamiliar scaffold with less confidence than the other four; #247 tracks broadening it further.

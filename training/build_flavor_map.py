@@ -178,7 +178,22 @@ if __name__ == "__main__":
                         if prob[name][i] >= bp:
                             bp, best[i] = prob[name][i], name
             out["aroma_label"] = best
+            # dominant MOUTHFEEL sensation (for the map's "color by mouthfeel" mode). Straight
+            # strongest-head-over-0.5: unlike aroma there's no documented corpus to prefer, and
+            # with only five heads there's no rarity problem to correct for.
+            if P._MOUTHFEEL_MODELS:
+                mbest, mbp = ["other"] * len(out), [0.5] * len(out)
+                for name, clf in P._MOUTHFEEL_MODELS.items():
+                    col = clf.predict_proba(Xf)[:, 1]
+                    for i in range(len(out)):
+                        if col[i] >= mbp[i]:
+                            mbp[i], mbest[i] = col[i], name
+                out["mouthfeel_label"] = mbest
     out.to_parquet("flavor_map.parquet")
+    mf = ""
+    if "mouthfeel_label" in out.columns:
+        hits = int((out.mouthfeel_label != "other").sum())
+        mf = f", mouthfeel-labelled={hits}"
     print(f"flavor_map.parquet: {len(out)} points  "
           f"({', '.join(f'{t}={int((out.label == t).sum())}' for t in TASTES)}, "
-          f"other={int((out.label == 'other').sum())})")
+          f"other={int((out.label == 'other').sum())}{mf})")
