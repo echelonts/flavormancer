@@ -15,6 +15,7 @@ Usage: python build_enrichment.py            # -> master_enrichment.parquet
 """
 import contextlib
 import glob
+import re
 
 import numpy as np
 import pandas as pd
@@ -120,6 +121,69 @@ def _documented_isomer_rows(name_by_skel):
     return rows
 
 
+def _pick_name(pr):
+    """Best display name from a properties row: common name if there is one, else the IUPAC name.
+
+    Written the long way ON PURPOSE. The obvious `pr.get("common_name") or pr.get("iupac_name")`
+    is a real bug here: a missing pandas value is NaN, NaN is TRUTHY, so the `or` returns NaN and
+    never falls through to the IUPAC name. That silently left ~500 molecules unnamed even though a
+    perfectly good name sat in the table — they rendered as raw SMILES in the grid and on cards."""
+    for key in ("common_name", "iupac_name"):
+        v = pr.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
+_CAS_INVERTED = re.compile(r"^([A-Za-z0-9\-\[\]\(\)']+), ([0-9A-Za-z\-\(\),+\u00b1\s]+?)-?$")
+
+
+def _uninvert_cas(name):
+    """Un-invert CAS-style index names so they read forwards.
+
+    PubChem/CAS list many compounds parent-first — "Carvone, (+-)-", "Limonene, (-)-",
+    "Cyclohexanol, 5-methyl-2-(1-methylethenyl)-". That ordering exists for alphabetised print
+    indexes and reads backwards to everyone else. Three cases, because they resolve differently:
+      stereo descriptor   "Carvone, (+-)-"          -> "(+-)-Carvone"       (parent keeps its case)
+      derivative suffix   "Linalool, oxide"          -> "Linalool oxide"
+                          "2-Hexen-1-ol, 1-acetate"  -> "2-Hexen-1-ol 1-acetate"
+      substituent prefix  "Cyclohexanol, 5-methyl-"  -> "5-methyl-cyclohexanol"
+    Anything that doesn't match is returned untouched — a wrong "fix" is worse than none."""
+    if not isinstance(name, str) or ", " not in name:
+        return name
+    m = _CAS_INVERTED.match(name.strip())
+    if not m:
+        return name
+    parent, mod = m.group(1), m.group(2).strip().rstrip("-").strip()
+    if not mod:
+        return parent
+    # 1. pure stereo / optical descriptor -> prefix, keep the parent's capitalisation
+    if re.fullmatch(r"[\(\[][^)\]]*[\)\]]", mod) or mod.lower() in ("cis", "trans", "d", "l", "dl"):
+        return f"{mod}-{parent}"
+    # 2. a derivative/functional word -> it's a suffix, not a substituent
+    if re.search(r"(acetate|oxide|ester|ether|hydrate|hydrochloride|anhydride|lactone|"
+                 r"[a-z]+oate|[a-z]+ate|alcohol|aldehyde|ketone|acid)$", mod, re.IGNORECASE):
+        return f"{parent} {mod}"
+    # 3. otherwise a substituent prefix -> lowercase the parent, which is now mid-name
+    return f"{mod}-{parent[0].lower()}{parent[1:]}"
+
+
+def _curated_names():
+    """{skeleton -> human name} from the curated CSVs (flavors + aroma/mouthfeel supplements).
+    These are the names a flavorist actually uses — "gamma-nonalactone", "hydroxy-alpha-sanshool" —
+    and for the molecules we hand-added they are usually the ONLY good name available."""
+    import csv
+    out = {}
+    for path in ("flavors.csv", "aroma_supplement.csv", "mouthfeel_supplement.csv"):
+        with contextlib.suppress(Exception), open(path, encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                nm = (r.get("molecule") or "").strip()
+                m = Chem.MolFromSmiles((r.get("smiles") or "").strip())
+                if nm and m is not None:
+                    out.setdefault(Chem.MolToInchiKey(m).split("-")[0], nm)
+    return out
+
+
 def _taste_by_skel():
     out = {}
     try:
@@ -150,8 +214,9 @@ if __name__ == "__main__":
     props = _by_skel("properties.parquet",
                      ["common_name", "iupac_name", "melting_point_c", "boiling_point_c"])
     taste_doc = _taste_by_skel()
+    curated = _curated_names()   # human names for the molecules we hand-curated
     print(f"{len(structs)} molecules; {len(props)} with crawl properties; "
-          f"{len(taste_doc)} with documented taste", flush=True)
+          f"{len(taste_doc)} with documented taste; {len(curated)} curated names", flush=True)
 
     skels, smis, rows, feats = [], [], [], []
     for skel, smi in structs.items():
@@ -159,7 +224,11 @@ if __name__ == "__main__":
         if m is None:
             continue
         pr = props.get(skel, {})
-        name = pr.get("common_name") or pr.get("iupac_name")
+        # Curated FIRST: those names were hand-picked as what a flavorist calls the molecule,
+        # and PubChem's "common_name" is often systematic anyway (spilanthol's is
+        # "N-(2-Methylpropyl)-2,6,8-decatrienamide"). Only fall through to PubChem when we
+        # haven't named it ourselves.
+        name = _uninvert_cas(curated.get(skel) or _pick_name(pr))
         rows.append({
             "inchikey_skel": skel, "smiles": smi,
             "name": name if isinstance(name, str) else None,
@@ -221,7 +290,7 @@ if __name__ == "__main__":
         r["tox_flags"] = ",".join(n for n, col in tox_cols.items() if col[i] >= 0.5)  # assays firing >=0.5
 
     # first-class rows for stereoisomers that differ in documented odor/taste
-    name_by_skel = {sk: (props.get(sk, {}).get("common_name") or props.get(sk, {}).get("iupac_name"))
+    name_by_skel = {sk: _uninvert_cas(curated.get(sk) or _pick_name(props.get(sk, {})))
                     for sk in structs}
     iso_rows = _documented_isomer_rows(name_by_skel)
     if iso_rows:
