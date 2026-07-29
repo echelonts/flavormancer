@@ -445,7 +445,7 @@ def api_substitutes(q: Query):
 @app.post("/api/precomputed")
 def api_precomputed(q: Query):
     """Fast check: is this molecule's profile already in the index (instant read) or does it need a
-    fresh 170-head compute? Lets the UI show a 'conjuring a fresh reading' note for novel molecules."""
+    fresh 178-head compute? Lets the UI show a 'conjuring a fresh reading' note for novel molecules."""
     smi = _resolve(q.smiles)
     return {"precomputed": bool(smi and P.is_precomputed(smi))}
 
@@ -583,7 +583,7 @@ def api_card(q: str = "", dl: int = 0):
                  "tasteless": out.get("tasteless")}
     taste_cells = sorted(((t, float(v) if isinstance(v, (int, float)) else 0.0)
                           for t, v in taste_src.items()), key=lambda kv: -kv[1])
-    # The card is a shareable SNAPSHOT — a PNG can't scroll, and there are 187 heads. So: the 6
+    # The card is a shareable SNAPSHOT — a PNG can't scroll, and there are 190 heads. So: the 6
     # tastes ALWAYS render (a complete, fixed row you can compare across cards), while aroma,
     # mouthfeel and safety show only what actually FIRES, capped. The labels say "N of M" so a
     # reader knows they're seeing the firing subset, not the whole model.
@@ -1315,7 +1315,7 @@ def _prewarm_formulation():
     with contextlib.suppress(Exception):  # best-effort
         P.substitute("CCO")
         # Warm the PROFILE path too: builds the normalized reference matrix (_profiles_unit, the
-        # 8k×170 renormalization) once here instead of on the first /api/substitutes.
+        # 8k×178 renormalization) once here instead of on the first /api/substitutes.
         P.substitutes("CCO")
     for n in _FORMULATION_WARM:
         with contextlib.suppress(Exception):  # best-effort warmup; a miss just means a cold first hit
@@ -1323,7 +1323,7 @@ def _prewarm_formulation():
             m = Chem.MolFromSmiles(smi) if smi else None
             if m is not None:
                 canon = Chem.MolToSmiles(m)
-                P.predict_aroma(canon)   # fills the shared 164-head aroma cache
+                P.predict_aroma(canon)   # fills the shared 167-head aroma cache
                 P.substitutes(canon)     # taste heads + profile cosine, so the demo chips are instant
 
 

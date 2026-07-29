@@ -17,7 +17,7 @@ running entirely on hardware you own.
 <p align="center">
   <img src="docs/assets/flavor-map.png" alt="Flavor-space map in 3D on MW × logP × TPSA axes, colored by taste and aroma" width="900">
 </p>
-<p align="center"><sub>The interactive flavor-space map in 3D on real <b>MW × logP × TPSA</b> axes, colored by <b>taste &amp; aroma</b> — every one of the 164 aroma + 6 taste classes labelled. <b>187 trained heads</b> in all: 6 taste + 164 aroma + 5 mouthfeel + 12 safety.</sub></p>
+<p align="center"><sub>The interactive flavor-space map in 3D on real <b>MW × logP × TPSA</b> axes, colored by <b>taste &amp; aroma</b> — every one of the 167 aroma + 6 taste classes labelled. <b>190 trained heads</b> in all: 6 taste + 167 aroma + 5 mouthfeel + 12 safety.</sub></p>
 
 > **8,847 unique molecules** across the open datasets · **taste + aroma + mouthfeel** prediction from
 > structure · a **flavor library** (start from a flavor → its character-impact molecule) and
@@ -59,7 +59,7 @@ is tagged by how it was derived**, so nothing reads as more certain than its sou
   **tasteless** (RandomForests on fingerprint + physicochemical features), plus a
   sweetness-**intensity** regressor. Sour and salty *also* keep a transparent chemistry
   rule (acid group / alkali-salt) as a deterministic cross-check alongside the model.
-- **Aroma** — **164 odor-descriptor heads** (citrus, floral, minty, almond, fatty,
+- **Aroma** — **167 odor-descriptor heads** (citrus, floral, minty, almond, fatty,
   petroleum, earthy, medicinal, sulfurous, camphor, fruity, fishy, garlic, ethereal,
   ammoniacal, pungent, pine, rose, rancid, alcoholic, woody, green, grassy, putrid)
   trained on **public-domain** HSDB odor text + curated character-impact facts, surfaced
@@ -162,7 +162,7 @@ Flavormancer ships as two editions of one method:
 | Edition | Commercial | Academic / open-source *(coming soon)* |
 | License | Apache-2.0 | open-source, **research / NonCommercial** |
 | Data | commercial-clean open data only | adds research odor datasets with **NonCommercial** terms |
-| Aroma | **164 presence/absence descriptor heads ship** (public-domain HSDB); scored **intensity** is trained on your data or a licensed set (PMP 2001) | full open model incl. **intensity** (research odor data) |
+| Aroma | **167 presence/absence descriptor heads ship** (public-domain HSDB); scored **intensity** is trained on your data or a licensed set (PMP 2001) | full open model incl. **intensity** (research odor data) |
 | Use | free to use, sell, run on-prem | research, teaching, advancing the method |
 
 The split is deliberate. The richest aroma data is licensed for research only, so
