@@ -21,7 +21,8 @@ from chemfeatures import descriptors as _desc
 from rdkit import Chem
 from rdkit.Chem import DataStructs, rdFingerprintGenerator
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_predict, cross_val_score
+from train_aroma import _calibrate  # same out-of-fold F1 calibration as the aroma heads
 
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
@@ -68,9 +69,19 @@ for d in sorted(descriptors, key=lambda c: -int(df[c].sum())):
     auroc = cross_val_score(clf, X, y, cv=5, scoring="roc_auc", n_jobs=-1).mean()
     flag = "kept" if auroc >= MIN_AUROC else "drop (not learnable)"
     if auroc >= MIN_AUROC:
+        # per-head decision threshold from OUT-OF-FOLD probabilities (see train_aroma._calibrate);
+        # a flat 0.5 makes the thin heads withhold real matches
+        oof = cross_val_predict(clf, X, y, cv=5, method="predict_proba", n_jobs=-1)[:, 1]
+        thr, prec, rec, f1, capable = _calibrate(y, oof)
         clf.fit(X, y)
         joblib.dump(clf, OUT / f"{d}_clf.joblib")
-        manifest["descriptors"][d] = {"auroc": round(float(auroc), 3), "n_pos": npos}
+        manifest["descriptors"][d] = {"auroc": round(float(auroc), 3), "n_pos": npos,
+                                      "threshold": thr, "cv_precision": prec, "cv_recall": rec,
+                                      "cv_f1": f1, "confident_capable": capable}
+        tag = "" if capable else "  INDICATIVE (never reaches 50% precision)"
+        print(f"  {d:12s} n_pos={npos:4d}  CV-AUROC={auroc:.3f}  thr={thr:.2f} "
+              f"prec={prec:.2f}{tag}  -> {flag}")
+        continue
     print(f"  {d:12s} n_pos={npos:4d}  CV-AUROC={auroc:.3f}  -> {flag}")
 
 (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))

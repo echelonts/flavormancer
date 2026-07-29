@@ -100,7 +100,11 @@ def audit(modality="aroma", threshold=FIRE, relaxed=RELAXED):
     for h in heads:
         p = models[h].predict_proba(x)[:, 1]
         trained = pos.get(h, set())
-        fired = {skel[i] for i in range(len(skel)) if p[i] >= threshold}
+        # score at the head's OWN calibrated threshold when it has one, so the audit measures the
+        # product's actual behaviour rather than a hypothetical flat cut-off it no longer uses
+        thr = meta.get(h, {}).get("threshold")
+        thr = float(thr) if isinstance(thr, (int, float)) else threshold
+        fired = {skel[i] for i in range(len(skel)) if p[i] >= thr}
         fired_lo = {skel[i] for i in range(len(skel)) if p[i] >= relaxed}
         novel, novel_lo = len(fired - trained), len(fired_lo - trained)
         rows.append({"head": h,
@@ -109,7 +113,19 @@ def audit(modality="aroma", threshold=FIRE, relaxed=RELAXED):
                      "hits": len(fired),
                      "novel": novel,
                      "novel_lo": novel_lo,
-                     "verdict": "ok" if novel else ("shy" if novel_lo else "memorizing")})
+                     "threshold": round(thr, 2),
+                     "precision": meta.get(h, {}).get("cv_precision"),
+                     "capable": meta.get(h, {}).get("confident_capable", True),
+                     # A head whose calibrated threshold sits ABOVE the relaxed probe is not shy —
+                     # it was deliberately made strict to reach the precision floor, and loosening
+                     # it would trade away the accuracy it was tuned for. That is precision-limited,
+                     # a different diagnosis with a different fix (more positives, not a lower bar).
+                     # Order matters: a head that finds nothing at EITHER threshold is memorizing,
+                     # whatever its cut-off. Only once we know relaxing would actually find
+                     # something does a high threshold mean "strict on purpose" rather than "broken".
+                     "verdict": ("ok" if novel else
+                                 "memorizing" if not novel_lo else
+                                 "precision-limited" if thr > relaxed else "shy")})
     return sorted(rows, key=lambda r: (r["novel"], r["novel_lo"], -(r["auroc"] or 0)))
 
 
@@ -125,24 +141,39 @@ def main():
     if not rows:
         sys.exit(1)
 
-    tag = {"ok": "", "shy": "  <- under-confident", "memorizing": "  <- MEMORIZING"}
-    print(f"{'head':16s} {'AUROC':>6s} {'n_pos':>6s} {'hits':>6s} "
+    tag = {"ok": "", "shy": "  <- under-confident",
+           "precision-limited": "  <- precision-limited (strict on purpose)",
+           "memorizing": "  <- MEMORIZING"}
+    print(f"{'head':16s} {'AUROC':>6s} {'thr':>5s} {'prec':>5s} {'n_pos':>6s} {'hits':>6s} "
           f"{'novel':>6s} {f'@{a.relaxed:g}':>6s}")
     for r in rows:
         au = f"{r['auroc']:.3f}" if r["auroc"] is not None else "  -  "
-        print(f"{r['head']:16s} {au:>6s} {r['n_pos']:6d} {r['hits']:6d} "
-              f"{r['novel']:6d} {r['novel_lo']:6d}{tag[r['verdict']]}")
+        pc = f"{r['precision']:.2f}" if r["precision"] is not None else "  -  "
+        ind = "" if r["capable"] else "  (indicative)"
+        print(f"{r['head']:16s} {au:>6s} {r['threshold']:5.2f} {pc:>5s} {r['n_pos']:6d} "
+              f"{r['hits']:6d} {r['novel']:6d} {r['novel_lo']:6d}{tag[r['verdict']]}{ind}")
 
+    indicative = [r["head"] for r in rows if not r["capable"]]
     shy = [r["head"] for r in rows if r["verdict"] == "shy"]
+    plim = [r["head"] for r in rows if r["verdict"] == "precision-limited"]
     mem = [r["head"] for r in rows if r["verdict"] == "memorizing"]
     novel = sorted(r["novel"] for r in rows)
-    print(f"\n{len(rows) - len(shy) - len(mem)}/{len(rows)} heads generalize at {a.threshold:g} "
-          f"(median {novel[len(novel) // 2]} novel discoveries).")
+    print(f"\n{len(rows) - len(shy) - len(plim) - len(mem)}/{len(rows)} heads generalize at their "
+          f"calibrated threshold (median {novel[len(novel) // 2]} novel discoveries).")
+    if plim:
+        print(f"\n{len(plim)} PRECISION-LIMITED — strict by design, to hold the 50% precision "
+              f"floor: {', '.join(plim)}")
+        print("  Not a defect and not a shy head: lowering the bar would trade away the accuracy "
+              "it was tuned for. More positives is the only real fix.")
     if shy:
         print(f"\n{len(shy)} UNDER-CONFIDENT — found unlabelled molecules at {a.relaxed:g} but not "
               f"{a.threshold:g}: {', '.join(shy)}")
         print("  These learned their class; they're shy because their positives are heavily "
               "outnumbered. More positives sharpen them. Not broken.")
+    if indicative:
+        print(f"\n{len(indicative)}/{len(rows)} are INDICATIVE — they never reach 50% out-of-fold "
+              f"precision at any threshold, so they fire as evidence, never as a confident call. "
+              f"They are still far better than the base rate; they are not yet trustworthy alone.")
     if mem:
         print(f"\n{len(mem)} MEMORIZING — fire on their own training molecules and nothing else, "
               f"at any threshold: {', '.join(mem)}")

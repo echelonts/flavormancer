@@ -172,21 +172,27 @@ if __name__ == "__main__":
                 dp = doc.get(ik)
                 if dp:                                   # rarest documented aroma (tie-break by model)
                     best[i] = min(dp, key=lambda h: (docfreq[h], -prob[h][i]))
-                else:                                    # else the strongest predicted head >= 0.5
-                    bp = 0.5
+                else:  # else the strongest head clearing its OWN calibrated threshold
+                    # a flat 0.5 here left thin heads uncoloured on the map even where they were
+                    # the best available call — see docs/METHODS.md on per-head thresholds
+                    bp = 0.0
+                    # indicative heads still colour points — the map is exploratory, and greying
+                    # out 73 heads' molecules would hide more than it clarifies
                     for name in heads:
-                        if prob[name][i] >= bp:
-                            bp, best[i] = prob[name][i], name
+                        p = prob[name][i]
+                        if p >= P._head_threshold(P._AROMA_META, name) and p > bp:
+                            bp, best[i] = p, name
             out["aroma_label"] = best
-            # dominant MOUTHFEEL sensation (for the map's "color by mouthfeel" mode). Straight
-            # strongest-head-over-0.5: unlike aroma there's no documented corpus to prefer, and
-            # with only five heads there's no rarity problem to correct for.
+            # dominant MOUTHFEEL sensation (for the map's "color by mouthfeel" mode): the strongest
+            # head that clears its own calibrated threshold. Unlike aroma there's no documented
+            # corpus to prefer, and with only five heads there's no rarity problem to correct for.
             if P._MOUTHFEEL_MODELS:
-                mbest, mbp = ["other"] * len(out), [0.5] * len(out)
+                mbest, mbp = ["other"] * len(out), [0.0] * len(out)
                 for name, clf in P._MOUTHFEEL_MODELS.items():
                     col = clf.predict_proba(Xf)[:, 1]
+                    thr = P._head_threshold(P._MOUTHFEEL_META, name)
                     for i in range(len(out)):
-                        if col[i] >= mbp[i]:
+                        if col[i] >= thr and col[i] > mbp[i]:
                             mbp[i], mbest[i] = col[i], name
                 out["mouthfeel_label"] = mbest
     out.to_parquet("flavor_map.parquet")

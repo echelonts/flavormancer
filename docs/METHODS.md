@@ -119,6 +119,32 @@ this, because it only ever asks about molecules *inside* the labelled set.
   **odour** (AUROC 0.724 over 208 positives) isn't thin — it's genuinely hard. The honest answer
   there is a better model (a GNN), not a longer list.
 
+## When does a head "fire"? (per-head thresholds, and the precision floor)
+Not at a flat 0.5. A head with 13 positives against 2,400 negatives is calibrated conservatively
+even with balanced class weights, so a shared cut-off silently withheld real matches from exactly
+the thin heads — a genuine pine match could land at 0.42 and never be shown.
+
+- **Per-head thresholds** — `computed`. Each head's cut-off is fitted on **out-of-fold**
+  probabilities at training time (`train_aroma._calibrate`) and stored in its manifest. Bounded to
+  [0.15, 0.85]; both directions are allowed, and both are used — `astringent` moved **up** to 0.71,
+  `rosemary` down to 0.16. No head sits at either bound, so the data is choosing, not the clamp.
+- **This changes labels, never numbers.** The raw probability is computed, returned and displayed
+  identically. Only the *confident* flag moves. The threshold is in the API response too.
+- **A precision floor of 0.50, because F1 alone was not safe.** Our first pass maximised F1 and
+  produced thresholds where the head was mostly wrong: `blackberry` tuned to 0.18, where **96% of
+  its calls were false**. On a badly imbalanced head F1 peaks in a low-precision regime, since
+  recall climbs faster than precision falls. **A high AUROC does not protect you** — AUROC is
+  computed on ranking and is insensitive to class imbalance; precision is not. `coffee` has
+  AUROC 0.960 and out-of-fold precision **0.46**; both are true of the same head.
+- **Heads that cannot clear the floor are `indicative`, not deleted.** 73 of 167 aroma heads never
+  reach 50% precision at any threshold. They keep their score, their place in the 178-dim profile,
+  their chips and their map colour — firing well above base rate is real evidence. They are simply
+  never presented as a *confident* call: the UI marks them, and the read returns `indicative: true`
+  plus the head's measured precision. Hiding them would delete reach to paper over a labelling
+  problem; the honest fix is to label them.
+- All five **mouthfeel** heads clear the floor (precision 0.57–1.00), so the whole modality is
+  confident-capable.
+
 ## The honest ceiling on "deeper flavor description"
 Taste tops out at the **5 basics + intensity + chemesthesis** on public data — that ceiling is
 real and hasn't moved. The rich descriptors people mean by "flavor" — *vanilla, fruity, green,

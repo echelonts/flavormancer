@@ -11,7 +11,7 @@ identical to before; predict.py loads profile_index.npz instantly on startup.
 Output profile_index.npz:
   smiles            (N,)  canonical SMILES, deduped by connectivity skeleton
   taste_documented  (N,)  comma-separated documented tastes ("" if none)
-  aromas            (N,)  comma-separated confident aroma heads (score >= 0.5)
+  aromas            (N,)  comma-separated confident aroma heads (score >= that head's calibrated threshold)
   profiles          (N,D) float32 head-score matrix: taste heads then aroma heads (sorted names)
   dims              (D,)  column labels ("taste:sweet", "aroma:citrus", ...)
 
@@ -106,11 +106,22 @@ def main():
     dims = ([f"taste:{t}" for t in taste] + [f"aroma:{a}" for a in aroma]
             + [f"mouthfeel:{h}" for h in mouth])
     profiles = np.column_stack([scores[k] for k in dims]).astype("float32")  # scores keyed by dim
+    # Per-head calibrated thresholds, read straight from the manifest: this module runs under
+    # NO_MODELS so predict's own _AROMA_META is empty, and defaulting to a flat 0.5 here would make
+    # the precomputed chip list disagree with a live read for exactly the thin heads (#261).
+    import json
+    _mf = AROMA_DIR / "manifest.json"
+    aroma_meta = json.loads(_mf.read_text()).get("descriptors", {}) if _mf.exists() else {}
     aromas = [[] for _ in smis]
+    # Indicative heads (those that never reach 50% out-of-fold precision) are INCLUDED here on
+    # purpose. Dropping them would silently delete 73 of 167 notes from chip search and palette
+    # match — a real loss of reach to avoid a labelling problem. The honest fix is to mark them,
+    # which the read does (`indicative` per descriptor), not to hide the molecules they find.
     for a in aroma:
         col = scores[f"aroma:{a}"]
+        thr = P._head_threshold(aroma_meta, a)
         for i in range(len(smis)):
-            if col[i] >= 0.5:
+            if col[i] >= thr:
                 aromas[i].append(a)
     tmp_out = "profile_index.building.npz"  # write then atomically replace so the live index is never half-written
     np.savez_compressed(
