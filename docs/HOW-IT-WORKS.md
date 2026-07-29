@@ -81,6 +81,14 @@ clean route:
    woody, green, grassy, putrid), 0.71–0.98. The lower-population heads (≈10–20 documented
    positives) are the noisiest — each ships with its honest CV-AUROC shown in the UI.
 
+**A head's AUROC is not the whole story, and this matters more than it sounds.** AUROC measures
+ranking and is blind to class imbalance; on a descriptor with 11 positives among 2,403 molecules a
+head can score 0.979 and still be right only 1 time in 10 when it actually fires. Every head
+therefore also publishes its own calibrated decision threshold and its measured out-of-fold
+**precision**, and the 73 heads that cannot reach 50% precision ship marked `indicative` rather
+than confident. See **[`ACCURACY.md`](ACCURACY.md)** for the full picture in plain language — it is
+the document to hand someone who asks "how good is this, really?"
+
 This is **presence/absence** ("which notes apply"), not **intensity** ("how strong") — the free
 text carries no scored ratings, and no public-domain intensity data exists. Intensity is the one
 piece that comes with a customer's panel data or a licensed set (PMP 2001). Where PubChem has a
