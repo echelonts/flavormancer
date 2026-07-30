@@ -15,7 +15,7 @@ The honesty release. Every trained head now publishes how good it actually is, a
 exists to install it somewhere other than the machine it was built on.
 
 ### Added
-- **Per-head calibrated thresholds with a 50% precision floor.** Each of the 190 heads carries a
+- **Per-head calibrated thresholds with a 50% precision floor.** Each of the 195 heads carries a
   decision threshold fitted on out-of-fold predictions, plus its measured precision and recall,
   published in `/api/heads` and shown on every bar. Heads that cannot be right more than half the
   time are marked `indicative` rather than confident — kept in full, never dressed up.

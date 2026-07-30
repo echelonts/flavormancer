@@ -45,7 +45,7 @@ local compute.
 **Verify it worked** (this is the honest end-to-end check, not just "the server started"):
 
 ```bash
-curl -s localhost:8000/api/status                      # {"ready":true,"total":190,...}
+curl -s localhost:8000/api/status                      # {"ready":true,"total":190,...}  (190 artifacts = 189 heads + the intensity regressor)
 curl -s localhost:8000/api/heads | jq '.aroma | length' # 166
 # vanillin — the vanilla head should fire at 1.0, confident, with its calibrated threshold
 curl -s -X POST localhost:8000/api/predict \
@@ -58,7 +58,7 @@ curl -s -X POST localhost:8000/api/predict \
 `.aroma.top` is the *confident* subset ordered by score, so `top[0]` is whichever head scored
 highest — not necessarily the one you are looking for. Query `descriptors[]` by name, as above.
 
-If `/api/status` reports fewer than 190 heads, a training step was skipped — the app degrades
+If `/api/status` reports fewer than 195 heads, a training step was skipped — the app degrades
 gracefully rather than failing, so it will start regardless.
 
 ---
@@ -95,7 +95,7 @@ override that, which is why it is recorded even though it is unused.
 |---|---|---|
 | `odor_notes.parquet` | 2,258 | `inchikey`, `smiles`, `name`, `odor`, `odor_source`, `odor_threshold_ppm`, `odor_threshold_note` |
 | `aroma_supplement.csv` | 2,159 | `flavor`, `molecule`, `smiles`, `category` |
-| `aroma_train.parquet` | 2,417 | `inchikey`, `smiles`, + one 0/1 column per descriptor |
+| `aroma_train.parquet` | 2,431 | `inchikey`, `smiles`, + one 0/1 column per descriptor |
 
 `odor` is **free text** as recorded ("sweet, floral, slightly minty"), normalised into the
 controlled vocabulary by `build_aroma_dataset.tag()`. `odor_threshold_ppm` is populated only where
@@ -134,7 +134,7 @@ a safety clearance, and the UI must never render it as one. See
 
 ### Master table
 
-`master_enrichment.parquet` — 8,861 rows, the single table the app reads for everything that is
+`master_enrichment.parquet` — 8,869 rows, the single table the app reads for everything that is
 not a live prediction: `inchikey_skel`, `smiles`, `name`, `mw`, `logp`, `tpsa`, `hbd`, `hba`,
 `rot_bonds`, `rings`, `melting_point_c`, `boiling_point_c`, `gras`, `taste_documented`, plus a
 `tox_*` column per Tox21 assay.

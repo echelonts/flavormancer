@@ -11,7 +11,7 @@ Companion to [`HOW-IT-WORKS.md`](HOW-IT-WORKS.md) (how it's built) and
 
 ## The setup
 
-Flavormancer is **190 separate yes/no experts**, called *heads*. One asks *does this smell like
+Flavormancer is **195 separate yes/no experts**, called *heads*. One asks *does this smell like
 vanilla?* Another asks *does this taste bitter?* A third asks *does this feel cooling in the
 mouth?* Each looks at a molecule's structure and returns a number between 0 and 1 — how strongly
 it believes the answer is yes.
@@ -19,7 +19,7 @@ it believes the answer is yes.
 | modality | heads | what they answer |
 |---|---|---|
 | Taste | 6 | the five basics — sweet, bitter, umami, sour, salty — plus `tasteless` |
-| Aroma | 167 | vanilla, citrus, smoky, pine, jasmine… |
+| Aroma | 172 | vanilla, citrus, smoky, pine, jasmine… |
 | Mouthfeel | 5 | cooling, warming, pungent, tingling, astringent |
 | Safety | 12 | Tox21 assay screens — caution flags, never a clearance |
 
@@ -124,7 +124,7 @@ because of it, and the reasoning is recorded in `train_aroma._calibrate` so nobo
 
 ## "Indicative" heads — marked, never removed
 
-**73 of 167 aroma heads cannot reach 50% precision at any threshold.** They are right less than
+**65 of 172 aroma heads cannot reach 50% precision at any threshold.** They are right less than
 half the time when they fire.
 
 They are **not deleted, disabled, or hidden.** They keep their score, their column in the
@@ -168,17 +168,45 @@ goal is to build every one of them up to confident, not to retire them.
 | when the head fires, it is right… | how many heads |
 |---|---|
 | 90–100% of the time | **25** |
-| 75–90% | 9 |
-| 50–75% | 60 |
-| under 50% *(shipped as `indicative`)* | 72 |
+| 75–90% | 11 |
+| 50–75% | 71 |
+| under 50% *(shipped as `indicative`)* | 65 |
 
-**23 heads have never been wrong on unseen molecules** — clove, jasmine, minty, buttery, cooling,
-maple, grape, camphor, hay, cognac, geranium, aldehydic, chamomile, champaca and more.
+**23 heads have never been wrong on unseen molecules** — aldehydic, balsamic, buttery, caramel,
+chamomile, champaca, cinnamon, cooling, grape, jasmine, lavender, malty, maple, melon, minty,
+mushroom, peach, pine, plum, tarry, tropical, wintergreen, ylang. When one of those fires, every out-of-fold call it made was correct.
+
+Read that alongside the discovery test below, though, because precision alone is not enough
+either. `quince` scores **AUROC 0.955** and **0.02 precision** — near-perfect ranking, right one
+time in fifty when it actually fires. And `turmeric` is the one head still memorising: it makes
+only correct calls, on molecules it was trained on, and finds nothing outside them. Three numbers,
+three different failure modes, which is why all three are published.
 
 **Safety — 12 Tox21 screens, caution-only.** These flag a molecule for review. They are never a
 clearance, and food-use status comes from open-government registers, not from a model.
 
 ---
+
+## A note on the roster number
+
+The head count is not perfectly stable, and it is worth understanding why before quoting it.
+
+A cluster of heads sits at **AUROC 0.69–0.71**, right against the 0.70 shipping bar, on 11–15
+positives. At that sample size 5-fold cross-validation cannot resolve a head more finely than
+about ±0.02, so ordinary corpus churn — three molecules added anywhere — reshuffles the folds and
+tips them across the line. `blackberry` measured 0.696, then 0.707, then 0.687 across three
+consecutive rebuilds **with its positive count unchanged at 13 the entire time**. Nothing about
+the head changed; the folds did.
+
+The distinction that matters is whether an intervention actually lands. In the same rebuilds,
+`chamomile` went from 0.691 to **0.741** because its positives genuinely rose 11 → 15 (Roman
+chamomile angelate esters, Matricaria bisabolol oxides) — and it now makes confident calls at
+**1.00** precision. Adding molecules that are *already* positives, as happened with blackberry,
+changes nothing but the noise.
+
+So: a head crossing the bar is only meaningful if `n_pos` moved with it. And the bar stays at
+0.70 — lowering it to 0.69 to recover a head would manufacture a number, which is the exact
+self-flattery the rest of this document exists to remove.
 
 ## Does a head *learn*, or just *memorise*?
 
@@ -196,23 +224,23 @@ python training/audit_generalization.py            # aroma heads
 python training/audit_generalization.py --mouthfeel
 ```
 
-Current state of the 167 aroma heads:
+Current state of the 172 aroma heads:
 
 | verdict | count | meaning |
 |---|---|---|
-| generalises | **146** | finds molecules nobody labelled (median 9) |
-| precision-limited | 19 | strict on purpose, to hold the precision floor |
-| memorising | **2** | `turmeric`, `celery` — fire only on their own training set |
+| generalises | **154** | finds molecules nobody labelled (median 9) |
+| precision-limited | 17 | strict on purpose, to hold the precision floor |
+| memorising | **1** | `turmeric` — fires only on its own training set |
 
-`turmeric` and `celery` are narrow single-scaffold classes. More molecules will not fix them; that
-is a model-architecture problem, tracked with the GNN work in
+`turmeric` is a narrow single-scaffold class (bisabolane sesquiterpenes). More molecules will not
+fix it; that is a model-architecture problem, tracked with the GNN work in
 [#199](https://github.com/echelonts/flavormancer/issues/199).
 
 ---
 
 ## The short version
 
-> It's 190 separate models. Every one is graded on molecules it has never seen, and every one
+> It's 195 separate models. Every one is graded on molecules it has never seen, and every one
 > publishes both how confident it is *and* how often it is actually right at that confidence.
 > About a hundred are trustworthy enough to act on — two dozen have never been wrong. The rest are
 > marked as hints rather than answers, because they're right less than half the time, and saying so
