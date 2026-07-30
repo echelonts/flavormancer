@@ -522,13 +522,29 @@
   .fam-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
     color:var(--muted);margin:0 0 5px;display:flex;align-items:baseline;gap:7px}
   .fam-n{font-size:10px;opacity:.6}
-  .schip-note{border-style:dashed}
-  .schip-taste{border-style:solid;border-width:1.5px}
+  /* ONE chip language, four members. Every family shares the same pill, size and border weight;
+     identity comes from a leading dot in the family's own hue plus a tinted border. Previously
+     each family had been given a different border STYLE (dashed / dotted / thicker) at a different
+     time, which read as four accidents rather than one system — the taste and mouthfeel chips in
+     particular stuck out against the flavor and note chips they sit beside. */
+  .atag.mf{border-style:solid;position:relative;padding-left:14px}
+  .atag.mf::before{content:'';position:absolute;left:6px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:currentColor}
+  .ss-why{font-size:11.5px;line-height:1.62;color:var(--muted);margin:2px 0 11px;max-width:74ch}
+  .ss-why b{color:var(--ink);font-weight:600}
+  .ss-why code{font-family:var(--mono);font-size:10.5px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+  .schip{display:inline-flex;align-items:center;gap:7px}
+  .schip::before{content:'';width:6px;height:6px;border-radius:50%;flex:0 0 auto;
+    background:var(--chip,var(--muted));box-shadow:0 0 0 2px rgb(from var(--chip,var(--muted)) r g b / .16)}
+  .schip-flavor{--chip:var(--brand-1)}
+  .schip-note{--chip:var(--aroma)}
+  .schip-taste{--chip:var(--brand-accent)}
+  .schip-mouth{--chip:var(--accent)}
+  .schip-flavor,.schip-note,.schip-taste,.schip-mouth{border-color:rgb(from var(--chip) r g b / .38)}
+  .schip.on::before{background:#08121A;box-shadow:none}
   .dtox{margin-top:4px;font-family:var(--mono);font-size:10.5px;color:#C0553A;cursor:help}
   /* mouthfeel chips: a distinct dotted edge + amber cast so the sensation modality reads apart
      from odour notes at a glance (cooling/pungent legitimately appear in both rows) */
-  .schip-mouth{border-style:dotted;border-color:var(--accent);color:var(--accent)}
-  .schip-mouth:hover{border-color:var(--brand-2)}
+  .schip-mouth:hover,.schip-taste:hover,.schip-note:hover,.schip-flavor:hover{border-color:var(--chip)}
   .schip.on{background:var(--brand-grad);color:#08121A;border-color:transparent;font-weight:650;box-shadow:0 2px 12px rgba(43,196,196,.32);transform:translateY(-1px)}
   .schip{transition:all .13s ease}
   .design-grid .dcell{animation:fadeUp .3s ease both}
@@ -622,10 +638,17 @@
   .hg-note{font-size:11px;color:var(--muted);margin:6px 0 0;line-height:1.5}
   #aromaPreview::-webkit-scrollbar{width:8px}#aromaPreview::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
   /* the two swap lists fill their box (bounded + internal scroll) so no wasted whitespace */
-  .swap-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
-  .swap-grid .card{display:flex;flex-direction:column;min-height:360px;max-height:70vh}
-  .swap-grid .card .nb-list{flex:1 1 auto;min-height:0;max-height:none}
-  @media(max-width:820px){ .modal-top{grid-template-columns:1fr} .swap-grid{grid-template-columns:1fr} .swap-grid .card{max-height:none} }
+  /* minmax(0,1fr), NOT 1fr: a bare `1fr` is minmax(auto,1fr), and `auto` refuses to shrink below
+     the content's min-content width — which is how these two cards ended up 468px wide inside a
+     358px modal on a phone. .modal-top already had this; .swap-grid did not. */
+  .swap-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch}
+  .swap-grid .card{display:flex;flex-direction:column;min-width:0;min-height:360px;max-height:70vh}
+  .swap-grid .card .nb-list{flex:1 1 auto;min-width:0;min-height:0;max-height:none}
+  @media(max-width:820px){
+    .modal-top{grid-template-columns:minmax(0,1fr)}
+    .swap-grid{grid-template-columns:minmax(0,1fr)}   /* stack into one column */
+    .swap-grid .card{max-height:none;min-height:0}
+  }
   /* mobile */
   @media(max-width:640px){
     header{padding:22px 14px 18px}
@@ -1633,6 +1656,7 @@ function renderNeighborList(el, list, scoreKey, emptyMsg, countEl){
           <div class="s">${x.smiles}</div>
           <div class="kt">${(()=>{const doc=(x.known_tastes||[]).map(t=>`<span class="tchip" style="background:${TASTE_COLORS[t]||'var(--muted)'}">${t}</span>`);const pred=(x.predicted_tastes||[]).filter(t=>!(x.known_tastes||[]).includes(t)).map(t=>`<span class="tchip pred" style="color:${TASTE_COLORS[t]||'var(--muted)'};border-color:${TASTE_COLORS[t]||'var(--muted)'}" title="predicted taste (model)">${t} •</span>`);return [...doc,...pred].join('')||'<span class="muted">no taste read</span>';})()}</div>
           ${(x.aroma&&x.aroma.length)?`<div class="nb-aroma" title="aroma (found = documented, else predicted •)">${x.aroma.map(a=>`<span class="atag" style="color:${aromaColor(a.odor)};border-color:${aromaColor(a.odor)}44">${a.odor}${a.source==='predicted'?' •':''}</span>`).join('')}</div>`:''}
+          ${(x.mouthfeel&&x.mouthfeel.length)?`<div class="nb-aroma" title="mouthfeel — trigeminal sensation, not smell or taste">${x.mouthfeel.map(m=>`<span class="atag mf" style="color:${_mouthC(m)};border-color:${_mouthC(m)}55">${m}</span>`).join('')}</div>`:''}
         </div>
         <div class="sim">${Math.round((x[scoreKey]||0)*100)}% match</div>
       </div>`).join('');
@@ -1722,7 +1746,10 @@ function render(p, neighbors, svg, names, substitutes){
     'Build the reference set to enable structural neighbors.', $('nbCount'));
 
   renderBehavior(p);
-  $('results').style.display='block'; $('footnote').style.display='block';
+  // '' not 'block': #results is a flex column whose 14px gap separates the cards, and an inline
+  // display:block silently killed that gap (block boxes ignore `gap`) — the Heads card sat flush
+  // against the Substitutes card below it. Clearing the inline style lets the stylesheet win.
+  $('results').style.display=''; $('footnote').style.display='';
   // animate bar fills
   requestAnimationFrame(()=>document.querySelectorAll('.fill')
     .forEach(f=>f.style.width=f.dataset.w+'%'));
@@ -1903,7 +1930,8 @@ function renderSafety(tx){
   const rows=assays.slice().sort((a,b)=>(b.probability||0)-(a.probability||0));
   box.innerHTML = rows.map(a=>{
     const col = a.probability>=0.5 ? '#C0553A' : 'var(--muted)';  // amber-red when the assay fires
-    return headBar(a.assay, a.probability, a.auroc, col, a.meaning);
+    return headBar(a.assay, a.probability, a.auroc, col, a.meaning,
+                   {threshold:a.threshold, precision:a.precision});
   }).join('');
   grp.style.display='block';
 }
@@ -2416,7 +2444,7 @@ async function initStudio(){
     let html = `<div class="chip-filter"><input id="studioFilter" type="search" autocomplete="off"
       placeholder="Filter ${cats.reduce((a,c)=>a+(c.flavors||[]).length,0)+notes.length+mouth.length+tastes.length} flavors, tastes, notes &amp; sensations — e.g. citrus, vanilla, cool">
       <span id="studioFilterNone" class="cf-none" hidden>no match</span></div>`;
-    html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors <span class="ss-sub">a flavor you know → the molecule that makes it</span></div><div class="ss-body">`;
+    html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors <span class="ss-sub">a flavor you know → the molecule that makes it</span></div><p class="ss-why"><b>A flavor is the whole percept</b> — banana, cola, root beer. It is what a person names, and it is almost never one molecule: it is a taste, several aroma notes and often a mouthfeel arriving together. Start here when you know the <i>target</i> and need the parts.</p><div class="ss-body">`;
     html += cats.map(c=>`<div class="studio-group"><span class="sg-label" title="${esc(c.category)}"><span class="sg-ico">${svgIcon(c.category)}</span>${c.category}</span>`+
       c.flavors.map(f=>`<button type="button" class="schip schip-flavor" data-term="${esc(f)}">${f}</button>`).join('')+`</div>`).join('');
     html += `</div></div>`;
@@ -2430,7 +2458,7 @@ async function initStudio(){
         if(have.length) groups.push([fam, have]);
       }
       if(left.size) groups.push(['Other', [...left].sort()]);
-      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Notes <span class="ss-sub">an aroma quality → molecules that carry it</span></div><div class="ss-body">`+
+      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Notes <span class="ss-sub">an aroma quality → molecules that carry it</span></div><p class="ss-why"><b>A note is what your nose reads</b> — vanilla, smoky, green, citrus. Aroma carries most of what people call &ldquo;flavor&rdquo;: block your nose and a pear and a potato are hard to tell apart. This is the largest set here (167 trained heads) and the main lever for making something smell like what you intend.</p><div class="ss-body">`+
         groups.map(([fam, ms])=>
           `<div class="fam"><div class="fam-label">${fam} <span class="fam-n">${ms.length}</span></div>`+
           `<div class="studio-group studio-group-notes">`+
@@ -2440,18 +2468,21 @@ async function initStudio(){
     }
     // Taste — the basic tastes, namespaced so they don't collide with the like-named aroma notes
     if(tastes.length){
-      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Taste <span class="ss-sub">what the tongue reads — distinct from a sweet <i>smell</i></span></div><div class="ss-body">`+
+      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Taste <span class="ss-sub">what the tongue reads — distinct from a sweet <i>smell</i></span></div><p class="ss-why"><b>Taste is only the five basics</b> the tongue detects — sweet, bitter, umami, sour, salty (plus tasteless). It is a genuinely different channel from smell, which is why <code>taste:sweet</code> and the aroma note <code>sweet</code> are separate heads: vanillin <i>smells</i> sweet without being a sweetener. Use taste to set the backbone, notes to give it character.</p><div class="ss-body">`+
         `<div class="studio-group studio-group-notes">`+
         tastes.map(t=>{const lbl=t.replace(/^taste:/,'');
-          return `<button type="button" class="schip schip-taste" data-term="${esc(t)}" title="${esc(TASTE_HELP[lbl]||lbl)}" style="border-color:${TASTE_COLORS[lbl]||'var(--line)'};color:${TASTE_COLORS[lbl]||'var(--ink)'}">${lbl}</button>`;}).join('')+
+          // set --chip, don't override border/text colour: the per-taste hue now flows through the
+          // shared chip system (dot + tinted border) instead of recolouring the whole chip, which
+          // is what made these stand apart from the flavour and note chips beside them
+          return `<button type="button" class="schip schip-taste" data-term="${esc(t)}" title="${esc(TASTE_HELP[lbl]||lbl)}" style="--chip:${TASTE_COLORS[lbl]||'var(--brand-accent)'}">${lbl}</button>`;}).join('')+
         `</div></div></div>`;
     }
     // Mouthfeel — trained trigeminal sensations (a different modality from taste and aroma)
     if(mouth.length){
-      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Mouthfeel <span class="ss-sub">how it <b>feels</b> in the mouth — chemesthesis, not smell</span></div><div class="ss-body">`+
+      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Mouthfeel <span class="ss-sub">how it <b>feels</b> in the mouth — chemesthesis, not smell</span></div><p class="ss-why"><b>Mouthfeel is touch, not taste or smell</b> — the trigeminal nerve reporting cooling, warming, pungency, tingle and astringency. Menthol is cold with no temperature change; capsaicin burns with no heat. It is the dimension most often left out of a formulation and the one people notice immediately when it is wrong.</p><div class="ss-body">`+
         `<div class="studio-group studio-group-notes">`+
         mouth.map(m=>{const lbl=m.replace(/^mouthfeel:/,'');  // term stays namespaced, label reads plain
-          return `<button type="button" class="schip schip-mouth" data-term="${esc(m)}" title="${esc(MOUTHFEEL_HELP[lbl]||lbl)}">${lbl}</button>`;}).join('')+
+          return `<button type="button" class="schip schip-mouth" data-term="${esc(m)}" title="${esc(MOUTHFEEL_HELP[lbl]||lbl)}" style="--chip:${MOUTHFEEL_COLORS[lbl]||'var(--accent)'}">${lbl}</button>`;}).join('')+
         `</div></div></div>`;
     }
     $('studioChips').innerHTML = html;

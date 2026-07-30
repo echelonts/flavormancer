@@ -1218,9 +1218,16 @@ _TOX_MEANING = {
 }
 
 
-def predict_tox(mol, threshold=0.5):
+def predict_tox(mol, threshold=None):
     """Caution-only in-vitro tox-assay activity (Tox21 models). INDICATIVE flags for
-    review — NEVER a toxicity/safety determination. Honest/empty if heads untrained."""
+    review — NEVER a toxicity/safety determination. Honest/empty if heads untrained.
+
+    Each assay fires at its OWN calibrated threshold, and calibration matters more here than
+    anywhere else in the app: assay actives are rare, so a flat 0.5 made several heads
+    over-flag. Every one of the twelve calibrated UPWARD (NR-AR to 0.69, NR-ER to 0.63) — the
+    opposite direction from the thin aroma heads. A caution flag that cries wolf is worse than
+    no flag, because it teaches people to ignore the ones that matter.
+    """
     if not _TOX_MODELS:
         return {"available": False,
                 "note": "tox heads not trained — run train_tox.py (Tox21, public domain)"}
@@ -1228,9 +1235,12 @@ def predict_tox(mol, threshold=0.5):
     assays = []
     for name, clf in sorted(_TOX_MODELS.items()):
         p = round(float(clf.predict_proba(x)[0, 1]), 3)
+        thr = _head_threshold(_TOX_META, name, threshold)
         assays.append({"assay": name, "meaning": _TOX_MEANING.get(name, name), "probability": p,
+                       "threshold": thr, "flagged": p >= thr,
+                       "precision": _TOX_META.get(name, {}).get("cv_precision"),
                        "auroc": _TOX_META.get(name, {}).get("auroc")})
-    flags = [a["assay"] for a in assays if a["probability"] >= threshold]
+    flags = [a["assay"] for a in assays if a["flagged"]]
     return {"available": True, "assays": assays, "flags": flags,
             "note": "INDICATIVE in-vitro tox-assay activity (Tox21 RandomForest heads) — "
                     "caution-only, NOT a toxicity/safety determination; confirm with a toxicologist."}
@@ -1310,13 +1320,13 @@ def head_catalog():
                    "desc": AROMA_DESC.get(h), **_cal(_MOUTHFEEL_META, h)}
                   for h in mouthfeel_heads]
     return {
-        # taste heads keep a flat 0.5: hundreds of positives each, so they were never shy
-        "taste": [{"head": t, "auroc": _taste_auroc(t), "threshold": 0.5,
-                   "confident_capable": True} for t in taste_heads],
+        "taste": [{"head": t, "auroc": _taste_auroc(t), **_cal(_TASTE_META, t)}
+                  for t in taste_heads],
         "aroma": [_aroma(a) for a in aroma_heads],
         "mouthfeel": mouthfeel,
         "safety": [{"head": t, "auroc": _TOX_META.get(t, {}).get("auroc"),
-                    "meaning": _TOX_MEANING.get(t, t)} for t in sorted(_TOX_MODELS)],
+                    "meaning": _TOX_MEANING.get(t, t), **_cal(_TOX_META, t)}
+                   for t in sorted(_TOX_MODELS)],
     }
 
 
@@ -1473,6 +1483,26 @@ def _predicted_tastes_at(profiles, i):
     return [t for s, t in scored[:3] if s >= 0.2]
 
 
+def _predicted_mouthfeel_at(profiles, i):
+    """The MOUTHFEEL read for reference-set row i, straight off the profile matrix — no extra
+    inference, the columns are already there. Each sensation must clear its OWN calibrated
+    threshold (and be confident-capable), so a card never shows a sensation the modal would
+    call indicative. Returns the firing sensations, strongest first."""
+    if profiles is None:
+        return []
+    taste_heads, aroma_heads, mouth_heads = _profile_heads()
+    base = len(taste_heads) + len(aroma_heads)   # mouthfeel columns follow taste then aroma
+    row, out = profiles[i], []
+    for j, name in enumerate(mouth_heads):
+        col = base + j
+        if col >= len(row):
+            break
+        score = float(row[col])
+        if score >= _head_threshold(_MOUTHFEEL_META, name) and _head_capable(_MOUTHFEEL_META, name):
+            out.append((score, name))
+    return [n for _, n in sorted(out, reverse=True)]
+
+
 def structural_neighbors(smiles: str, k: int = 8, min_similarity: float = 0.0) -> dict:
     """STRUCTURAL neighbors: the k labeled molecules most structurally similar to the query
     (Tanimoto over Morgan fingerprints), each with its known tastes. Structural look-alikes —
@@ -1504,6 +1534,7 @@ def structural_neighbors(smiles: str, k: int = 8, min_similarity: float = 0.0) -
         neighbors.append({"smiles": smis[i], "similarity": round(float(sims[i]), 3),
                           "known_tastes": tastes[i],
                           "predicted_tastes": _predicted_tastes_at(profiles, i),
+                          "mouthfeel": _predicted_mouthfeel_at(profiles, i),
                           # confident aromas precomputed once in the index — reused so the
                           # endpoint never re-runs the 24 aroma heads per neighbor (8x ~1.3s saved)
                           "aromas": _aromas[i] if i < len(_aromas) else []})
@@ -1545,6 +1576,7 @@ def substitutes(smiles: str, k: int = 8, min_match: float = 0.0) -> dict:
             continue
         subs.append({"smiles": smis[i], "profile_match": round(float(sims[i]), 3),
                      "known_tastes": tastes[i], "predicted_tastes": _predicted_tastes_at(profiles, i),
+                     "mouthfeel": _predicted_mouthfeel_at(profiles, i),
                      "aromas": aromas[i] if i < len(aromas) else []})
         if len(subs) >= k:
             break
@@ -1584,6 +1616,7 @@ def mixture_to_molecule(smiles_list: list, weights: list | None = None, k: int =
             continue
         out.append({"smiles": smis[i], "profile_match": round(float(sims[i]), 3),
                     "known_tastes": tastes[i], "predicted_tastes": _predicted_tastes_at(profiles, i),
+                     "mouthfeel": _predicted_mouthfeel_at(profiles, i),
                     "aromas": aromas[i] if i < len(aromas) else []})
         if len(out) >= k:
             break
@@ -1733,7 +1766,8 @@ def predict(smiles: str, include_aroma: bool = False) -> dict:
     # If two+ taste heads both fire high, surface that as a complex-taste note —
     # the model-side echo of ChemTastesDB's 'multitaste' class.
     strong = [t for t in ("sweet", "bitter", "umami")
-              if isinstance(out.get(t), float) and out[t] >= 0.5]
+              if isinstance(out.get(t), float)
+              and out[t] >= _head_threshold(_TASTE_META, t)]
     out["multitaste"] = len(strong) >= 2
     out["taste_profile"] = _taste_profile(out)
     out["physchem"] = physchem(mol)
