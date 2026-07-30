@@ -534,6 +534,17 @@
   .how-card.gloss dd{margin:0;font-size:11.5px;line-height:1.55;color:var(--muted)}
   .how-card.gloss dd b{color:var(--ink);font-weight:600}
   @media(max-width:560px){.how-card.gloss .gl{grid-template-columns:1fr;gap:2px}.how-card.gloss dt{margin-top:7px}}
+  .chip-key{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:2px 0 14px;
+    padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:11px}
+  .ck-item{display:inline-flex;align-items:center;gap:6px;color:var(--ink);white-space:nowrap}
+  .ck-item em{font-style:normal;color:var(--muted)}
+  .ck-dot{width:7px;height:7px;border-radius:50%;background:var(--chip,var(--muted));flex:0 0 auto}
+  .ck-swatch{width:16px;height:8px;border-radius:4px;flex:0 0 auto;border:1px solid var(--muted)}
+  .ck-swatch.solid{background:var(--muted)}
+  .ck-swatch.open{background:transparent}
+  .ck-swatch.hatch{background:repeating-linear-gradient(45deg,var(--muted),var(--muted) 2px,transparent 2px,transparent 5px)}
+  .ck-sep{width:1px;height:16px;background:var(--line)}
+  @media(max-width:640px){.chip-key{gap:5px 11px;font-size:10.5px}.ck-item em{display:none}}
   .ss-why{font-size:11.5px;line-height:1.62;color:var(--muted);margin:2px 0 11px;max-width:74ch}
   .ss-why b{color:var(--ink);font-weight:600}
   .ss-why code{font-family:var(--mono);font-size:10.5px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px}
@@ -2458,6 +2469,19 @@ async function initStudio(){
     let html = `<div class="chip-filter"><input id="studioFilter" type="search" autocomplete="off"
       placeholder="Filter ${cats.reduce((a,c)=>a+(c.flavors||[]).length,0)+notes.length+mouth.length+tastes.length} flavors, tastes, notes &amp; sensations — e.g. citrus, vanilla, cool">
       <span id="studioFilterNone" class="cf-none" hidden>no match</span></div>`;
+    // One key for the whole vocabulary (#229). Four dimensions with four different meanings sit
+    // side by side here, and the dot colour is the only thing distinguishing them — so say what
+    // the dots mean once, up front, rather than expecting anyone to infer it.
+    html += `<div class="chip-key">
+      <span class="ck-item"><i class="ck-dot" style="--chip:var(--brand-1)"></i>Flavor <em>the whole percept</em></span>
+      <span class="ck-item"><i class="ck-dot" style="--chip:var(--aroma)"></i>Note <em>what the nose reads</em></span>
+      <span class="ck-item"><i class="ck-dot" style="--chip:var(--brand-accent)"></i>Taste <em>what the tongue reads</em></span>
+      <span class="ck-item"><i class="ck-dot" style="--chip:var(--accent)"></i>Mouthfeel <em>what you feel</em></span>
+      <span class="ck-sep"></span>
+      <span class="ck-item"><i class="ck-swatch solid"></i>documented <em>measured &amp; cited</em></span>
+      <span class="ck-item"><i class="ck-swatch open"></i>predicted <em>model, with its precision</em></span>
+      <span class="ck-item"><i class="ck-swatch hatch"></i>indicative <em>right &lt;50% of the time — a hint, not an answer</em></span>
+    </div>`;
     html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Flavors <span class="ss-sub">a flavor you know → the molecule that makes it</span></div><p class="ss-why"><b>A flavor is the whole percept</b> — banana, cola, root beer. It is what a person names, and it is almost never one molecule: it is a taste, several aroma notes and often a mouthfeel arriving together. Start here when you know the <i>target</i> and need the parts.</p><div class="ss-body">`;
     html += cats.map(c=>`<div class="studio-group"><span class="sg-label" title="${esc(c.category)}"><span class="sg-ico">${svgIcon(c.category)}</span>${c.category}</span>`+
       c.flavors.map(f=>`<button type="button" class="schip schip-flavor" data-term="${esc(f)}">${f}</button>`).join('')+`</div>`).join('');

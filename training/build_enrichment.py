@@ -47,17 +47,24 @@ def _all_structures():
 
 
 def _by_skel(path, cols):
-    """{skeleton -> {col: val}} from a parquet keyed by full inchikey."""
+    """{skeleton -> {col: val}} from a parquet keyed by either `inchikey` or `inchikey_skel`.
+
+    Accepting BOTH keys matters: properties.parquet is keyed by the full InChIKey, while the
+    backfill tables written by build_iupac_backfill.py and build_measured_properties.py are keyed
+    by the skeleton. An inchikey-only reader returns an empty dict for those two — silently, with
+    no error — so the backfilled names and measured boiling points would simply never appear.
+    """
     out = {}
     try:
         d = pd.read_parquet(path)
     except Exception:  # noqa: BLE001 — table absent; return what we have
         return out
-    if "inchikey" not in d.columns:
+    key = next((k for k in ("inchikey", "inchikey_skel") if k in d.columns), None)
+    if key is None:
         return out
     have = [c for c in cols if c in d.columns]
     for _, r in d.iterrows():
-        ik = r["inchikey"]
+        ik = r[key]
         if isinstance(ik, str):
             out[ik.split("-")[0]] = {c: r[c] for c in have}
     return out
@@ -237,6 +244,21 @@ if __name__ == "__main__":
                     structs.setdefault(Chem.MolToInchiKey(_m).split("-")[0], Chem.MolToSmiles(_m))
     props = _by_skel("properties.parquet",
                      ["common_name", "iupac_name", "melting_point_c", "boiling_point_c"])
+    # Names PubChem's property table missed (build_iupac_backfill.py: Title AND IUPACName).
+    for _skel, _row in _by_skel("iupac_backfill.parquet", ["common_name", "iupac_name"]).items():
+        tgt = props.setdefault(_skel, {})
+        for _k in ("common_name", "iupac_name"):
+            if not isinstance(tgt.get(_k), str) and isinstance(_row.get(_k), str):
+                tgt[_k] = _row[_k]
+    # MEASURED boiling/melting points from PUG-View (build_measured_properties.py). The property
+    # table only ever carried COMPUTED values, which is why 73% of rows had no measured BP despite
+    # every one of those molecules having a PubChem record — we had never asked the right endpoint.
+    for _skel, _row in _by_skel("measured_properties.parquet",
+                                ["melting_point_c", "boiling_point_c"]).items():
+        tgt = props.setdefault(_skel, {})
+        for _k in ("melting_point_c", "boiling_point_c"):
+            if tgt.get(_k) is None and _row.get(_k) is not None:
+                tgt[_k] = _row[_k]
     taste_doc = _taste_by_skel()
     curated = _curated_names()   # human names for the molecules we hand-curated
     print(f"{len(structs)} molecules; {len(props)} with crawl properties; "
