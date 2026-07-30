@@ -30,9 +30,28 @@ costs nothing on Track A — the demo keeps working while the product is built.
 | App / API | **ASP.NET Core (C#)** | Enterprise default for a service like this: strong tooling, broad hiring pool, first-class ONNX Runtime support. |
 | ML serving | **ONNX Runtime in-process in .NET** | Taste models (sklearn → `skl2onnx`) run inside the .NET app, no Python at runtime. |
 | Aroma serving | **Python FastAPI sidecar** *(only if needed)* | The GNN may not export to ONNX cleanly; if not, a thin localhost sidecar does aroma inference only. Best case it exports and there's zero Python at runtime. |
-| Frontend | **React** | Deepest hiring pool and the lightest fit for a simple single-screen workbench. |
+| Frontend | **React 19 + Vite + TypeScript** | Deepest hiring pool and the lightest fit for a simple single-screen workbench. |
+| UI kit | **Tailwind + shadcn/ui** *(not MUI)* | shadcn is copy-in, not import: the components live in our source tree where they can be read and owned. MUI would flatten Flavormancer's existing visual identity into Material and we would spend the port fighting it. The trade is real — MUI wins if you need an enterprise data-grid and date pickers tomorrow; this app is cards, chips, charts and a modal, which is shadcn's sweet spot. |
 | Database | **PostgreSQL + pgvector** | Mature and battle-tested; pgvector backs the substitution-search index with first-class vector search. |
 | Deploy | **Linux + Docker Compose** on the client-owned box | Single-box, small user count → Compose, not Kubernetes. Containers make the OS matrix irrelevant. |
+
+---
+
+## Deliberate exclusions
+
+What we chose **not** to use matters as much as the stack, and both of these come up often enough
+to be worth writing down.
+
+**Node.js — build tooling and MCP only, never a third backend.** Two API stacks (the shipping
+Python/FastAPI service and the planned .NET one) is breadth; a third is sprawl, and it reads as
+indecision rather than range. Node earns its place in exactly two spots: the React toolchain
+(Vite, TypeScript, the test runner), and — optionally — a **TypeScript MCP server** alongside the
+Python one, which is ~200 lines and demonstrates the official TS SDK against the same contract.
+
+**Laravel — deliberately absent.** It is a genuinely good fit for CRUD-and-content products and is
+used heavily elsewhere in this portfolio. It is the wrong tool here: Flavormancer is on-prem
+scientific computing, and adding a comfortable framework that proves nothing new would muddy that
+story. Choosing against your most familiar stack when it does not fit is the point.
 
 ---
 
