@@ -18,7 +18,10 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import DataStructs, rdFingerprintGenerator
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_predict, cross_val_score
+from train_aroma import (
+    _calibrate,  # same out-of-fold threshold + precision floor as the aroma heads
+)
 
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
@@ -62,9 +65,19 @@ for t in TASKS:
         continue
     clf_args = {"n_estimators": 200, "n_jobs": -1, "random_state": 42, "class_weight": "balanced"}
     auc = cross_val_score(RandomForestClassifier(**clf_args), Xd, yd, cv=5, scoring="roc_auc").mean()
+    # Calibration matters MORE here than anywhere else in the app. Assay actives are rare, so a
+    # high AUROC can sit on top of terrible precision — and a safety flag that is wrong most of
+    # the time is worse than no flag, because it teaches people to ignore the ones that matter.
+    oof = cross_val_predict(RandomForestClassifier(**clf_args), Xd, yd, cv=5,
+                            method="predict_proba")[:, 1]
+    thr, prec, rec, f1, capable = _calibrate(yd, oof)
     joblib.dump(RandomForestClassifier(**clf_args).fit(Xd, yd), OUT / f"{t}_rf.joblib")
-    manifest[t] = {"auroc": round(float(auc), 3), "n_pos": int(yd.sum()), "n": int(mask.sum())}
+    manifest[t] = {"auroc": round(float(auc), 3), "n_pos": int(yd.sum()), "n": int(mask.sum()),
+                   "threshold": thr, "cv_precision": prec, "cv_recall": rec, "cv_f1": f1,
+                   "confident_capable": capable}
     kept += 1
-    print(f"  {t:14s} n={int(mask.sum()):5d} pos={int(yd.sum()):4d}  CV-AUROC={auc:.3f}")
+    tag = "" if capable else "  INDICATIVE (never reaches 50% precision)"
+    print(f"  {t:14s} n={int(mask.sum()):5d} pos={int(yd.sum()):4d}  CV-AUROC={auc:.3f} "
+          f"thr={thr:.2f} prec={prec:.2f}{tag}")
 (OUT / "manifest.json").write_text(json.dumps({"assays": manifest}, indent=2))
 print(f"\nkept {kept}/{len(TASKS)} tox heads -> tox_models/  (caution-only, Tox21 public domain)")

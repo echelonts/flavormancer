@@ -28,7 +28,10 @@ from rdkit import Chem
 from rdkit.Chem import DataStructs, rdFingerprintGenerator
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import r2_score, roc_auc_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_predict, train_test_split
+from train_aroma import (
+    _calibrate,  # same out-of-fold threshold + precision floor as the aroma heads
+)
 
 BASIC = ["sweet", "bitter", "umami", "sour", "salty", "tasteless"]
 # Salty now ALSO trains as an INDICATIVE head (CV-AUROC ~0.96 once the PubChem documented-
@@ -102,9 +105,19 @@ def train_classifiers(master):
         clf = RandomForestClassifier(n_estimators=500, n_jobs=-1, random_state=42)
         clf.fit(Xtr, ytr)
         auc = roc_auc_score(yte, clf.predict_proba(Xte)[:, 1])
-        print(f"  {taste:7s} AUROC={auc:.3f}  (pos={pos}, neg={neg})")
+        # Per-head decision threshold + measured precision, same instrument as the aroma heads
+        # (train_aroma._calibrate). These heads have hundreds of positives each and were never
+        # expected to be shy — but "we measured and 0.5 was right" is a result, not a reason to
+        # skip measuring. See docs/ACCURACY.md.
+        oof = cross_val_predict(RandomForestClassifier(n_estimators=500, n_jobs=-1, random_state=42),
+                                Xv, yv, cv=5, method="predict_proba")[:, 1]
+        thr, prec, rec, f1, capable = _calibrate(yv, oof)
+        tag = "" if capable else "  INDICATIVE (never reaches 50% precision)"
+        print(f"  {taste:7s} AUROC={auc:.3f}  thr={thr:.2f} prec={prec:.2f}{tag}  (pos={pos}, neg={neg})")
         joblib.dump(clf, OUT / f"{taste}_rf.joblib")
-        manifest[taste] = {"auroc": round(float(auc), 3), "n_pos": pos, "n_neg": neg}
+        manifest[taste] = {"auroc": round(float(auc), 3), "n_pos": pos, "n_neg": neg,
+                           "threshold": thr, "cv_precision": prec, "cv_recall": rec,
+                           "cv_f1": f1, "confident_capable": capable}
     return manifest
 
 
