@@ -17,6 +17,42 @@ the difference between **prediction** and **lookup**, and it's the whole point.
 
 ---
 
+## 0.5. Reading the numbers — a two-sentence glossary
+
+Every head reports the same handful of numbers. They are used throughout this document, and three
+of them are routinely misread, so here is what each one actually means. The long version, with
+worked examples, is in [`ACCURACY.md`](ACCURACY.md).
+
+**Head** — one yes/no expert for one property. *Does this smell like vanilla?* is a head; so is
+*does this taste bitter?* There are 190 of them, and each returns a number from 0 to 1 for how
+strongly it believes the answer is yes.
+
+**AUROC** — a **ranking** score. Hand a head one true vanilla molecule and one non-vanilla: how
+often does it score the vanilla one higher? **0.5 is a coin flip, 1.0 is never wrong.** It says
+nothing about how often the head is right when it actually fires — see precision.
+
+**Threshold** — the score at or above which a head counts as *firing*. It is **not** a flat 0.5;
+each head has its own, fitted on data it never trained on, and they range 0.16–0.85. A head with
+13 examples hedges, so a real `pine` match can land at 0.42 — a shared cut-off would have silently
+withheld it.
+
+**Precision** — **when it says yes, how often is it right?** This is trustworthiness, and it is the
+number AUROC cannot see. A head with 11 positives among 2,403 molecules can score AUROC 0.979 and
+have precision 0.10 — right one time in ten. Both are true of `ginger`.
+
+**Recall** — **of all the real ones, how many did it catch?** This is thoroughness. It trades
+against precision: raise a head's threshold and you get fewer false alarms but more misses.
+
+**Out-of-fold** — scored by a model that never saw that molecule. Every accuracy number here is
+out-of-fold; none of them are a model grading its own homework. See 5-fold cross-validation below.
+
+**Confident vs indicative** — a head may only be called *confident* if it clears **50% precision**;
+it has to be right more often than not. The 73 aroma heads that cannot are shipped as
+**indicative** — they keep their score, their chips and every molecule they find, but they are
+never dressed up as a confident call.
+
+---
+
 ## 1. How a molecule becomes numbers
 
 Everything starts by turning a structure into something math can chew on:

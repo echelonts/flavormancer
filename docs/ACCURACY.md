@@ -18,7 +18,7 @@ it believes the answer is yes.
 
 | modality | heads | what they answer |
 |---|---|---|
-| Taste | 6 | sweet, bitter, umami, sour, salty, tasteless |
+| Taste | 6 | the five basics — sweet, bitter, umami, sour, salty — plus `tasteless` |
 | Aroma | 167 | vanilla, citrus, smoky, pine, jasmine… |
 | Mouthfeel | 5 | cooling, warming, pungent, tingling, astringent |
 | Safety | 12 | Tox21 assay screens — caution flags, never a clearance |

@@ -529,6 +529,11 @@
      particular stuck out against the flavor and note chips they sit beside. */
   .atag.mf{border-style:solid;position:relative;padding-left:14px}
   .atag.mf::before{content:'';position:absolute;left:6px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:currentColor}
+  .how-card.gloss .gl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 10px;align-items:baseline}
+  .how-card.gloss dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);white-space:nowrap}
+  .how-card.gloss dd{margin:0;font-size:11.5px;line-height:1.55;color:var(--muted)}
+  .how-card.gloss dd b{color:var(--ink);font-weight:600}
+  @media(max-width:560px){.how-card.gloss .gl{grid-template-columns:1fr;gap:2px}.how-card.gloss dt{margin-top:7px}}
   .ss-why{font-size:11.5px;line-height:1.62;color:var(--muted);margin:2px 0 11px;max-width:74ch}
   .ss-why b{color:var(--ink);font-weight:600}
   .ss-why code{font-family:var(--mono);font-size:10.5px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px}
@@ -826,8 +831,17 @@
         <div class="how-card"><h4>3 · Aroma — 167 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 167 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
         <div class="how-card"><h4>4 · Honest by design</h4><p>Every value is tagged <b>measured / predicted / estimate</b>, so nothing reads as more precise than it is. Where a quantitative feature needs data we can't ship free-commercially (odor thresholds, panel intensities), the UI <b>says so</b> — and it lights up with <b>your</b> data.</p></div>
         <div class="how-card"><h4>5 · How good is a head, really?</h4><p><b>AUROC alone will lie to you.</b> It measures <i>ranking</i> and is blind to how rare a note is — a head with 11 examples among 2,403 molecules can score <b>0.979</b> and still be right just <b>1 time in 10</b> when it fires. So every head also publishes its <b>precision</b>: when it says yes, how often it's actually right, measured only on molecules it never trained on. Each head gets its <b>own</b> firing threshold (0.16&nbsp;–&nbsp;0.85, not a flat 0.5), fitted so a <b>confident</b> call is right more than half the time. <b>23 heads have never been wrong</b> on unseen molecules; the 73 that can't clear 50% are shown as <b>indicative</b> — hatched bars, kept in full, never dressed up as confident.</p></div>
-        <div class="how-card"><h4>6 · Formulation, not just molecules</h4><p>The <b>Formulation Studio</b> reads a whole recipe before you pour — weighting each ingredient by odor impact, aggregating the blend's note-profile, flagging the overpowering component, and closing the gap to your target. That's single-molecule ML turned into a bench tool.</p></div>
-        <div class="how-card"><h4>7 · On-prem &amp; commercial-clean</h4><p>Nothing leaves the box — a read makes <b>no cloud calls</b>. The shipped models train only on <b>public-domain or permissively-licensed</b> data, so the commercial edition stays clean (provenance tracked in the repo).</p></div>
+        <div class="how-card gloss"><h4>6 · Reading the numbers</h4>
+        <dl class="gl">
+          <dt>AUROC</dt><dd>A <b>ranking</b> score: given one true example and one false one, how often is the true one scored higher? <b>0.5 = coin flip, 1.0 = never wrong.</b> Says nothing about how often a head is right when it fires.</dd>
+          <dt>Threshold</dt><dd>The score at which a head counts as <b>firing</b>. Not a flat 0.5 — each head has its own, fitted on data it never trained on, ranging <b>0.16&nbsp;–&nbsp;0.85</b>.</dd>
+          <dt>Precision</dt><dd><b>When it says yes, how often is it right?</b> Trustworthiness — and the number AUROC can't see.</dd>
+          <dt>Recall</dt><dd><b>Of all the real ones, how many did it catch?</b> Thoroughness. Trades against precision.</dd>
+          <dt>Out&#8209;of&#8209;fold</dt><dd>Scored by a model that <b>never saw that molecule</b>. Every number here is out-of-fold — no model grades its own homework.</dd>
+          <dt>Indicative</dt><dd>A head that can't reach <b>50% precision</b> at any threshold. Kept in full, shown with a hatched bar, never called confident.</dd>
+        </dl></div>
+        <div class="how-card"><h4>7 · Formulation, not just molecules</h4><p>The <b>Formulation Studio</b> reads a whole recipe before you pour — weighting each ingredient by odor impact, aggregating the blend's note-profile, flagging the overpowering component, and closing the gap to your target. That's single-molecule ML turned into a bench tool.</p></div>
+        <div class="how-card"><h4>8 · On-prem &amp; commercial-clean</h4><p>Nothing leaves the box — a read makes <b>no cloud calls</b>. The shipped models train only on <b>public-domain or permissively-licensed</b> data, so the commercial edition stays clean (provenance tracked in the repo).</p></div>
       </div>
       <p class="how-foot">Deeper dives in the repo: <a href="https://github.com/echelonts/flavormancer/blob/main/docs/HOW-IT-WORKS.md" target="_blank" rel="noopener">docs/HOW-IT-WORKS.md</a> (the full method) · <a href="https://github.com/echelonts/flavormancer/blob/main/docs/DATA-SOURCES.md" target="_blank" rel="noopener">docs/DATA-SOURCES.md</a> (every source + license) · <a href="https://github.com/echelonts/flavormancer/blob/main/docs/AROMA.md" target="_blank" rel="noopener">docs/AROMA.md</a> (the odor heads).</p>
     </div>
@@ -2468,7 +2482,7 @@ async function initStudio(){
     }
     // Taste — the basic tastes, namespaced so they don't collide with the like-named aroma notes
     if(tastes.length){
-      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Taste <span class="ss-sub">what the tongue reads — distinct from a sweet <i>smell</i></span></div><p class="ss-why"><b>Taste is only the five basics</b> the tongue detects — sweet, bitter, umami, sour, salty (plus tasteless). It is a genuinely different channel from smell, which is why <code>taste:sweet</code> and the aroma note <code>sweet</code> are separate heads: vanillin <i>smells</i> sweet without being a sweetener. Use taste to set the backbone, notes to give it character.</p><div class="ss-body">`+
+      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-flavors"/></svg> Taste <span class="ss-sub">what the tongue reads — distinct from a sweet <i>smell</i></span></div><p class="ss-why"><b>Taste is the five basics</b> the tongue detects — sweet, bitter, umami, sour, salty. We train <b>six</b> heads: those five plus <code>tasteless</code>, which predicts the documented <i>absence</i> of taste and is how you find a clean carrier. It is a genuinely different channel from smell, which is why <code>taste:sweet</code> and the aroma note <code>sweet</code> are separate heads: vanillin <i>smells</i> sweet without being a sweetener. Use taste to set the backbone, notes to give it character.</p><div class="ss-body">`+
         `<div class="studio-group studio-group-notes">`+
         tastes.map(t=>{const lbl=t.replace(/^taste:/,'');
           // set --chip, don't override border/text colour: the per-taste hue now flows through the
