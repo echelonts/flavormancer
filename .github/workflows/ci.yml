@@ -23,7 +23,12 @@ jobs:
         run: ruff check .
       - name: Install runtime deps
         run: pip install -r requirements.txt
-      - name: Pytest (unit)
+        # fastapi + httpx back the TestClient integration tests (tests/test_api_contract.py).
+        # Without them that file skips itself rather than failing, but then CI silently stops
+        # checking every endpoint contract — so install them explicitly.
+      - name: Install test-only deps
+        run: pip install fastapi httpx pydantic
+      - name: Pytest (unit + integration)
         run: |
           if git ls-files '*test_*.py' '*_test.py' 'tests/**/*.py' | grep -qv '^tests/e2e/'; then
             pytest -q --ignore=tests/e2e

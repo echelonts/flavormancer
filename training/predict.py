@@ -323,7 +323,14 @@ def _load_all_models():
 # only need featurization (_feat / _MORGAN), like the parallel index builder, which loads each head
 # in its own worker process rather than in this parent.
 if os.environ.get("FLAVORMANCER_NO_MODELS") == "1":
-    pass
+    # Skip loading, but still mark READY. Leaving the event unset meant the app's warming gate
+    # returned 503 to every request FOREVER — a models-less install was not "degraded", it was
+    # dead, which is the opposite of what the docs promised. Structure-derived answers (physchem,
+    # the sour/salty rules, applicability, substructure) need no heads at all and should be served.
+    with _LOAD_LOCK:
+        LOAD_PROGRESS["phase"] = "ready (no models)"
+        LOAD_PROGRESS["ready"] = True
+    MODELS_READY.set()
 elif os.environ.get("FLAVORMANCER_BLOCKING_LOAD") == "1":
     _load_all_models()
 else:
