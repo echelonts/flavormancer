@@ -1,0 +1,62 @@
+# Flavormancer — single-box deployment.
+#
+# One machine, a handful of users, no orchestration. That is the actual shape of an on-prem
+# install for a flavour house, so this is Compose rather than Kubernetes — see
+# docs/ARCHITECTURE.md.
+#
+#   docker compose up -d
+#   curl localhost:8000/healthz
+#
+# The trained models are NOT in the image. Point MODELS_DIR at wherever they live on the host
+# (default ./models) — they are ~1 GB of joblib forests plus the parquet tables, rebuilt by the
+# training scripts on a box with cores to spare.
+
+name: flavormancer
+
+services:
+  app:
+    build: .
+    image: flavormancer:latest
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      # Serving is CPU-bound on forest inference; leave the box some headroom for Postgres.
+      FLAVORMANCER_INFER_WORKERS: "${INFER_WORKERS:-0}"   # 0 = auto (3/4 of cores)
+      FLAVORMANCER_HOME: /app/data                        # where the mounted artifacts live
+      DATABASE_URL: "postgresql://flavormancer:${POSTGRES_PASSWORD:-flavormancer}@db:5432/flavormancer"
+    volumes:
+      # One clean mount, because the app now resolves artifacts under FLAVORMANCER_HOME rather
+      # than the working directory. Before that, ANY bind that reached the models also shadowed
+      # app.py — the container would have started with no application code.
+      - "${MODELS_DIR:-./models}:/app/data:ro"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 15s
+      timeout: 5s
+      start_period: 180s     # a cold start loads 190 heads; see docs/METHODS.md
+      retries: 4
+
+  db:
+    # pgvector, not plain Postgres: the substitution index is a nearest-neighbour search over the
+    # 177-dimension flavour-profile vector, which is exactly what pgvector exists for (#20).
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: flavormancer
+      POSTGRES_USER: flavormancer
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-flavormancer}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flavormancer -d flavormancer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

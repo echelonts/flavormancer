@@ -1,0 +1,25 @@
+# Keep the build context small and the image free of anything that isn't runtime code.
+.git
+.github
+.claude
+**/__pycache__
+**/*.pyc
+.venv
+venv
+# Trained artifacts are MOUNTED, never baked in — see the Dockerfile header.
+**/*.joblib
+**/*.parquet
+**/*.npz
+**/*.onnx
+models/
+aroma_models/
+taste_models/
+mouthfeel_models/
+tox_models/
+onnx_models/
+# Dev-only
+tests/
+docs/
+node_modules/
+*.md
+!README.md

@@ -62,9 +62,21 @@ from rdkit.Chem import (
     rdMolDescriptors,
 )
 
+# Where the trained artifacts live. Defaults to the working directory, which is how the systemd
+# deployment has always run (code and models share one directory). Setting FLAVORMANCER_HOME lets
+# a container bake the CODE into the image while MOUNTING the ~1 GB of models and parquet tables —
+# without it, any bind mount that reached the artifacts would also shadow app.py.
+HOME = Path(os.environ.get("FLAVORMANCER_HOME") or ".")
+
+
+def artifact(name):
+    """Resolve one trained artifact (model directory, parquet or csv) under FLAVORMANCER_HOME."""
+    return HOME / name
+
+
 FP_BITS, FP_RADIUS = 2048, 2
 _MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=FP_RADIUS, fpSize=FP_BITS)
-TASTE = Path("taste_models")
+TASTE = artifact("taste_models")
 
 ACID_SMARTS = {
     # Match both protonated (-OH) and deprotonated (-O-) forms — sour compounds are
@@ -209,13 +221,13 @@ _INTENSITY = None          # sweet-intensity regressor
 _TASTE_META = {}           # taste -> {auroc, ...} from taste_models/manifest.json (held-out score)
 _TOX_MODELS = {}           # Tox21 caution-only assay heads (INDICATIVE, never a determination)
 _TOX_META = {}             # assay -> {auroc, n_pos, ...} from tox_models/manifest.json (held-out CV)
-_TOX_DIR = Path("tox_models")
+_TOX_DIR = artifact("tox_models")
 _AROMA_MODELS = {}         # HSDB odor-descriptor heads (presence/absence; NOT intensity)
 _AROMA_META = {}
-_AROMA_DIR = Path("aroma_models")
+_AROMA_DIR = artifact("aroma_models")
 _MOUTHFEEL_MODELS = {}     # trigeminal/chemesthesis heads (warming/astringent/tingling), own modality
 _MOUTHFEEL_META = {}
-_MOUTHFEEL_DIR = Path("mouthfeel_models")
+_MOUTHFEEL_DIR = artifact("mouthfeel_models")
 
 MODELS_READY = _threading.Event()  # set once every head is loaded; the app gates requests on this
 _INFER_POOL = None  # shared thread pool for fanning a novel-molecule read across cores (lazy)
@@ -321,12 +333,12 @@ else:
 # is how the salty/sour data works as a FLAG without a model — if a queried
 # molecule is in our labeled set, we report the verified fact instead of a guess.
 _KNOWN = {}  # inchikey -> {taste: 1}
-_MASTER = Path("taste_master.parquet")
+_MASTER = artifact("taste_master.parquet")
 # The neighbor / substitute reference set: the FULL molecule universe (every structure we know,
 # ~8.8k) so structural neighbors and profile substitutes can surface ANY molecule — e.g. ethyl
 # vanillin as the top vanillin substitute — not just the taste-labelled subset. Falls back to
 # taste_master when the enrichment table hasn't been built yet.
-_UNIVERSE = Path("master_enrichment.parquet")
+_UNIVERSE = artifact("master_enrichment.parquet")
 if _MASTER.exists():
     import pandas as pd
     _m = pd.read_parquet(_MASTER)
@@ -342,7 +354,7 @@ if _MASTER.exists():
 # 'inchikey' column and we cross-check against it; absent the file we say so
 # honestly rather than guessing.
 _GRAS = set()
-_GRAS_FILE = Path("gras_reference.parquet")
+_GRAS_FILE = artifact("gras_reference.parquet")
 if _GRAS_FILE.exists():
     import pandas as pd
     _g = pd.read_parquet(_GRAS_FILE)
@@ -377,7 +389,7 @@ def _foodsafe_label(fl, cfr):
     return f"{term} — {' & '.join(refs)}{tag}" if refs else term
 
 
-_FOODSAFE_FILE = Path("food_safe_supplement.csv")
+_FOODSAFE_FILE = artifact("food_safe_supplement.csv")
 _FOODSAFE_BASIS = {}   # skeleton -> specific open-gov label (term + refs + jurisdiction)
 if _FOODSAFE_FILE.exists():
     import pandas as pd
@@ -400,7 +412,7 @@ if _FOODSAFE_FILE.exists():
 # permitted); every AUTHORISED row is a food-cleared flavouring cited by its FL number. Union into
 # the food-use reference so the whole authorised list reads food-listed with a specific citation.
 # The FILE is a private data asset (gitignored); this LOADER is open framework.
-_GB_FILE = Path("gb_union_list.csv")
+_GB_FILE = artifact("gb_union_list.csv")
 if _GB_FILE.exists():
     import pandas as pd
     _gb = pd.read_csv(_GB_FILE, dtype=str, keep_default_na=False)
@@ -1336,7 +1348,7 @@ def _build_sub_index():
     # Fast path: load the precomputed profile index (build_profile_index.py). The 178-dim
     # inference over ~8.8k molecules is slow (~3 min); the cache makes startup instant. We only
     # rebuild the cheap Morgan fingerprints from SMILES on load.
-    cache = Path("profile_index.npz")
+    cache = artifact("profile_index.npz")
     if cache.exists():
         z = np.load(cache, allow_pickle=True)
         smis = [str(s) for s in z["smiles"]]
