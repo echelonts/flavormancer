@@ -203,12 +203,38 @@ CURATED = {
     "magnolia": ["methyl anthranilate", "trans-beta-ocimene", "citral", "geraniol",
                  "alpha-terpineol", "methyl benzoate", "isoeugenol", "nerolidol",
                  "benzyl alcohol", "cis-beta-ocimene"],
+    # --- #257: the broad heads. sweet/ethereal/pungent now clear the 50% precision floor but sit
+    # EXACTLY on it with high thresholds (0.75 / 0.64 / 0.66), which means they only stay confident
+    # by being very reluctant to fire. Food-authorised character molecules push them clear on the
+    # food side rather than removing the industrial odorants that also (truthfully) smell this way.
+    "sweet":    ["vanillin", "ethylvanillin", "maltol", "ethyl maltol", "furaneol", "homofuraneol",
+                 "heliotropin", "anisaldehyde", "gamma-decalactone", "delta-decalactone",
+                 "gamma-undecalactone", "4-hydroxy-2,5-dimethyl-3(2H)-furanone", "veratraldehyde",
+                 "acetovanillone", "anisyl alcohol", "methyl anthranilate"],
+    # ethereal = the light, volatile, solvent-like top note. Food-authorised acetals, formates and
+    # short esters, NOT the chlorinated solvents that share the descriptor honestly (see #257).
+    "ethereal": ["acetaldehyde", "1,1-diethoxyethane", "ethyl formate", "methyl formate",
+                 "methyl acetate", "acetaldehyde dimethyl acetal", "2-methyl-1,3-dioxolane",
+                 "propanal", "isobutyraldehyde", "diethyl carbonate"],
+    # fatty sat at 0.21 precision on 27 positives — one of the worst. Its chemistry is unusually
+    # crisp for a broad head: mid-chain aldehydes, free fatty acids and the lactones.
+    "fatty":    ["nonanal", "decanal", "2,4-decadienal", "trans-2-nonenal", "trans-2-decenal",
+                 "2-undecenal", "octanoic acid", "decanoic acid", "hexanoic acid", "lauric acid",
+                 "myristic acid", "gamma-nonalactone", "methyl octanoate", "ethyl decanoate",
+                 "1-octanol", "heptanal"],
     "alcoholic": ["ethanol", "1-propanol", "isobutanol", "isoamyl alcohol", "1-butanol",
                  "2-methylbutanol", "1-hexanol", "phenethyl alcohol", "1-pentanol"],
     # pungent (an odor/chemesthesis head, also tagged mouthfeel): sharp biting Piper long/black-pepper
     # amides on top of the corpus's documented pungent molecules (piperine, isothiocyanates, etc.)
     "pungent":  ["piperlongumine", "piperlonguminine", "pipernonaline", "sarmentine",
-                 "dehydropipernonaline", "guineensine"],
+                 "dehydropipernonaline", "guineensine",
+                 # #257: food-authorised sharp-smelling volatiles on the food side — short acids,
+                 # isothiocyanates and alliaceous sulfur. Appended to the existing Piper amides
+                 # rather than declared as a second "pungent" key, which would silently shadow
+                 # them (last key wins in a dict literal) and delete six molecules.
+                 "acetic acid", "formic acid", "propionic acid", "butyric acid",
+                 "allyl isothiocyanate", "methyl isothiocyanate", "phenethyl isothiocyanate",
+                 "diallyl disulfide", "diallyl sulfide", "isovaleric acid", "methyl mercaptan"],
 }
 
 

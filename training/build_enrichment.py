@@ -135,6 +135,30 @@ def _pick_name(pr):
     return None
 
 
+def _fallback_label(mol):
+    """A readable label for a molecule that genuinely has no name anywhere.
+
+    770 rows reach this. They are not flavour molecules we failed to look up — a full PubChem
+    crawl on Title AND IUPACName resolved only 41 of 784, and an InChIKey lookup did worse. The
+    remainder are the long tail that arrived with the broad food/safety universe: 159
+    multi-component salts (PubChem indexes the components, not the mixture), 197 very large
+    structures, 100 peptide-like, 13 carbon-free. No crawl will name those, and most are not
+    flavour-relevant.
+
+    Showing a raw SMILES for them is the worst option — it is unreadable and looks broken. A
+    molecular formula is honest, compact, and tells a chemist something real, so that is the floor.
+    Multi-component structures are labelled as such rather than pretending to be one substance.
+    """
+    if mol is None:
+        return None
+    parts = Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=False)
+    formula = rdMolDescriptors.CalcMolFormula(mol)
+    if len(parts) > 1:
+        bits = [rdMolDescriptors.CalcMolFormula(x) for x in parts]
+        return f"{formula} (mixture: {' + '.join(bits[:3])}{' + …' if len(bits) > 3 else ''})"
+    return formula
+
+
 _CAS_INVERTED = re.compile(r"^([A-Za-z0-9\-\[\]\(\)']+), ([0-9A-Za-z\-\(\),+\u00b1\s]+?)-?$")
 
 
@@ -231,7 +255,8 @@ if __name__ == "__main__":
         name = _uninvert_cas(curated.get(skel) or _pick_name(pr))
         rows.append({
             "inchikey_skel": skel, "smiles": smi,
-            "name": name if isinstance(name, str) else None,
+            # never emit a bare SMILES as a name: fall back to the molecular formula
+            "name": name if isinstance(name, str) else _fallback_label(m),
             "mw": round(float(Descriptors.MolWt(m)), 1),
             "logp": round(float(Crippen.MolLogP(m)), 2),
             "tpsa": round(float(rdMolDescriptors.CalcTPSA(m)), 1),
@@ -291,7 +316,7 @@ if __name__ == "__main__":
 
     # first-class rows for stereoisomers that differ in documented odor/taste
     name_by_skel = {sk: _uninvert_cas(curated.get(sk) or _pick_name(props.get(sk, {})))
-                    for sk in structs}
+                    for sk in structs}  # isomer labels only — a formula parent reads badly there
     iso_rows = _documented_isomer_rows(name_by_skel)
     if iso_rows:
         rows.extend(iso_rows)
