@@ -222,6 +222,38 @@ CURATED = {
                  "2-undecenal", "octanoic acid", "decanoic acid", "hexanoic acid", "lauric acid",
                  "myristic acid", "gamma-nonalactone", "methyl octanoate", "ethyl decanoate",
                  "1-octanol", "heptanal"],
+    # chamomile, second attempt. The first (#271) used bisabolol + farnesene + germacrene D and made
+    # it WORSE — farnesene and germacrene D are in half the sesquiterpene heads in the corpus, which
+    # is the generic-molecule trap blackberry taught us. This list is strictly distinctive: the
+    # angelate esters are specific to Roman chamomile and the bisabolol oxides to Matricaria.
+    "chamomile": ["isobutyl angelate", "2-methylbutyl angelate", "isoamyl angelate",
+                 "bisabolol oxide A", "bisabolol oxide B", "alpha-bisabolol", "chamazulene",
+                 "matricin", "bisabolone oxide A", "isobutyl isobutyrate"],
+    # --- Near-miss descriptors that sit below the 10-positive floor but have genuinely UNIQUE
+    # character chemistry. Chosen over chasing `blackberry`, whose remaining candidates are all
+    # already positives, so adding them moves nothing but the cross-validation noise.
+    #
+    # Deliberately NOT attempted here: cucumber, watermelon and boronia. Their chemistry is the
+    # same C9 nonadienal/nonadienol set that `melon` already owns, and the ionones that `violet`
+    # owns — entangled classes, which is the trap that cost blackberry 0.10 AUROC. Adding them
+    # would likely damage the heads that already work.
+    "lychee":   ["cis-rose oxide", "trans-rose oxide", "geraniol", "citronellol", "linalool oxide",
+                 "beta-damascenone", "2-phenylethanol", "nerol oxide", "guaiacol"],
+    "quince":   ["marmelo lactone", "marmelo oxide", "theaspirane", "edulan",
+                 "ethyl 2-methylbutyrate", "alpha-ionone", "beta-ionone", "hexyl acetate",
+                 "ethyl hexanoate", "hexyl butyrate", "damascenone", "dihydro-beta-ionone"],
+    "immortelle": ["italidione", "neryl acetate", "gamma-curcumene", "alpha-pinene", "nerol",
+                 "beta-caryophyllene", "linalool", "alpha-cedrene", "neryl propionate",
+                 "eudesmol", "rosifoliol", "neryl acetate"],
+    "galbanum": ["2-methoxy-3-isobutylpyrazine", "undeca-1,3,5-triene", "alpha-pinene", "myrcene",
+                 "beta-pinene", "delta-3-carene", "limonene", "sabinene", "guaiol"],
+    "tagetes":  ["dihydrotagetone", "tagetone", "ocimenone", "tagetenone", "cis-ocimene",
+                 "limonene", "trans-ocimene", "linalool"],
+    "angelica": ["15-pentadecanolide", "alpha-angelica lactone", "beta-angelica lactone",
+                 "alpha-phellandrene", "cyclopentadecanolide", "ambrettolide", "alpha-pinene",
+                 "3-butylphthalide"],
+    "wormwood": ["alpha-thujone", "beta-thujone", "artemisia ketone", "camphor", "chamazulene",
+                 "davanone", "1,8-cineole", "artemisia alcohol", "sabinyl acetate"],
     "alcoholic": ["ethanol", "1-propanol", "isobutanol", "isoamyl alcohol", "1-butanol",
                  "2-methylbutanol", "1-hexanol", "phenethyl alcohol", "1-pentanol"],
     # pungent (an odor/chemesthesis head, also tagged mouthfeel): sharp biting Piper long/black-pepper

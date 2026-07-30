@@ -57,7 +57,7 @@ def models_present(base_url):
     """
     import json
     import time
-    deadline = time.monotonic() + 180  # poll for up to 3 min — covers a cold 190-head load under load
+    deadline = time.monotonic() + 180  # poll for up to 3 min — covers a cold 195-head load under load
     while time.monotonic() < deadline:
         with contextlib.suppress(Exception):  # server busy/starting -> wait and retry
             req = urllib.request.Request(base_url + "/api/predict", method="POST",

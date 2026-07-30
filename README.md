@@ -1,6 +1,13 @@
 # Flavormancer
 
 <p align="center">
+  <a href="https://github.com/echelonts/flavormancer/releases/latest"><img src="https://img.shields.io/github/v/release/echelonts/flavormancer?style=flat-square&color=8A6BE0&label=release" alt="latest release"></a>
+  <img src="https://img.shields.io/badge/heads-195%20trained-2BC4C4?style=flat-square" alt="195 trained heads">
+  <img src="https://img.shields.io/badge/runs-100%25%20on--prem-0A0A0A?style=flat-square" alt="runs entirely on-prem">
+  <a href="docs/ACCURACY.md"><img src="https://img.shields.io/badge/accuracy-published%20per%20head-E0913C?style=flat-square" alt="per-head accuracy published"></a>
+</p>
+
+<p align="center">
   <img src="docs/assets/hero.png" alt="Flavormancer — taste &amp; aroma prediction from chemical structure" width="860">
 </p>
 
@@ -8,6 +15,15 @@ On-prem flavor prediction from chemical structure — **taste _and_ aroma, physi
 behavior, formulation notes, and safety flags** for any molecule, plus substitution search.
 Enter a **common or IUPAC name** (or a SMILES) and get a single, honest flavor read,
 running entirely on hardware you own.
+
+**Every head tells you how good it is.** Each of the 195 trained heads publishes the decision
+threshold it fires at and its measured out-of-fold precision — because AUROC alone will flatter a
+model badly on rare classes. The `ginger` head scores **AUROC 0.979** and is right **1 time in 10**
+when it fires; both are true, and only one of them was ever being reported. Heads that cannot be
+right more than half the time ship marked **indicative** rather than confident: they keep their
+score, their chips and every molecule they find, but they are never dressed up as answers.
+[**How accurate is it, really?**](docs/ACCURACY.md) explains all of it without assuming an ML
+background.
 
 <p align="center">
   <img src="docs/assets/molecule-read.png" alt="A full, confidence-tagged molecule flavor read" width="640">
@@ -17,9 +33,9 @@ running entirely on hardware you own.
 <p align="center">
   <img src="docs/assets/flavor-map.png" alt="Flavor-space map in 3D on MW × logP × TPSA axes, colored by taste and aroma" width="900">
 </p>
-<p align="center"><sub>The interactive flavor-space map in 3D on real <b>MW × logP × TPSA</b> axes, colored by <b>taste &amp; aroma</b> — every one of the 167 aroma + 6 taste classes labelled. <b>190 trained heads</b> in all: 6 taste + 167 aroma + 5 mouthfeel + 12 safety.</sub></p>
+<p align="center"><sub>The interactive flavor-space map in 3D on real <b>MW × logP × TPSA</b> axes, colored by <b>taste &amp; aroma</b> — every one of the 172 aroma + 6 taste classes labelled. <b>195 trained heads</b> in all: 6 taste + 172 aroma + 5 mouthfeel + 12 safety.</sub></p>
 
-> **8,847 unique molecules** across the open datasets · **taste + aroma + mouthfeel** prediction from
+> **8,869 unique molecules** across the open datasets · **taste + aroma + mouthfeel** prediction from
 > structure · a **flavor library** (start from a flavor → its character-impact molecule) and
 > **flavor designer** (pick your notes → best food-safe molecules + drop-in swaps) · an
 > interactive 2D/3D **flavor-space map** · **2D & 3D** structure views. All on
@@ -28,10 +44,10 @@ running entirely on hardware you own.
 > Per set (unique molecules): taste training **3,845** · aroma training **2,394** · odor
 > corpus **2,255** · documented taste **676** · mouthfeel training **2,534** · Tox21 (safety)
 > **7,823** · GRAS reference **2,781** · sweetness intensity **316** · character-impact aroma
-> supplement **602 associations** (open-gov-sourced). Every one of the 8,847 is enriched with
+> supplement **602 associations** (open-gov-sourced). Every one of the 8,861 is enriched with
 > names + measured properties from public-domain PubChem.
 >
-> *How the universe grows:* the flavor-space map and enrichment table show **8,847 unique
+> *How the universe grows:* the flavor-space map and enrichment table show **8,861 unique
 > structures** (deduped by connectivity skeleton), expanded by ingesting the **full EU/GB
 > flavourings Union List (~2,200 authorised, Open Government Licence v3)** so the browse-able
 > universe is food-forward. Meaningfully-distinct stereoisomers (e.g. R- vs S-limonene) that carry
@@ -59,7 +75,7 @@ is tagged by how it was derived**, so nothing reads as more certain than its sou
   **tasteless** (RandomForests on fingerprint + physicochemical features), plus a
   sweetness-**intensity** regressor. Sour and salty *also* keep a transparent chemistry
   rule (acid group / alkali-salt) as a deterministic cross-check alongside the model.
-- **Aroma** — **167 odor-descriptor heads** (citrus, floral, minty, almond, fatty,
+- **Aroma** — **172 odor-descriptor heads** (citrus, floral, minty, almond, fatty,
   petroleum, earthy, medicinal, sulfurous, camphor, fruity, fishy, garlic, ethereal,
   ammoniacal, pungent, pine, rose, rancid, alcoholic, woody, green, grassy, putrid)
   trained on **public-domain** HSDB odor text + curated character-impact facts, surfaced
@@ -162,7 +178,7 @@ Flavormancer ships as two editions of one method:
 | Edition | Commercial | Academic / open-source *(coming soon)* |
 | License | Apache-2.0 | open-source, **research / NonCommercial** |
 | Data | commercial-clean open data only | adds research odor datasets with **NonCommercial** terms |
-| Aroma | **167 presence/absence descriptor heads ship** (public-domain HSDB); scored **intensity** is trained on your data or a licensed set (PMP 2001) | full open model incl. **intensity** (research odor data) |
+| Aroma | **172 presence/absence descriptor heads ship** (public-domain HSDB); scored **intensity** is trained on your data or a licensed set (PMP 2001) | full open model incl. **intensity** (research odor data) |
 | Use | free to use, sell, run on-prem | research, teaching, advancing the method |
 
 The split is deliberate. The richest aroma data is licensed for research only, so
@@ -208,9 +224,29 @@ tests/           pytest suite for the prediction core
 
 ## Getting started
 
-See [training/SETUP.md](training/SETUP.md) for the clean-machine setup. Datasets and
-trained models are **not** committed — the training scripts pull their sources and
+**With Docker** — the app plus a pgvector-backed Postgres, one command:
+
+```bash
+cp .env.example .env          # every value has a working default
+docker compose up -d
+curl localhost:8000/healthz
+```
+
+Trained models are **not** in the image (they are ~1 GB and change on every retrain) — point
+`MODELS_DIR` at them and they mount read-only at run time. Set `FLAVORMANCER_HOME` if you run
+without Compose.
+
+**From source** — [`training/SETUP.md`](training/SETUP.md) covers the install;
+[`docs/DATA-PIPELINE.md`](docs/DATA-PIPELINE.md) is the clean-machine walkthrough with every
+build step in dependency order, timings, and an end-to-end check that verifies a *prediction*
+rather than just that the server started.
+
+Datasets and trained models are **not** committed — the training scripts pull their sources and
 `.gitignore` keeps artifacts out of the repo.
+
+> The Docker path has not yet been run end to end on a machine with Docker installed — the
+> Compose file parses and the path handling is tested, but treat the first `docker compose up`
+> as the test rather than a guarantee.
 
 ## Team
 

@@ -583,7 +583,7 @@ def api_card(q: str = "", dl: int = 0):
                  "tasteless": out.get("tasteless")}
     taste_cells = sorted(((t, float(v) if isinstance(v, (int, float)) else 0.0)
                           for t, v in taste_src.items()), key=lambda kv: -kv[1])
-    # The card is a shareable SNAPSHOT — a PNG can't scroll, and there are 190 heads. So: the 6
+    # The card is a shareable SNAPSHOT — a PNG can't scroll, and there are 195 heads. So: the 6
     # tastes ALWAYS render (a complete, fixed row you can compare across cards), while aroma,
     # mouthfeel and safety show only what actually FIRES, capped. The labels say "N of M" so a
     # reader knows they're seeing the firing subset, not the whole model.

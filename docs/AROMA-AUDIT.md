@@ -60,7 +60,7 @@
 >    its white-floral neighbours (`jasmine`/`gardenia`/`ylang`/`champaca`), nearly doubling their example
 >    counts and de-inflating their small-n scores.
 >
-> `sweet`-odor rides the bar (0.72, documented-only until a GNN). Net: **167 aroma heads / 190 total
+> `sweet`-odor rides the bar (0.72, documented-only until a GNN). Net: **172 aroma heads / 195 total
 > (with the 6 taste heads).** The count is inherently ±2–3 at the margin — ~15 heads sit right at the
 > 10-positive / 0.70-AUROC boundary, so any data change reshuffles which marginal heads ship.
 >

@@ -235,7 +235,7 @@ _INFER_POOL = None  # shared thread pool for fanning a novel-molecule read acros
 
 def _infer_pool():
     """A process-wide thread pool for parallel head inference on novel molecules. Sized to ~3/4 of
-    the box (env FLAVORMANCER_INFER_WORKERS overrides) so a fresh 190-head read rips across cores
+    the box (env FLAVORMANCER_INFER_WORKERS overrides) so a fresh 195-head read rips across cores
     (~40 s -> a couple of seconds). Shared, so many concurrent novel reads share one bounded pool
     instead of each spawning its own — in-corpus reads never touch it (they hit the index)."""
     global _INFER_POOL
