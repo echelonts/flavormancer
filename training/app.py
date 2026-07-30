@@ -164,13 +164,13 @@ def _load_name2smiles():
     idx = {}
     with contextlib.suppress(Exception):  # table absent / no pandas; live lookup still covers it
         import pandas as pd
-        df = pd.read_parquet("master_enrichment.parquet")
+        df = pd.read_parquet(P.artifact("master_enrichment.parquet"))
         for nm, smi in zip(df["name"], df["smiles"]):
             if isinstance(nm, str) and isinstance(smi, str) and nm.strip() and smi.strip():
                 idx.setdefault(nm.strip().lower(), smi)
     with contextlib.suppress(Exception):  # no suggest file; fine
         import csv
-        with open("flavor_volatiles.csv", encoding="utf-8") as fh:
+        with open(P.artifact("flavor_volatiles.csv"), encoding="utf-8") as fh:
             for r in csv.DictReader(fh):
                 if r.get("name") and r.get("smiles"):
                     idx.setdefault(r["name"].strip().lower(), r["smiles"])
@@ -220,7 +220,7 @@ def _load_name_table():
     written name columns; live PubChem stays the fallback for anything not in the table."""
     try:
         import pandas as pd
-        df = pd.read_parquet("properties.parquet")
+        df = pd.read_parquet(P.artifact("properties.parquet"))
         if "common_name" not in df.columns:
             return {}
         out = {}
@@ -238,7 +238,7 @@ def _merge_iupac_backfill(table):
     the main properties crawl missed (skeleton -> keep any common name, add the IUPAC)."""
     try:
         import pandas as pd
-        bf = pd.read_parquet("iupac_backfill.parquet")
+        bf = pd.read_parquet(P.artifact("iupac_backfill.parquet"))
     except Exception:  # noqa: BLE001 — backfill not built; nothing to merge
         return table
     for skel, u in zip(bf["inchikey_skel"], bf["iupac_name"]):
@@ -306,7 +306,7 @@ def _load_spectra():
     public-domain PubChem availability metadata. Empty until the crawl has run."""
     try:
         import pandas as pd
-        df = pd.read_parquet("spectra.parquet")
+        df = pd.read_parquet(P.artifact("spectra.parquet"))
         labels = [("has_ms", "MS"), ("has_ir", "IR"), ("has_nmr", "NMR"),
                   ("has_uv", "UV"), ("has_raman", "Raman")]
         out = {}
@@ -1403,7 +1403,7 @@ def _precompute_top_lists():
     aroma heads over the odor corpus. Model-derived: honest 'what the tool predicts'."""
     import pandas as pd
     with contextlib.suppress(Exception):  # no taste data; skip taste lists
-        tm = pd.read_parquet("taste_master.parquet")
+        tm = pd.read_parquet(P.artifact("taste_master.parquet"))
         for taste, clf in P._CLASSIFIERS.items():
             ranked = _rank(tm["smiles"], lambda X, c=clf: c.predict_proba(X)[:, 1])
             _TOP_LISTS[f"taste:{taste}"] = {"label": f"Top {taste}", "items": _named_top(ranked)}
@@ -1418,7 +1418,7 @@ def _precompute_top_lists():
         # skews industrial, so ranking by a head surfaces confident-but-odd picks (cyanide under
         # "almond"). Documented examples are real, recognizable, and honest ("documented citrus").
         from build_aroma_dataset import tag as _odor_tag
-        od = pd.read_parquet("odor_notes.parquet")
+        od = pd.read_parquet(P.artifact("odor_notes.parquet"))
         by_desc = {}
         for _, r in od.iterrows():
             nm, odor = r.get("name"), r.get("odor")
@@ -1456,7 +1456,7 @@ def _load_flavor_map():
     + 3D (x3,y3,z3) coordinates normalized to 0..1 with names — an interactive scatter / cloud."""
     try:
         import pandas as pd
-        df = pd.read_parquet("flavor_map.parquet")
+        df = pd.read_parquet(P.artifact("flavor_map.parquet"))
         # UMAP occasionally emits NaN coords for a few near-duplicate rows — drop them so the
         # JSON stays valid (NaN isn't JSON-compliant) and the scatter has no phantom points.
         df = df.dropna(subset=[c for c in ("x", "y", "x3", "y3", "z3") if c in df.columns]).reset_index(drop=True)
@@ -1570,7 +1570,7 @@ def _precompute_design():
         import numpy as np
         import pandas as pd
         from build_aroma_dataset import tag as _odor_tag
-        od = pd.read_parquet("odor_notes.parquet")
+        od = pd.read_parquet(P.artifact("odor_notes.parquet"))
         rows = []  # (smiles, name, mol_skeleton, {documented tags})
         for smi, nm, odor in zip(od["smiles"], od.get("name", [None] * len(od)), od["odor"]):
             mol = Chem.MolFromSmiles(str(smi)) if isinstance(smi, str) else None
@@ -1880,7 +1880,7 @@ def _load_enrichment():
     """Rows from master_enrichment.parquet with taste collapsed to a display string."""
     try:
         import pandas as pd
-        df = pd.read_parquet("master_enrichment.parquet")
+        df = pd.read_parquet(P.artifact("master_enrichment.parquet"))
     except Exception:  # noqa: BLE001 — not built yet
         return []
     def _s(v):  # NaN (a truthy float) -> "" ; keep real strings
@@ -2069,7 +2069,7 @@ def _load_odor_table():
     build_odor_notes.py has run; tolerant of older tables without the threshold columns."""
     try:
         import pandas as pd
-        df = pd.read_parquet("odor_notes.parquet")
+        df = pd.read_parquet(P.artifact("odor_notes.parquet"))
 
         def col(name):
             return df[name] if name in df.columns else [None] * len(df)
@@ -2106,13 +2106,13 @@ def _load_documented_full():
     out = {}
     with contextlib.suppress(Exception):
         import pandas as pd
-        od = pd.read_parquet("odor_notes.parquet")
+        od = pd.read_parquet(P.artifact("odor_notes.parquet"))
         for ik, odor in zip(od["inchikey"], od["odor"]):
             if isinstance(ik, str) and isinstance(odor, str) and odor.strip():
                 out.setdefault(ik, {})["odor"] = odor.strip().split("\n")[0][:160]
     with contextlib.suppress(Exception):
         import pandas as pd
-        tn = pd.read_parquet("taste_notes.parquet")
+        tn = pd.read_parquet(P.artifact("taste_notes.parquet"))
         for ik, taste in zip(tn["inchikey"], tn["taste"]):
             if isinstance(ik, str) and isinstance(taste, str) and taste.strip():
                 out.setdefault(ik, {})["taste"] = taste.strip().split("\n")[0][:160]
