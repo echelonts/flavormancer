@@ -2165,7 +2165,7 @@ function setMapLayout(l){
 function setMapColor(c){ _mapColorBy=c;
   $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma');
   $('mapCB').classList.toggle('on',c==='both'); $('mapCM').classList.toggle('on',c==='mouthfeel');
-  mapLegendRender(); drawMap();
+  loadMemberCounts().then(mapLegendRender); mapLegendRender(); drawMap();
 }
 let _mapHi = new Set();  // classes highlighted from the legend (empty = show all evenly)
 const _mapMembers = new Map();  // class -> Set(smiles) of TRUE members (head >= 0.5), from /api/map_members
@@ -2177,6 +2177,21 @@ function mapHit(p){
   for(const l of _mapHi){ const m=_mapMembers.get(l); if(m && m.has(p.smiles)) return true; }
   return false;
 }
+// How many molecules each head actually FIRES on, keyed by dimension ("aroma:pine"). Fetched once.
+const _memberCounts = {};
+async function loadMemberCounts(){
+  try{ const d = await getJSON('/api/map_counts'); Object.assign(_memberCounts, d.counts||{}); }
+  catch(e){ /* legend falls back to dominant counts */ }
+}
+// The count a person actually means by "how many raspberry molecules are there": every molecule
+// the head fires on. The dominant-label count answers a different question — which molecules this
+// head WINS the colour for — and showing that as "(0)" made trained heads look empty.
+function memberCount(l){
+  for(const k of ['aroma:'+l,'taste:'+l,'mouthfeel:'+l,l])
+    if(_memberCounts[k]!=null) return _memberCounts[k];
+  return null;
+}
+
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
   // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 172 aroma heads /
@@ -2187,11 +2202,14 @@ function mapLegendRender(){
   const empty=canon.filter(l=>!counts[l]);
   const labs=present.concat(empty); if(counts.other) labs.push('other');
   $('mapLegend').innerHTML=labs.map(l=>{
-    const n=counts[l]||0, zero=n===0;
-    // A "(0)" head isn't empty — it just never WINS the winner-take-all colour. Clicking it
-    // fetches true membership (every molecule the head predicts >=0.5), so no head looks broken.
-    const t = zero ? `${l}: no molecule shows this as its dominant note — click to highlight every molecule the head predicts`
-                   : `${n} molecule${n===1?'':'s'} show ${l} as their dominant note — click to spotlight`;
+    const dom=counts[l]||0, mem=memberCount(l);
+    // Show MEMBERSHIP (how many molecules carry this note) when we know it, because that is the
+    // question the number is read as. Dominance is only how the point gets its colour.
+    const n = (mem!=null) ? mem : dom, zero = n===0;
+    const t = (mem!=null)
+      ? `${mem} molecule${mem===1?'':'s'} carry ${l}. ${dom} of them show it as their DOMINANT note (that is what colours the dot). Click to spotlight all ${mem}.`
+      : (zero ? `${l}: no molecule shows this as its dominant note — click to highlight every molecule the head predicts`
+              : `${dom} molecule${dom===1?'':'s'} show ${l} as their dominant note — click to spotlight`);
     return `<span class="leg${_mapHi.has(l)?' on':''}${zero?' leg-zero':''}" data-l="${l.replace(/"/g,'&quot;')}" title="${t.replace(/"/g,'&quot;')}"><i style="background:${legendColor(l)}"></i>${l} (${n})</span>`;
   }).join('');
   $('mapLegend').querySelectorAll('.leg').forEach(s=> s.addEventListener('click', async ()=>{
