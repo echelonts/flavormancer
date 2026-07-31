@@ -6,7 +6,7 @@ normalized to presence/absence descriptor labels). Trains one RandomForest class
 descriptor that has enough positives, reports HONEST 5-fold CV AUROC, and keeps only the
 descriptors that clear a minimum AUROC. Saves the kept heads to aroma_models/ + a manifest.
 
-PARALLELISM: each head trains in its OWN process with n_jobs=1, so the ~167 heads train
+PARALLELISM: each head trains in its OWN process with n_jobs=1, so the ~172 heads train
 concurrently across the box's cores instead of one-at-a-time (the same process-per-unit pattern
 that made build_profile_index fast). Feature matrix is memmapped so workers share it. A head
 either clears the bar and dumps its model, or is dropped — workers write disjoint files, no locks.

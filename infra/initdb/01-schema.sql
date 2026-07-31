@@ -1,8 +1,8 @@
 -- Flavormancer schema (#20).
 --
 -- The substitution index is a nearest-neighbour search over the flavour-profile vector, so the
--- vector lives in the database rather than being recomputed per query. 177 dimensions:
--- 6 taste + 166 aroma + 5 mouthfeel. Tox is deliberately NOT in the vector — safety is not a
+-- vector lives in the database rather than being recomputed per query. 183 dimensions:
+-- 6 taste + 172 aroma + 5 mouthfeel. Tox is deliberately NOT in the vector — safety is not a
 -- flavour-match dimension, and letting it steer "what tastes similar" would be wrong.
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS molecule (
 
 CREATE TABLE IF NOT EXISTS molecule_profile (
     inchikey_skel   text PRIMARY KEY REFERENCES molecule(inchikey_skel) ON DELETE CASCADE,
-    profile         vector(177) NOT NULL,
+    profile         vector(183) NOT NULL,
     aromas          text[]                   -- heads clearing their own calibrated threshold
 );
 

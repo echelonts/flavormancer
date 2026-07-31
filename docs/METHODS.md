@@ -136,8 +136,8 @@ the thin heads — a genuine pine match could land at 0.42 and never be shown.
   recall climbs faster than precision falls. **A high AUROC does not protect you** — AUROC is
   computed on ranking and is insensitive to class imbalance; precision is not. `coffee` has
   AUROC 0.960 and out-of-fold precision **0.46**; both are true of the same head.
-- **Heads that cannot clear the floor are `indicative`, not deleted.** 73 of 167 aroma heads never
-  reach 50% precision at any threshold. They keep their score, their place in the 178-dim profile,
+- **Heads that cannot clear the floor are `indicative`, not deleted.** 65 of 172 aroma heads never
+  reach 50% precision at any threshold. They keep their score, their place in the 183-dim profile,
   their chips and their map colour — firing well above base rate is real evidence. They are simply
   never presented as a *confident* call: the UI marks them, and the read returns `indicative: true`
   plus the head's measured precision. Hiding them would delete reach to paper over a labelling

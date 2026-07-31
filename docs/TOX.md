@@ -16,7 +16,7 @@ assay** heads that act as a *defensive screen*.
 |---|---|---|
 | label source | **documented + curated** sensory facts (a molecule is *known to be perceived* as X) | **experimental wet-lab screening** (a molecule *measurably was* active in an assay) |
 | what a positive means | people report this percept | this well lit up in a dish |
-| in the substitute-match vector? | **yes** (175 dims) | **no** — deliberately |
+| in the substitute-match vector? | **yes** (183 dims) | **no** — deliberately |
 | framing | prediction | **caution-only review flag** |
 
 Tox is excluded from the flavor-profile vector on purpose: you do not want reformulation

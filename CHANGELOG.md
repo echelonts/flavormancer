@@ -31,7 +31,7 @@ exists to install it somewhere other than the machine it was built on.
 - Numbers glossary in `HOW-IT-WORKS.md` and in the app's own How-it-works panel.
 
 ### Changed
-- Aroma roster **164 → 166 heads**; confident-capable heads **94 → 108**.
+- Aroma roster **164 → 172 heads**; confident-capable heads **94 → 108**.
 - Chip families (flavor / note / taste / mouthfeel) share one visual language instead of four
   accidental ones, and each studio section explains what its dimension *is*.
 - Every molecule has a display name: names fall back to molecular formula, with multi-component

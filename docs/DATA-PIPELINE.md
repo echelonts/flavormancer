@@ -45,8 +45,8 @@ local compute.
 **Verify it worked** (this is the honest end-to-end check, not just "the server started"):
 
 ```bash
-curl -s localhost:8000/api/status                      # {"ready":true,"total":190,...}  (190 artifacts = 189 heads + the intensity regressor)
-curl -s localhost:8000/api/heads | jq '.aroma | length' # 166
+curl -s localhost:8000/api/status                      # {"ready":true,"total":190,...}  (190 artifacts = 195 heads + the intensity regressor)
+curl -s localhost:8000/api/heads | jq '.aroma | length' # 172
 # vanillin — the vanilla head should fire at 1.0, confident, with its calibrated threshold
 curl -s -X POST localhost:8000/api/predict \
   -H 'Content-Type: application/json' \

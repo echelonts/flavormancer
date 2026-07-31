@@ -440,7 +440,7 @@ def api_substitutes(q: Query):
 @app.post("/api/precomputed")
 def api_precomputed(q: Query):
     """Fast check: is this molecule's profile already in the index (instant read) or does it need a
-    fresh 178-head compute? Lets the UI show a 'conjuring a fresh reading' note for novel molecules."""
+    fresh 183-head compute? Lets the UI show a 'conjuring a fresh reading' note for novel molecules."""
     smi = _resolve(q.smiles)
     return {"precomputed": bool(smi and P.is_precomputed(smi))}
 
@@ -1321,7 +1321,7 @@ def _prewarm_formulation():
             m = Chem.MolFromSmiles(smi) if smi else None
             if m is not None:
                 canon = Chem.MolToSmiles(m)
-                P.predict_aroma(canon)   # fills the shared 167-head aroma cache
+                P.predict_aroma(canon)   # fills the shared 172-head aroma cache
                 P.substitutes(canon)     # taste heads + profile cosine, so the demo chips are instant
 
 

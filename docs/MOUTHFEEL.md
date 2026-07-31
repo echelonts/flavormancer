@@ -10,7 +10,7 @@ without *feeling* cool, and WS-23 cools the mouth with almost no odour at all.
 
 **Five trained heads**, one RandomForest per sensation on the Morgan fingerprint + physicochemical
 block (the same stack as taste/aroma), in their own `mouthfeel_models/` directory, loaded and tagged
-`mouthfeel` by `predict.py` and folded into the 175-dim flavor-profile vector used for substitutes.
+`mouthfeel` by `predict.py` and folded into the 183-dim flavor-profile vector used for substitutes.
 
 | head | what it is | held-out CV-AUROC |
 |---|---|---|
