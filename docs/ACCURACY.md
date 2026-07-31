@@ -128,7 +128,7 @@ because of it, and the reasoning is recorded in `train_aroma._calibrate` so nobo
 half the time when they fire.
 
 They are **not deleted, disabled, or hidden.** They keep their score, their column in the
-178-dimension flavor profile, their chips in search, their colour on the map, and every molecule
+183-dimension flavor profile, their chips in search, their colour on the map, and every molecule
 they find. What changes is one word: they are reported as **indicative** rather than *confident*,
 and the UI hatches their bar so you can see it at a glance.
 

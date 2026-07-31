@@ -214,8 +214,11 @@ def _load_rf(path):
 
 # Model heads are loaded on a BACKGROUND THREAD at import (see _load_all_models below) so that
 # `import predict` returns immediately and the web server can bind its port right away, showing a
-# friendly "warming up" page while the ~180 forests (628 MB) load — instead of a 34 s startup 502.
-# The load is fanned out across cores (joblib.load releases the GIL), which also cuts the wall time.
+# friendly "warming up" page while the ~195 forests (~700 MB) load — instead of a 50 s startup 502.
+# The load is SERIAL, and this comment used to claim the opposite ("fanned out across cores,
+# joblib.load releases the GIL"). Both halves of that were wrong: unpickling is GIL-bound, so
+# threads made it ~2.5x SLOWER, and a process pool deadlocks because this runs during module
+# import. See _load_all_models for the measurements and #225 for the real fix.
 _CLASSIFIERS = {}          # sweet/bitter/umami/... taste heads
 _INTENSITY = None          # sweet-intensity regressor
 _TASTE_META = {}           # taste -> {auroc, ...} from taste_models/manifest.json (held-out score)
@@ -1098,12 +1101,12 @@ AROMA_DESC = {
 
 @lru_cache(maxsize=8192)
 def _aroma_scores_canon(canon):
-    """Run all 167 descriptor forests for a CANONICAL SMILES and return {head: score}."""
+    """Run all 172 descriptor forests for a CANONICAL SMILES and return {head: score}."""
     m = Chem.MolFromSmiles(canon)
     if m is None or not _AROMA_MODELS:
         return None
     fp = _feat(m)
-    # Fan the 167 forests across cores — each predict_proba releases the GIL, so this turns the
+    # Fan the 172 forests across cores — each predict_proba releases the GIL, so this turns the
     # ~40 s serial read (the only remaining cost, for genuinely novel/out-of-corpus molecules) into
     # a couple of seconds. In-corpus molecules never reach here (they read the precomputed index row).
     def _score(it):
@@ -1114,13 +1117,13 @@ def _aroma_scores_canon(canon):
 
 
 def _aroma_scores(smiles):
-    """The expensive part of the aroma read: all 167 descriptor forests → {head: score}. Keyed on
+    """The expensive part of the aroma read: all 172 descriptor forests → {head: score}. Keyed on
     the CANONICAL SMILES (not threshold/top_k, not the raw string) so every caller shares one
     computation per molecule regardless of how they spelled it — predict_aroma, _query_profile
     (substitutes) and the /api/aroma endpoint all collapse to the same cache entry instead of each
-    re-running 167 forests (that double/mismatched inference was the ~6 s /api/substitutes).
+    re-running 172 forests (that double/mismatched inference was the ~6 s /api/substitutes).
 
-    In-corpus molecules skip the forests entirely: their 167 scores are read straight off the
+    In-corpus molecules skip the forests entirely: their 172 scores are read straight off the
     precomputed profile index (built at startup) — the same numbers, ~40 s cheaper on a cold hit."""
     m = Chem.MolFromSmiles(smiles)
     if m is None or not _AROMA_MODELS:
@@ -1365,7 +1368,7 @@ def head_catalog():
 def _build_sub_index():
     global _SUB_INDEX
     import numpy as np
-    # Fast path: load the precomputed profile index (build_profile_index.py). The 178-dim
+    # Fast path: load the precomputed profile index (build_profile_index.py). The 183-dim
     # inference over ~8.8k molecules is slow (~3 min); the cache makes startup instant. We only
     # rebuild the cheap Morgan fingerprints from SMILES on load.
     cache = artifact("profile_index.npz")
@@ -1443,7 +1446,7 @@ _SKEL2ROW = {}
 def _index_row(mol):
     """Row of `mol` in the profile index (matched by connectivity skeleton), or None if the
     molecule isn't in the reference corpus. In-corpus molecules can reuse their PRECOMPUTED
-    178-dim profile (built once at index build / startup) instead of re-running 167 forests at
+    183-dim profile (built once at index build / startup) instead of re-running 172 forests at
     query time — that inference is ~40 s cold on a novel molecule and was the real /api/substitutes
     and include_aroma cost. The precomputed row is the SAME model output, just paid up front."""
     _ensure_sub_index()
@@ -1465,7 +1468,7 @@ def _index_row(mol):
 
 def is_precomputed(smiles):
     """True if this molecule's full taste+aroma profile is already in the index (an instant read),
-    False if it's out-of-corpus and the 178 profile heads have to run fresh (the slower path). Used by the
+    False if it's out-of-corpus and the 183 profile heads have to run fresh (the slower path). Used by the
     UI to decide whether to show the 'conjuring a fresh reading' note while a read brews."""
     mol = Chem.MolFromSmiles(smiles or "")
     return mol is not None and _index_row(mol) is not None

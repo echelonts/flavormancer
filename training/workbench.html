@@ -839,7 +839,7 @@
       <div class="how-grid">
         <div class="how-card"><h4>1 · Structure → numbers</h4><p>Every molecule becomes a <b>2,048-bit Morgan fingerprint</b> (which substructures it contains) plus a block of <b>physicochemical descriptors</b> (logP, MW, TPSA, H-bonding…). That one shared vector feeds every model — the same structure-to-property representation QSAR has leaned on for decades.</p></div>
         <div class="how-card"><h4>2 · Taste — 6 trained heads + 2 rules</h4><p>Six <b>random-forest</b> classifiers (sweet, bitter, umami…) each return a probability, scored by an honest held-out <b>CV-AUROC</b>. Sour and salty are solution / ionic effects, not molecule-shape ones, so they're transparent <b>rules</b> — not faked models. A sweetness-intensity regressor estimates relative-to-sucrose potency.</p></div>
-        <div class="how-card"><h4>3 · Aroma — 167 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 167 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
+        <div class="how-card"><h4>3 · Aroma — 172 odor heads</h4><p>One random forest per descriptor (citrus, floral, woody…), trained on <b>public-domain odor text</b>. A head ships only if it clears <b>CV-AUROC ≥ 0.70</b> — 172 survive, each shown with its own score. It reads <b>presence, not intensity</b> (free text carries none) — an honest ceiling, stated in the UI.</p></div>
         <div class="how-card"><h4>4 · Honest by design</h4><p>Every value is tagged <b>measured / predicted / estimate</b>, so nothing reads as more precise than it is. Where a quantitative feature needs data we can't ship free-commercially (odor thresholds, panel intensities), the UI <b>says so</b> — and it lights up with <b>your</b> data.</p></div>
         <div class="how-card"><h4>5 · How good is a head, really?</h4><p><b>AUROC alone will lie to you.</b> It measures <i>ranking</i> and is blind to how rare a note is — a head with 11 examples among 2,403 molecules can score <b>0.979</b> and still be right just <b>1 time in 10</b> when it fires. So every head also publishes its <b>precision</b>: when it says yes, how often it's actually right, measured only on molecules it never trained on. Each head gets its <b>own</b> firing threshold (0.16&nbsp;–&nbsp;0.85, not a flat 0.5), fitted so a <b>confident</b> call is right more than half the time. <b>23 heads have never been wrong</b> on unseen molecules; the 73 that can't clear 50% are shown as <b>indicative</b> — hatched bars, kept in full, never dressed up as confident.</p></div>
         <div class="how-card gloss"><h4>6 · Reading the numbers</h4>
@@ -1012,7 +1012,7 @@
           the trend, exactly the kind of lead worth a closer look.</p>
           <p><b>Two flavor dimensions.</b> Flip the color toggle between <b>taste</b> (sweet /
           bitter / umami / sour / salty / tasteless) and <b>aroma</b> (= odor — the same thing;
-          the 167 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
+          the 172 documented descriptor classes like citrus, floral, sulfurous). Same molecules,
           same structural layout — you're overlaying a different sense. The <b>both</b> toggle merges
           them into one full-flavor view: each dot takes its <b>taste</b> color where a taste is known,
           otherwise its <b>aroma</b> color — so nearly every molecule is colored by its dominant known
@@ -1089,7 +1089,7 @@
       <div class="loader-cantrip" id="loaderCantrip" aria-hidden="true"></div>
       <ul class="loader-steps" id="loaderSteps">
         <li data-step="predict"><span class="ls-dot"></span> Taste heads + chemistry + safety</li>
-        <li data-step="aroma"><span class="ls-dot"></span> Aroma — 167 odor heads</li>
+        <li data-step="aroma"><span class="ls-dot"></span> Aroma — 172 odor heads</li>
         <li data-step="names"><span class="ls-dot"></span> Names (common / IUPAC)</li>
         <li data-step="structure"><span class="ls-dot"></span> 2D structure</li>
         <li data-step="structure3d"><span class="ls-dot"></span> 3D conformer</li>
@@ -1135,7 +1135,7 @@
         <div class="chips" id="chips"></div>
       </div>
       <div class="head-group" id="aromaGroup">
-        <div class="hg-label">Aroma <span class="hg-hint">167 trained heads</span></div>
+        <div class="hg-label">Aroma <span class="hg-hint">172 trained heads</span></div>
         <div id="aromaPreview" style="display:none"></div>
         <p class="aroma-note">Predicted from structure by RandomForest heads on <b>public-domain</b> HSDB
         odor data — the same stack as taste, so aroma is predicted for <b>any</b> molecule. This is
@@ -2179,7 +2179,7 @@ function mapHit(p){
 }
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
-  // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 167 aroma heads /
+  // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 172 aroma heads /
   // both), plus 'other' last. Present classes are ordered by count; any with zero points still
   // appear (dimmed) so the legend is a full reference — never hide a real head.
   const canon=legendClasses();
@@ -2250,7 +2250,7 @@ function drawClusterLabels(){
   const cv=$('flavorMap'), ctx=cv.getContext('2d'), groups={};
   for(const p of _mapPts){ const l=mapLabel(p); if(!l||l==='other') continue; (groups[l]=groups[l]||[]).push(p); }
   ctx.save(); ctx.font='700 14px "Cinzel Decorative",Georgia,serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  // label EVERY class that has points (all 167 aroma / 6 taste heads), not just the big ones
+  // label EVERY class that has points (all 172 aroma / 6 taste heads), not just the big ones
   for(const l in groups){ const pts=groups[l]; if(pts.length<3) continue;
     let sx=0,sy=0,n=0; for(const p of pts){ const x=_mapProj.px(p),y=_mapProj.py(p); if(x<-9000||!isFinite(x)) continue; sx+=x; sy+=y; n++; }
     if(!n) continue; sx/=n; sy/=n;
@@ -2496,7 +2496,7 @@ async function initStudio(){
         if(have.length) groups.push([fam, have]);
       }
       if(left.size) groups.push(['Other', [...left].sort()]);
-      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Notes <span class="ss-sub">an aroma quality → molecules that carry it</span></div><p class="ss-why"><b>A note is what your nose reads</b> — vanilla, smoky, green, citrus. Aroma carries most of what people call &ldquo;flavor&rdquo;: block your nose and a pear and a potato are hard to tell apart. This is the largest set here (167 trained heads) and the main lever for making something smell like what you intend.</p><div class="ss-body">`+
+      html += `<div class="studio-section"><div class="ss-head"><svg class="ic"><use href="#ic-notes"/></svg> Notes <span class="ss-sub">an aroma quality → molecules that carry it</span></div><p class="ss-why"><b>A note is what your nose reads</b> — vanilla, smoky, green, citrus. Aroma carries most of what people call &ldquo;flavor&rdquo;: block your nose and a pear and a potato are hard to tell apart. This is the largest set here (172 trained heads) and the main lever for making something smell like what you intend.</p><div class="ss-body">`+
         groups.map(([fam, ms])=>
           `<div class="fam"><div class="fam-label">${fam} <span class="fam-n">${ms.length}</span></div>`+
           `<div class="studio-group studio-group-notes">`+

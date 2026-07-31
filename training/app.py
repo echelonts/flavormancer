@@ -215,40 +215,35 @@ def _svg(smi, w=320, h=220):
 
 
 def _load_name_table():
-    """inchikey-skeleton -> (common, IUPAC) from the precomputed enrichment table, so the
-    whole labeled set resolves instantly and offline. Empty until build_properties.py has
-    written name columns; live PubChem stays the fallback for anything not in the table."""
+    """skeleton -> (common, IUPAC), sourced from master_enrichment — the ONE base table (#224).
+
+    This used to read properties.parquet and then merge iupac_backfill.parquet itself, which
+    duplicated work build_enrichment.py had already done and silently diverged from it in three
+    ways. The enrichment build resolves a name by curated list first, then PubChem common name,
+    then IUPAC name, then a molecular-formula fallback — and it un-inverts CAS-style ordering
+    along the way. None of that reached this table, so 754 molecules the grid displayed by name
+    (cedrol, fenchyl alcohol, hydroxycitronellal, musk ketone...) resolved to nothing here. The
+    old merge also read only `iupac_name` from the backfill and ignored the `common_name` column,
+    so every PubChem Title the crawler recovered was thrown away.
+
+    Reading the resolved name straight off the base table makes the UI's lookup and the grid
+    agree by construction rather than by coincidence.
+    """
     try:
         import pandas as pd
-        df = pd.read_parquet(P.artifact("properties.parquet"))
-        if "common_name" not in df.columns:
-            return {}
-        out = {}
-        for ik, c, u in zip(df["inchikey"], df["common_name"], df["iupac_name"]):
-            if isinstance(ik, str) and (isinstance(c, str) or isinstance(u, str)):
-                out[ik.split("-")[0]] = (c if isinstance(c, str) else None,
-                                         u if isinstance(u, str) else None)
-        return out
-    except Exception:  # noqa: BLE001 — no table / no pandas; just fall back to live lookups
+        df = pd.read_parquet(P.artifact("master_enrichment.parquet"))
+    except Exception:  # noqa: BLE001 — no table / no pandas; live lookups still cover it
         return {}
+    out = {}
+    iupac = dict(zip(df.get("inchikey_skel", []), df.get("iupac_name", [])))  # optional column
+    for skel, name in zip(df["inchikey_skel"], df["name"]):
+        if isinstance(skel, str) and isinstance(name, str) and name.strip():
+            u = iupac.get(skel)
+            out[skel] = (name.strip(), u if isinstance(u, str) else None)
+    return out
 
 
-def _merge_iupac_backfill(table):
-    """Fold in IUPAC names that build_iupac_backfill.py recovered from PubChem for molecules
-    the main properties crawl missed (skeleton -> keep any common name, add the IUPAC)."""
-    try:
-        import pandas as pd
-        bf = pd.read_parquet(P.artifact("iupac_backfill.parquet"))
-    except Exception:  # noqa: BLE001 — backfill not built; nothing to merge
-        return table
-    for skel, u in zip(bf["inchikey_skel"], bf["iupac_name"]):
-        if isinstance(skel, str) and isinstance(u, str) and u:
-            common = table.get(skel, (None, None))[0]
-            table[skel] = (common, u)
-    return table
-
-
-_NAME_TABLE = _merge_iupac_backfill(_load_name_table())
+_NAME_TABLE = _load_name_table()
 
 
 @lru_cache(maxsize=8192)
@@ -445,7 +440,7 @@ def api_substitutes(q: Query):
 @app.post("/api/precomputed")
 def api_precomputed(q: Query):
     """Fast check: is this molecule's profile already in the index (instant read) or does it need a
-    fresh 178-head compute? Lets the UI show a 'conjuring a fresh reading' note for novel molecules."""
+    fresh 183-head compute? Lets the UI show a 'conjuring a fresh reading' note for novel molecules."""
     smi = _resolve(q.smiles)
     return {"precomputed": bool(smi and P.is_precomputed(smi))}
 
@@ -1326,7 +1321,7 @@ def _prewarm_formulation():
             m = Chem.MolFromSmiles(smi) if smi else None
             if m is not None:
                 canon = Chem.MolToSmiles(m)
-                P.predict_aroma(canon)   # fills the shared 167-head aroma cache
+                P.predict_aroma(canon)   # fills the shared 172-head aroma cache
                 P.substitutes(canon)     # taste heads + profile cosine, so the demo chips are instant
 
 
