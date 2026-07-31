@@ -266,9 +266,22 @@ def _load_all_models():
     """Discover and load every trained head (taste + tox + aroma), updating LOAD_PROGRESS as each
     lands, then set MODELS_READY. Runs on a daemon thread from import so the port binds instantly.
 
-    Loading is SERIAL on purpose: joblib.load is dominated by GIL-bound Python unpickling, so a
-    thread pool only adds contention (measured ~34 s serial vs ~86 s across 14 threads). The win
-    from cores comes at INFERENCE time (predict_proba releases the GIL) — see _aroma_scores_canon."""
+    Loading is SERIAL, and BOTH ways of parallelising it have now been measured and rejected:
+
+      threads    WORSE than serial (~34 s serial vs ~86 s across 14 threads). joblib.load is
+                 dominated by GIL-bound Python unpickling, so threads only add contention.
+      processes  3.1x FASTER in isolation — 40 files take 11.5 s serial and 3.7 s across a
+                 ProcessPoolExecutor, transfer of the deserialised forests included. But this
+                 function runs DURING MODULE IMPORT, and forking while the interpreter holds the
+                 import lock deadlocks: the children inherit a locked import machinery they can
+                 never acquire. Tried it; the parent and every worker hung indefinitely.
+
+    The process pool is the right answer, but only once loading is deferred out of import time
+    (a FastAPI startup hook, or an explicit warm() the server calls) — see #225. Until then serial
+    is correct, and the warming page makes the ~50 s visible rather than mysterious.
+
+    The win from cores comes at INFERENCE time instead (predict_proba releases the GIL) — see
+    _aroma_scores_canon."""
     jobs = []  # (kind, name, path)
     if TASTE.exists():
         jobs += [("taste", p.stem.replace("_rf", ""), p) for p in TASTE.glob("*_rf.joblib")]
@@ -323,7 +336,14 @@ def _load_all_models():
 # only need featurization (_feat / _MORGAN), like the parallel index builder, which loads each head
 # in its own worker process rather than in this parent.
 if os.environ.get("FLAVORMANCER_NO_MODELS") == "1":
-    pass
+    # Skip loading, but still mark READY. Leaving the event unset meant the app's warming gate
+    # returned 503 to every request FOREVER — a models-less install was not "degraded", it was
+    # dead, which is the opposite of what the docs promised. Structure-derived answers (physchem,
+    # the sour/salty rules, applicability, substructure) need no heads at all and should be served.
+    with _LOAD_LOCK:
+        LOAD_PROGRESS["phase"] = "ready (no models)"
+        LOAD_PROGRESS["ready"] = True
+    MODELS_READY.set()
 elif os.environ.get("FLAVORMANCER_BLOCKING_LOAD") == "1":
     _load_all_models()
 else:

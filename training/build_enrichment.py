@@ -248,6 +248,7 @@ if __name__ == "__main__":
     for _skel, _row in _by_skel("iupac_backfill.parquet", ["common_name", "iupac_name"]).items():
         tgt = props.setdefault(_skel, {})
         for _k in ("common_name", "iupac_name"):
+            # isinstance(..., str) is the right guard here — it treats NaN as absent correctly
             if not isinstance(tgt.get(_k), str) and isinstance(_row.get(_k), str):
                 tgt[_k] = _row[_k]
     # MEASURED boiling/melting points from PUG-View (build_measured_properties.py). The property
@@ -257,7 +258,11 @@ if __name__ == "__main__":
                                 ["melting_point_c", "boiling_point_c"]).items():
         tgt = props.setdefault(_skel, {})
         for _k in ("melting_point_c", "boiling_point_c"):
-            if tgt.get(_k) is None and _row.get(_k) is not None:
+            # `is None` is WRONG here and silently discarded the entire crawl: a missing value
+            # read from parquet is NaN, not None, so the guard never fired for any row that
+            # already existed in properties.parquet with an empty cell — which is all of them.
+            # Same NaN trap that once left ~500 molecules unnamed (see _pick_name).
+            if pd.isna(tgt.get(_k)) and not pd.isna(_row.get(_k)):
                 tgt[_k] = _row[_k]
     taste_doc = _taste_by_skel()
     curated = _curated_names()   # human names for the molecules we hand-curated
