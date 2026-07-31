@@ -215,6 +215,8 @@
   .map-section{margin:22px 0 8px}
   .map-head{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);cursor:pointer}
   .map-head .mapsub{font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);opacity:.8}
+  .map-count-key{font-size:11px;color:var(--muted);margin:2px 0 6px;line-height:1.5}
+  .map-count-key b{color:var(--ink);font-weight:600}
   .map-legend{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px;font-size:12px}
   .map-legend span{display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:2px 8px;border-radius:20px;border:1px solid transparent;transition:all .12s}
   .map-legend span:hover{border-color:var(--line)}
@@ -981,6 +983,8 @@
         <span id="mapLegend" class="map-legend"></span>
         <button type="button" id="mapLabels" class="st-tab on">labels</button>
         <button type="button" id="mapClusters" class="st-tab on" title="Soft density shading under each class — spotlight a class in the legend to see where it concentrates">clusters</button>
+        <span class="map-toggle3d" title="What the number beside each legend class counts"><button type="button" id="mapCntMembers" class="st-tab on">carries</button><button type="button" id="mapCntDom" class="st-tab">dominant</button></span>
+        <button type="button" id="mapTox" class="st-tab" title="Ring every molecule with a Tox21 caution flag — an overlay ON TOP of flavour colour, never instead of it">⚠ safety</button>
         <button type="button" id="mapSpin" class="st-tab">spin</button>
         <button type="button" id="mapReset" class="map-reset">Reset view</button>
       </div>
@@ -990,6 +994,7 @@
           <div class="load-sub">placing every molecule in flavor space</div></div>
         <div id="mapTip" class="map-tip" style="display:none"></div></div>
       <div id="mapAxisKey" class="map-axis-key"></div>
+      <div id="mapCountKey" class="map-count-key">Legend numbers = <b>molecules that carry the note</b> (the head fires on them, at its own calibrated threshold). A molecule can carry several.</div>
       <div class="map-key">Each dot is a molecule; <b>nearby dots are structurally similar</b>.
         Color = <b>dominant taste</b> (toggle to <b>aroma</b>); tight groups are structural families.
         <b>Click a class in the legend</b> to spotlight it (the rest dim). <b>2D:</b> scroll to zoom
@@ -2108,6 +2113,9 @@ function legendClasses(){
   return TASTE_CLASSES;
 }
 let _mapPts=null, _mapReady=false, _mapMode='2d', _mapProj=null, _mapColorBy='taste', _mapLayout='similarity';
+// 'members' = molecules the head FIRES on; 'dominant' = molecules it wins the colour for. Two
+// genuinely different questions, so both are available rather than one being picked for you.
+let _mapCountBasis='members', _mapToxOverlay=false;
 let _v2={s:1,ox:0,oy:0}, _v3={rx:-0.45,ry:0.6,z:1,ox:0,oy:0}, _drag=null, _dragged=false, _spinVel={ry:0,rx:0}, _inertia=null;
 function startInertia(){ cancelAnimationFrame(_inertia); const step=()=>{ _v3.ry+=_spinVel.ry; _v3.rx+=_spinVel.rx; _spinVel.ry*=0.93; _spinVel.rx*=0.93; drawMap(); if(Math.abs(_spinVel.ry)>0.0006||Math.abs(_spinVel.rx)>0.0006) _inertia=requestAnimationFrame(step); }; _inertia=requestAnimationFrame(step); }
 const GREY='#5A6068';
@@ -2151,6 +2159,30 @@ $('mapReset').addEventListener('click', ()=>{ cancelAnimationFrame(_inertia); _v
 $('mapLabels').addEventListener('click', ()=>{ _showLabels=!_showLabels; $('mapLabels').classList.toggle('on',_showLabels); drawMap(); });
 $('mapClusters').addEventListener('click', ()=>{ _showClusters=!_showClusters; $('mapClusters').classList.toggle('on',_showClusters); drawMap(); });
 let _spinOn=false, _autoRaf=null;
+// Count basis: what the legend number means. Both are true; they answer different questions, so
+// the key line under the map spells out which one is showing rather than leaving it to a tooltip.
+function setCountBasis(b){
+  _mapCountBasis=b;
+  $('mapCntMembers').classList.toggle('on', b==='members');
+  $('mapCntDom').classList.toggle('on', b==='dominant');
+  const k=$('mapCountKey');
+  if(k) k.innerHTML = b==='members'
+    ? `Legend numbers = <b>molecules that carry the note</b> (the head fires on them, at its own calibrated threshold). A molecule can carry several.`
+    : `Legend numbers = <b>molecules the note colours</b> — where it wins the single dominant label. Rare notes often read 0 here while still carrying molecules.`;
+  mapLegendRender();
+}
+$('mapCntMembers').addEventListener('click', ()=>setCountBasis('members'));
+$('mapCntDom').addEventListener('click', ()=>setCountBasis('dominant'));
+
+// Safety as an OVERLAY, deliberately not a colour mode. Colouring by tox would assert that a
+// molecule IS its worst assay; ringing it says "this one also warrants review", which is the
+// true and useful statement — and it keeps the flavour colour you were reading.
+$('mapTox').addEventListener('click', ()=>{
+  _mapToxOverlay=!_mapToxOverlay;
+  $('mapTox').classList.toggle('on', _mapToxOverlay);
+  drawMap();
+});
+
 $('mapSpin').addEventListener('click', ()=>{ _spinOn=!_spinOn; $('mapSpin').classList.toggle('on',_spinOn);
   if(_spinOn){ if(_mapMode!=='3d') setMapMode('3d'); autoSpin(); } else cancelAnimationFrame(_autoRaf); });
 function autoSpin(){ cancelAnimationFrame(_autoRaf); const step=()=>{ if(!_spinOn) return; if(_mapMode==='3d' && !_drag){ _v3.ry+=0.0016; drawMap(); } _autoRaf=requestAnimationFrame(step); }; _autoRaf=requestAnimationFrame(step); }
@@ -2165,7 +2197,7 @@ function setMapLayout(l){
 function setMapColor(c){ _mapColorBy=c;
   $('mapCT').classList.toggle('on',c==='taste'); $('mapCA').classList.toggle('on',c==='aroma');
   $('mapCB').classList.toggle('on',c==='both'); $('mapCM').classList.toggle('on',c==='mouthfeel');
-  mapLegendRender(); drawMap();
+  loadMemberCounts().then(mapLegendRender); mapLegendRender(); drawMap();
 }
 let _mapHi = new Set();  // classes highlighted from the legend (empty = show all evenly)
 const _mapMembers = new Map();  // class -> Set(smiles) of TRUE members (head >= 0.5), from /api/map_members
@@ -2177,6 +2209,21 @@ function mapHit(p){
   for(const l of _mapHi){ const m=_mapMembers.get(l); if(m && m.has(p.smiles)) return true; }
   return false;
 }
+// How many molecules each head actually FIRES on, keyed by dimension ("aroma:pine"). Fetched once.
+const _memberCounts = {};
+async function loadMemberCounts(){
+  try{ const d = await getJSON('/api/map_counts'); Object.assign(_memberCounts, d.counts||{}); }
+  catch(e){ /* legend falls back to dominant counts */ }
+}
+// The count a person actually means by "how many raspberry molecules are there": every molecule
+// the head fires on. The dominant-label count answers a different question — which molecules this
+// head WINS the colour for — and showing that as "(0)" made trained heads look empty.
+function memberCount(l){
+  for(const k of ['aroma:'+l,'taste:'+l,'mouthfeel:'+l,l])
+    if(_memberCounts[k]!=null) return _memberCounts[k];
+  return null;
+}
+
 function mapLegendRender(){
   const counts={}; _mapPts.forEach(p=>counts[mapLabel(p)]=(counts[mapLabel(p)]||0)+1);
   // COMPLETE key: EVERY canonical class for the mode (all 6 taste heads / all 172 aroma heads /
@@ -2187,11 +2234,14 @@ function mapLegendRender(){
   const empty=canon.filter(l=>!counts[l]);
   const labs=present.concat(empty); if(counts.other) labs.push('other');
   $('mapLegend').innerHTML=labs.map(l=>{
-    const n=counts[l]||0, zero=n===0;
-    // A "(0)" head isn't empty — it just never WINS the winner-take-all colour. Clicking it
-    // fetches true membership (every molecule the head predicts >=0.5), so no head looks broken.
-    const t = zero ? `${l}: no molecule shows this as its dominant note — click to highlight every molecule the head predicts`
-                   : `${n} molecule${n===1?'':'s'} show ${l} as their dominant note — click to spotlight`;
+    const dom=counts[l]||0, mem=memberCount(l);
+    // Default to MEMBERSHIP because that is how the number is read, but let it be switched:
+    // dominance is what actually colours the dot, and sometimes that is the question.
+    const n = (_mapCountBasis==='dominant' || mem==null) ? dom : mem, zero = n===0;
+    const t = (mem!=null)
+      ? `${mem} molecule${mem===1?'':'s'} carry ${l}. ${dom} of them show it as their DOMINANT note (that is what colours the dot). Click to spotlight all ${mem}.`
+      : (zero ? `${l}: no molecule shows this as its dominant note — click to highlight every molecule the head predicts`
+              : `${dom} molecule${dom===1?'':'s'} show ${l} as their dominant note — click to spotlight`);
     return `<span class="leg${_mapHi.has(l)?' on':''}${zero?' leg-zero':''}" data-l="${l.replace(/"/g,'&quot;')}" title="${t.replace(/"/g,'&quot;')}"><i style="background:${legendColor(l)}"></i>${l} (${n})</span>`;
   }).join('');
   $('mapLegend').querySelectorAll('.leg').forEach(s=> s.addEventListener('click', async ()=>{
@@ -2226,7 +2276,36 @@ async function loadMap(){
     if(ov && _mapReady) ov.classList.add('done');  // fade the overlay out once the map is drawn
   }
 }
-function drawMap(){ _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D()); if(_showLabels) drawClusterLabels(); updateAxisKey(); }
+function drawMap(){
+  _mapMode==='3d'?draw3D():(_mapLayout==='properties'?drawProps():draw2D());
+  if(_mapToxOverlay) drawToxOverlay();     // on top of the dots, under the labels
+  if(_showLabels) drawClusterLabels();
+  updateAxisKey();
+}
+
+// Ring every molecule carrying a Tox21 caution flag. An OVERLAY, not a colour mode: colouring by
+// tox would say a molecule IS its worst assay, when the true statement is "this is a flavour
+// molecule that also warrants review". Ringing keeps the flavour colour you were already reading
+// and answers the question a formulator actually has — where are the risky ones in MY space?
+// Uses the same projection the dots were drawn with, so it lines up in 2D, 3D and property axes.
+function drawToxOverlay(){
+  if(!_mapProj || !_mapPts) return;
+  const ctx=$('flavorMap').getContext('2d');
+  ctx.save();
+  for(const p of _mapPts){
+    if(!p.tox) continue;
+    if(_mapHi.size && !mapHit(p)) continue;           // respect an active spotlight
+    const x=_mapProj.px(p), y=_mapProj.py(p);
+    if(!isFinite(x) || x<-9000) continue;
+    // more flags -> hotter and thicker, so severity reads without a second legend
+    const n=Math.min(p.tox,4);
+    ctx.beginPath(); ctx.arc(x, y, 4.5+n*0.9, 0, Math.PI*2);
+    ctx.strokeStyle=`rgba(224,145,60,${0.45+0.14*n})`;
+    ctx.lineWidth=1+n*0.35;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 let _showLabels=true, _showClusters=true;
 // Cluster density shading: paint a soft additive splat per point in its class color, UNDER the
 // dots, so where a class concentrates reads as a colored cloud. Subtle for all classes at once;

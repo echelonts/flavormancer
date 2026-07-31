@@ -1470,9 +1470,25 @@ def _load_flavor_map():
         mw = df["mw"].tolist() if "mw" in df.columns else [None] * len(smis)
         logp = df["logp"].tolist() if "logp" in df.columns else [None] * len(smis)
         tpsa = df["tpsa"].tolist() if "tpsa" in df.columns else [None] * len(smis)
+        # Tox21 flag count per molecule, read off master_enrichment's precomputed tox_* columns —
+        # no inference here. Carried so the map can OVERLAY hazard on top of flavour rather than
+        # colouring by it: a molecule is not "a liver-toxicity molecule", it is a flavour molecule
+        # that also warrants review, and colour-by-tox would assert the former.
+        ntox = [0] * len(smis)
+        with contextlib.suppress(Exception):
+            enr = pd.read_parquet(P.artifact("master_enrichment.parquet"))
+            tox_cols = [c for c in enr.columns if c.startswith("tox_") and c != "tox_flags"]
+            if tox_cols:
+                by_smi = {}
+                for smi, flags in zip(enr["smiles"], enr.get("tox_flags", [""] * len(enr))):
+                    if isinstance(smi, str):
+                        by_smi[smi] = len([f for f in str(flags or "").split(",") if f])
+                ntox = [by_smi.get(smis[i], 0) for i in range(len(smis))]
+
         pts = []
         for i in range(len(smis)):
             p = {"label": labs[i], "aroma": aromas[i], "mouth": mouth[i], "smiles": smis[i],
+                 "tox": ntox[i],
                  "name": _table_name(smis[i]) or "",
                  "mw": None if mw[i] != mw[i] else mw[i],      # NaN -> None
                  "logp": None if logp[i] != logp[i] else logp[i],
@@ -1950,7 +1966,7 @@ def _svg_cell(smi):
 
 @app.get("/api/map_members")
 @lru_cache(maxsize=512)
-def api_map_members(term: str = "", threshold: float = 0.5):
+def api_map_members(term: str = "", threshold: float | None = None):
     """Every molecule whose head `term` fires >= threshold — not just the ones where it happens to
     be the DOMINANT label.
 
@@ -1978,8 +1994,41 @@ def api_map_members(term: str = "", threshold: float = 0.5):
             break
     if col is None:
         return {"term": term, "smiles": [], "n": 0, "note": "no such head"}
-    hits = [smis[i] for i in range(len(smis)) if float(profiles[i][col]) >= threshold]
-    return {"term": term, "dim": dims[col], "threshold": threshold, "n": len(hits), "smiles": hits}
+    # Default to the head's OWN calibrated threshold, not a flat 0.5. A head that fires at 0.24
+    # would otherwise have most of its molecules hidden here while the modal happily calls them
+    # matches — the two surfaces disagreeing about the same head.
+    thr = threshold if threshold is not None else _member_threshold(dims[col])
+    hits = [smis[i] for i in range(len(smis)) if float(profiles[i][col]) >= thr]
+    return {"term": term, "dim": dims[col], "threshold": thr, "n": len(hits), "smiles": hits}
+
+
+def _member_threshold(dim):
+    """The calibrated firing threshold for a dimension-qualified head name ("aroma:pine")."""
+    kind, _, name = dim.partition(":")
+    meta = {"aroma": P._AROMA_META, "taste": P._TASTE_META,
+            "mouthfeel": P._MOUTHFEEL_META}.get(kind, {})
+    return P._head_threshold(meta, name)
+
+
+@app.get("/api/map_counts")
+@lru_cache(maxsize=4)
+def api_map_counts():
+    """How many molecules each head actually FIRES on, for every head at once.
+
+    The map legend used to show the count of molecules where a head wins the winner-take-all
+    colour, which is a different question and produced the confusing "(0)" on heads that are
+    trained on plenty of molecules. `raspberry` reads 0 there and fires on 19. This gives the
+    legend the number people are actually asking for; the dominant label stays a colouring device.
+    """
+    P._ensure_sub_index()
+    smis, profiles, dims = P._SUB_INDEX[1], P._SUB_INDEX[4], P._SUB_INDEX[5]
+    if profiles is None or not smis:
+        return {"counts": {}, "note": "profile index not built"}
+    out = {}
+    for j, d in enumerate(str(x) for x in dims):
+        thr = _member_threshold(d)
+        out[d] = int(sum(1 for i in range(len(smis)) if float(profiles[i][j]) >= thr))
+    return {"counts": out}
 
 
 @lru_cache(maxsize=8192)
