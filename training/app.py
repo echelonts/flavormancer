@@ -1470,9 +1470,25 @@ def _load_flavor_map():
         mw = df["mw"].tolist() if "mw" in df.columns else [None] * len(smis)
         logp = df["logp"].tolist() if "logp" in df.columns else [None] * len(smis)
         tpsa = df["tpsa"].tolist() if "tpsa" in df.columns else [None] * len(smis)
+        # Tox21 flag count per molecule, read off master_enrichment's precomputed tox_* columns —
+        # no inference here. Carried so the map can OVERLAY hazard on top of flavour rather than
+        # colouring by it: a molecule is not "a liver-toxicity molecule", it is a flavour molecule
+        # that also warrants review, and colour-by-tox would assert the former.
+        ntox = [0] * len(smis)
+        with contextlib.suppress(Exception):
+            enr = pd.read_parquet(P.artifact("master_enrichment.parquet"))
+            tox_cols = [c for c in enr.columns if c.startswith("tox_") and c != "tox_flags"]
+            if tox_cols:
+                by_smi = {}
+                for smi, flags in zip(enr["smiles"], enr.get("tox_flags", [""] * len(enr))):
+                    if isinstance(smi, str):
+                        by_smi[smi] = len([f for f in str(flags or "").split(",") if f])
+                ntox = [by_smi.get(smis[i], 0) for i in range(len(smis))]
+
         pts = []
         for i in range(len(smis)):
             p = {"label": labs[i], "aroma": aromas[i], "mouth": mouth[i], "smiles": smis[i],
+                 "tox": ntox[i],
                  "name": _table_name(smis[i]) or "",
                  "mw": None if mw[i] != mw[i] else mw[i],      # NaN -> None
                  "logp": None if logp[i] != logp[i] else logp[i],
